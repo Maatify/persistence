@@ -1,5 +1,8 @@
 # Security Policy
 
+[![Maatify Persistence](https://img.shields.io/badge/Maatify-PERSISTENCE-blue?style=for-the-badge)](https://github.com/Maatify/persistence)
+[![Maatify Ecosystem](https://img.shields.io/badge/Maatify-Ecosystem-9C27B0?style=for-the-badge)](https://github.com/Maatify)
+
 ## Supported Versions
 
 The actively supported release line is `1.x`.

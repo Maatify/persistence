@@ -1,4 +1,7 @@
-# Contributor Covenant Code of Conduct
+# Code of Conduct — maatify/persistence
+
+[![Maatify Persistence](https://img.shields.io/badge/Maatify-PERSISTENCE-blue?style=for-the-badge)](https://github.com/Maatify/persistence)
+[![Maatify Ecosystem](https://img.shields.io/badge/Maatify-Ecosystem-9C27B0?style=for-the-badge)](https://github.com/Maatify)
 
 ## Our Pledge
 
