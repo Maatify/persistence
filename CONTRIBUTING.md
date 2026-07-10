@@ -38,11 +38,11 @@ Before submitting a Pull Request, please ensure all local verification steps pas
 
 ```bash
 composer install
-composer analyse
-vendor/bin/php-cs-fixer fix --dry-run --diff
 composer validate --strict
+composer analyse
 composer test:unit
 composer test:regression
+vendor/bin/php-cs-fixer fix --dry-run --diff
 ```
 
 ### Integration Testing
@@ -52,9 +52,9 @@ Integration tests require a real MySQL database. SQLite is explicitly **not** su
 To run the integration suite, ensure you have a local MySQL server and set the following environment variables (adjust values to your local setup):
 
 ```bash
-export PERSISTENCE_TEST_MYSQL_DSN="mysql:host=127.0.0.1;port=3306;dbname=test_db"
-export PERSISTENCE_TEST_MYSQL_USER="test_user"
-export PERSISTENCE_TEST_MYSQL_PASSWORD="test_password"
+export PERSISTENCE_TEST_MYSQL_DSN="mysql:host=127.0.0.1;port=3306;dbname=your_test_database"
+export PERSISTENCE_TEST_MYSQL_USER="your_test_user"
+export PERSISTENCE_TEST_MYSQL_PASSWORD="your_test_password"
 ```
 
 Then run:
@@ -85,7 +85,7 @@ When contributing code, you must adhere to the following architectural rules:
 * **No Global Normalization**: Do not perform global normalization of gaps as a side effect of a scoped operation.
 * **Rollback Behavior**: Rollbacks must preserve the original error/exception.
 * **Exception Handling**: Do not catch every `\PDOException` or external `\Throwable` randomly to wrap it in a package exception. `PersistenceException` is strictly for package-defined exceptions.
-* **Composer Lock**: Never commit or create a `composer.lock` file in this repository.
+* **Composer Lock**: Do not commit or submit `composer.lock`. It is intentionally untracked for this reusable library. Remove any locally generated `composer.lock` file before final delivery.
 
 ## Pull Request Rules
 
@@ -93,6 +93,6 @@ When contributing code, you must adhere to the following architectural rules:
 * **No Unrelated Changes**: Keep PRs clean of unnecessary or unrelated modifications.
 * **Update Tests and Docs**: Any change in behavior must be accompanied by updated tests and documentation.
 * **BC Impact**: Clearly state any Backwards Compatibility (BC) impact in the PR description.
-* **Discussion First**: Public API and runtime behavior should not be changed without prior architectural discussion in an Issue.
+* **Discussion First**: Public API and runtime behavior must not be changed without prior architectural discussion and explicit approval.
 * **Security**: Do NOT open public issues or PRs for security vulnerabilities. Follow the instructions in `SECURITY.md`.
 * **Changelog**: Notable changes should be recorded in `CHANGELOG.md`.

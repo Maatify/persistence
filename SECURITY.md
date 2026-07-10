@@ -11,14 +11,14 @@ Please report vulnerabilities privately by emailing `support@maatify.com`.
 Do **not** publish exploitable details in a public issue or pull request.
 
 When reporting a vulnerability, please include where possible:
-* Affected version
+* Affected package version or commit SHA
 * Steps to reproduce
 * Impact
 * Suggested mitigation
 
 ## Security Scope
 
-The scope of this security policy is strictly limited to the boundaries of the `maatify/persistence` package. Valid security vulnerabilities include, but are not limited to:
+The scope of this security policy is strictly limited to the boundaries of the `maatify/persistence` package. Security reports may be relevant when they involve:
 
 * Unsafe SQL identifier validation or quoting within the package logic.
 * SQL injection vulnerabilities inside package-owned query construction.
@@ -48,7 +48,8 @@ The following areas are explicitly out of scope for this package's security poli
 
 Once a security vulnerability is reported via `support@maatify.com`, the Maatify team will:
 1. Acknowledge receipt of the vulnerability report.
-2. Review and investigate the report promptly.
-3. Keep the reporter updated on the status of the investigation and the timeline for a fix.
-4. Prepare a security patch for supported versions.
-5. Publish a security advisory alongside the release of the patch.
+2. Review and investigate the report to determine impact and scope.
+3. Keep the reporter updated on the status of the investigation.
+4. Prepare and test a security patch when deemed necessary.
+5. Issue a patched version when appropriate.
+6. A security advisory may be published if the issue affects a published version and public disclosure is warranted.

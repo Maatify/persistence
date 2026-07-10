@@ -14,7 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Global and scoped ordering.
 * SQL identifier validation and quoting.
 * Configurable id, order, scope, and deleted-at columns.
-* Soft-delete filtering for missing targets.
+* Optional soft-delete filtering across applicable ordering operations.
 * Next-position lookup capability.
 * Scoped row-existence lookup.
 * Transaction-owned movement operations.
@@ -30,11 +30,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Stable CI Gate.
 * Package reference documentation (`PERSISTENCE_PACKAGE_REFERENCE.md`).
 * Security policy (`SECURITY.md`).
+* Affected-range-only movement without globally normalizing pre-existing gaps.
 
 ### Changed
 * Refined exception architecture to distinguish between runtime validation (`InvalidOrderingOperationException`), configuration errors (`InvalidOrderingConfigurationException`), and operational constraints (`OrderingTransactionException`).
-* Enforced strict propagation for original throwables on rollback failures.
+* Rolls back owned transactions after operation failures and rethrows the original throwable.
 * Enforced real MySQL testing; SQLite substitution is explicitly disabled.
-
-### Fixed
-* Fixed gap normalization side effects by keeping operations restricted to the affected range only.

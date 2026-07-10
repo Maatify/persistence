@@ -54,7 +54,8 @@
   "authors": [
     {
       "name": "Maatify",
-      "email": "support@maatify.com"
+      "email": "support@maatify.com",
+      "homepage": "https://maatify.dev"
     }
   ],
   "support": {

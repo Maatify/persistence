@@ -38,7 +38,7 @@ This Code of Conduct applies within all community spaces for the `maatify/persis
 
 Instances of abusive, harassing, or otherwise unacceptable behavior may be reported to the community leaders responsible for enforcement at:
 
-**support@maatify.com**
+[support@maatify.com](mailto:support@maatify.com)
 
 All complaints will be reviewed and investigated promptly and fairly.
 
