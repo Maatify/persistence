@@ -24,7 +24,8 @@
   },
   "scripts": {
     "analyse": "phpstan analyse src tests --level=max",
-    "format": "php-cs-fixer fix"
+    "format": "php-cs-fixer fix",
+    "test": "phpunit"
   },
   "config": {
     "optimize-autoloader": true,
