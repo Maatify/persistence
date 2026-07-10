@@ -20,12 +20,16 @@
   },
   "require-dev": {
     "friendsofphp/php-cs-fixer": "^3.94",
-    "phpstan/phpstan": "^2.1"
+    "phpstan/phpstan": "^2.1",
+    "phpunit/phpunit": "^11.5"
   },
   "scripts": {
     "analyse": "phpstan analyse src tests --level=max",
     "format": "php-cs-fixer fix",
-    "test": "phpunit"
+    "test": "phpunit",
+    "test:unit": "phpunit --testsuite unit",
+    "test:regression": "phpunit --testsuite regression",
+    "test:integration": "phpunit --testsuite integration"
   },
   "config": {
     "optimize-autoloader": true,
