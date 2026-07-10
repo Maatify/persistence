@@ -1,11 +1,34 @@
+<div align="center">
+
 # Maatify Persistence
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
-[![PHP: >=8.2](https://img.shields.io/badge/PHP-%3E%3D8.2-777bb4.svg)](https://php.net)
+![Maatify.dev](https://www.maatify.dev/assets/img/img/maatify_logo_white.svg)
 
-`maatify/persistence` provides reusable, framework-agnostic PDO utilities for Maatify projects. Currently, it focuses on providing robust scoped and global ordering utilities for database tables using integer ordering columns (such as `display_order`).
+**Package status:**<br>
+[![Latest Version](https://img.shields.io/packagist/v/maatify/persistence.svg)](https://packagist.org/packages/maatify/persistence)
+[![PHP Version](https://img.shields.io/packagist/php-v/maatify/persistence.svg)](https://packagist.org/packages/maatify/persistence)
+[![License: MIT](https://img.shields.io/packagist/l/maatify/persistence.svg)](LICENSE)
+[![PHPStan: Level Max](https://img.shields.io/badge/PHPStan-level%20max-brightgreen.svg)](phpstan.neon)
 
-## Key Features
+**Documentation:**<br>
+[![Changelog](https://img.shields.io/badge/Changelog-View-blue.svg)](CHANGELOG.md)
+[![Package Reference](https://img.shields.io/badge/Reference-Read-blue.svg)](PERSISTENCE_PACKAGE_REFERENCE.md)
+[![Security Policy](https://img.shields.io/badge/Security-Policy-blue.svg)](SECURITY.md)
+[![Contributing Guide](https://img.shields.io/badge/Contributing-Guide-blue.svg)](CONTRIBUTING.md)
+
+**Ecosystem and usage:**<br>
+[![Monthly Downloads](https://img.shields.io/packagist/dm/maatify/persistence)](https://packagist.org/packages/maatify/persistence)
+[![Total Downloads](https://img.shields.io/packagist/dt/maatify/persistence)](https://packagist.org/packages/maatify/persistence)
+[![Maatify Ecosystem](https://img.shields.io/badge/Maatify-Ecosystem-blueviolet)](https://github.com/Maatify)
+[![Install](https://img.shields.io/badge/Install-composer%20require%20maatify%2Fpersistence-blue)](https://packagist.org/packages/maatify/persistence)
+
+*Standalone, framework-agnostic PDO utilities for Maatify projects, providing robust scoped and global ordering tools. Designed and verified for MySQL environments.*
+
+</div>
+
+---
+
+## 🚀 Key Features
 
 * **Global and Scoped Ordering**: Easily manage display order across an entire table or within a specific scope.
 * **Transaction Ownership**: Handles its own transactions and locks the necessary scope reliably.
@@ -13,7 +36,7 @@
 * **Soft-Delete Filtering**: Optional support for ignoring soft-deleted rows in ordering calculations.
 * **Scope Isolation**: Ensures only the affected range within the configured scope is updated.
 
-## Requirements
+## ⚙️ Requirements
 
 **Runtime requirements:**
 * PHP `>= 8.2`
@@ -23,13 +46,13 @@
 **Database behavior:**
 * The package behavior is designed and verified against MySQL.
 
-## Installation
+## 📦 Installation
 
 ```bash
 composer require maatify/persistence
 ```
 
-## Quick Usage
+## ⚡ Quick Usage
 
 ```php
 use Maatify\Persistence\Pdo\Ordering\ScopedOrderingConfig;
@@ -66,7 +89,7 @@ $success = $ordering->moveWithinScope(
 ### Note on `getNextPosition()` Concurrency
 `getNextPosition()` does not start a transaction and does not lock the scope. When using it for concurrent inserts, the host application must provide an appropriate transaction and locking mechanism at the repository/application level.
 
-## Public Runtime API
+## 🧩 Public Runtime API
 
 The package currently provides the following public classes for PDO ordering:
 
@@ -81,7 +104,7 @@ Maatify\Persistence\Exception\InvalidOrderingOperationException;
 Maatify\Persistence\Exception\OrderingTransactionException;
 ```
 
-## Critical Runtime Behavior
+## ⚠️ Critical Runtime Behavior
 
 **`moveWithinScope()`:**
 * Rejects inconsistent scope usage.
@@ -108,7 +131,7 @@ Maatify\Persistence\Exception\OrderingTransactionException;
 * Throws `InvalidOrderingOperationException` on invalid scope usage.
 * External PDO errors propagate unmodified.
 
-## Architecture Guarantees
+## 🏛️ Architecture Guarantees
 
 * Standalone Composer package.
 * Framework-agnostic.
@@ -123,15 +146,15 @@ Maatify\Persistence\Exception\OrderingTransactionException;
 * Trusted SQL identifiers.
 * Runtime values use prepared statements.
 
-## Exception and Error-Propagation
+## 🛡️ Exception and Error Propagation
 
 All package-defined exceptions implement the marker interface `Maatify\Persistence\Exception\PersistenceException`. However, this interface is not a catch-all. `PDOException` or other external `Throwable`s may propagate without wrapping and require a separate catch or an outer `Throwable` boundary if handling is needed.
 
-## Security & Trust Boundaries
+## 🔐 Security and Trust Boundaries
 
 The `ScopedOrderingConfig` validates and quotes all configured table and column identifiers. However, these identifiers **must** still be provided as trusted application configurations (e.g., constants), never as raw user input. All actual runtime values are safely passed using PDO prepared statements.
 
-## Documentation
+## 📚 Documentation
 
 For a comprehensive guide, please refer to the main technical reference:
 * [Persistence Package Reference](PERSISTENCE_PACKAGE_REFERENCE.md)
@@ -144,7 +167,7 @@ Other important documentation:
 * [Package Building Standard](docs/standards/PACKAGE_BUILDING_STANDARD.md)
 * [CI Workflow Standard](docs/standards/CI_WORKFLOW_STANDARD.md)
 
-## Quality Status
+## ✅ Quality Status
 
 * PHP 8.2–8.5 verification in CI.
 * PHPStan Level Max.
@@ -157,7 +180,7 @@ Other important documentation:
 * SQLite is not an Integration substitute.
 * MySQL `8.4.10` is the currently verified CI baseline.
 
-## Development and Testing
+## 🛠️ Development and Testing
 
 ```bash
 composer validate --strict
@@ -174,10 +197,16 @@ Set the following environment variables for Integration tests:
 * `PERSISTENCE_TEST_MYSQL_USER`
 * `PERSISTENCE_TEST_MYSQL_PASSWORD`
 
-## License
+## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## Maatify
+## 👤 Author
 
-Developed and maintained by [Maatify](https://github.com/Maatify).
+Engineered by **Mohamed Abdulalim** ([@megyptm](https://github.com/megyptm))
+Backend Lead & Technical Architect
+[https://www.maatify.dev](https://www.maatify.dev)
+
+---
+
+[Built with ❤️ by Maatify.dev — Unified Ecosystem for Modern PHP Libraries](https://www.maatify.dev)

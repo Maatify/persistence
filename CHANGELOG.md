@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.0.0]
+## [1.0.0] - 2026-07-11
 
 ### Added
 * Standalone PDO scoped-ordering package.
@@ -36,3 +36,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Refined exception architecture to distinguish between runtime validation (`InvalidOrderingOperationException`), configuration errors (`InvalidOrderingConfigurationException`), and operational constraints (`OrderingTransactionException`).
 * Rolls back owned transactions after operation failures and rethrows the original throwable.
 * Enforced real MySQL testing; SQLite substitution is explicitly disabled.
+
+[Unreleased]: https://github.com/Maatify/persistence/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/Maatify/persistence/releases/tag/v1.0.0

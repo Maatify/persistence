@@ -2,11 +2,18 @@
 
 ## Supported Versions
 
-No package version has been released yet. Supported release lines will be identified in this document after the first version is published.
+The actively supported release line is `1.x`.
+
+Security fixes are provided in the latest stable release within the supported `1.x` line. Users should upgrade to the latest available `1.x` version before reporting a vulnerability.
+
+| Version | Supported |
+|---------|-----------|
+| `1.x`   | Yes       |
+| `< 1.0` | No        |
 
 ## Reporting a Vulnerability
 
-Please report vulnerabilities privately by emailing `support@maatify.com`.
+Please report vulnerabilities privately by emailing [support@maatify.com](mailto:support@maatify.com).
 
 Do **not** publish exploitable details in a public issue or pull request.
 
