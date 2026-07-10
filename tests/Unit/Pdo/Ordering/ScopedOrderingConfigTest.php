@@ -85,13 +85,17 @@ final class ScopedOrderingConfigTest extends TestCase
         self::assertSame('`removed_at`', (new ScopedOrderingConfig('items', deletedAtColumn: 'removed_at'))->quotedDeletedAtColumn());
     }
 
+    /**
+     * @param non-empty-string $table
+     * @param non-empty-string $quoted
+     */
     #[DataProvider('validTableProvider')]
     public function testAcceptsValidTableIdentifiers(string $table, string $quoted): void
     {
         self::assertSame($quoted, (new ScopedOrderingConfig($table))->quotedTable());
     }
 
-    /** @return iterable<string, array{string, string}> */
+    /** @return iterable<string, array{non-empty-string, non-empty-string}> */
     public static function validTableProvider(): iterable
     {
         yield 'starts with letter' => ['items', '`items`'];
@@ -100,6 +104,7 @@ final class ScopedOrderingConfigTest extends TestCase
         yield 'valid schema.table' => ['tenant_1.items2', '`tenant_1`.`items2`'];
     }
 
+    /** @param non-empty-string $column */
     #[DataProvider('validColumnProvider')]
     public function testAcceptsValidColumnIdentifiers(string $column): void
     {
@@ -110,7 +115,7 @@ final class ScopedOrderingConfigTest extends TestCase
         self::assertSame('`' . $column . '`', $config->quotedDeletedAtColumn());
     }
 
-    /** @return iterable<string, array{string}> */
+    /** @return iterable<string, array{non-empty-string}> */
     public static function validColumnProvider(): iterable
     {
         yield 'starts with letter' => ['column'];
@@ -118,6 +123,7 @@ final class ScopedOrderingConfigTest extends TestCase
         yield 'contains digits after first character' => ['column2'];
     }
 
+    /** @param non-empty-string $table */
     #[DataProvider('invalidTableProvider')]
     public function testRejectsInvalidTableIdentifiers(string $table): void
     {
@@ -126,10 +132,9 @@ final class ScopedOrderingConfigTest extends TestCase
         new ScopedOrderingConfig($table);
     }
 
-    /** @return iterable<string, array{string}> */
+    /** @return iterable<string, array{non-empty-string}> */
     public static function invalidTableProvider(): iterable
     {
-        yield 'empty string' => [''];
         yield 'starts with digit' => ['1items'];
         yield 'whitespace' => ['item list'];
         yield 'hyphen' => ['item-list'];
@@ -141,6 +146,7 @@ final class ScopedOrderingConfigTest extends TestCase
         yield 'sql comment' => ['items--comment'];
     }
 
+    /** @param non-empty-string $column */
     #[DataProvider('invalidColumnProvider')]
     public function testRejectsInvalidCustomIdColumn(string $column): void
     {
@@ -149,6 +155,7 @@ final class ScopedOrderingConfigTest extends TestCase
         new ScopedOrderingConfig('items', idColumn: $column);
     }
 
+    /** @param non-empty-string $column */
     #[DataProvider('invalidColumnProvider')]
     public function testRejectsInvalidOrderColumn(string $column): void
     {
@@ -157,6 +164,7 @@ final class ScopedOrderingConfigTest extends TestCase
         new ScopedOrderingConfig('items', orderColumn: $column);
     }
 
+    /** @param non-empty-string $column */
     #[DataProvider('invalidColumnProvider')]
     public function testRejectsInvalidScopeColumn(string $column): void
     {
@@ -165,6 +173,7 @@ final class ScopedOrderingConfigTest extends TestCase
         new ScopedOrderingConfig('items', scopeColumn: $column);
     }
 
+    /** @param non-empty-string $column */
     #[DataProvider('invalidColumnProvider')]
     public function testRejectsInvalidDeletedAtColumn(string $column): void
     {
@@ -173,10 +182,9 @@ final class ScopedOrderingConfigTest extends TestCase
         new ScopedOrderingConfig('items', deletedAtColumn: $column);
     }
 
-    /** @return iterable<string, array{string}> */
+    /** @return iterable<string, array{non-empty-string}> */
     public static function invalidColumnProvider(): iterable
     {
-        yield 'empty string' => [''];
         yield 'starts with digit' => ['1column'];
         yield 'whitespace' => ['column name'];
         yield 'hyphen' => ['column-name'];

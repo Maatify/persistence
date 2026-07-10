@@ -10,6 +10,7 @@ use Maatify\Persistence\Exception\PersistenceException;
 use Maatify\Persistence\Pdo\Ordering\ScopedOrderingConfig;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use ReflectionClass;
 
 final class InvalidOrderingConfigurationExceptionTest extends TestCase
 {
@@ -27,25 +28,45 @@ final class InvalidOrderingConfigurationExceptionTest extends TestCase
         self::assertInstanceOf(SystemMaatifyException::class, $exception);
     }
 
+    /**
+     * @param 'table'|'scopeColumn'|'idColumn'|'orderColumn'|'deletedAtColumn' $argumentName
+     * @param non-empty-string $value
+     */
     #[DataProvider('invalidConfigurationProvider')]
     public function testInvalidConfigurationThrowsInvalidOrderingConfigurationException(string $argumentName, string $value): void
     {
         $this->expectException(InvalidOrderingConfigurationException::class);
 
-        if ($argumentName === 'table') {
-            new ScopedOrderingConfig($value);
-        } elseif ($argumentName === 'scopeColumn') {
-            new ScopedOrderingConfig('items', scopeColumn: $value);
-        } elseif ($argumentName === 'idColumn') {
-            new ScopedOrderingConfig('items', idColumn: $value);
-        } elseif ($argumentName === 'orderColumn') {
-            new ScopedOrderingConfig('items', orderColumn: $value);
-        } elseif ($argumentName === 'deletedAtColumn') {
-            new ScopedOrderingConfig('items', deletedAtColumn: $value);
-        }
+        match ($argumentName) {
+            'table' => new ScopedOrderingConfig($value),
+            'scopeColumn' => new ScopedOrderingConfig('items', scopeColumn: $value),
+            'idColumn' => new ScopedOrderingConfig('items', idColumn: $value),
+            'orderColumn' => new ScopedOrderingConfig('items', orderColumn: $value),
+            'deletedAtColumn' => new ScopedOrderingConfig('items', deletedAtColumn: $value),
+        };
     }
 
-    /** @return iterable<string, array{string, string}> */
+    /** @param list<mixed> $arguments */
+    #[DataProvider('emptyStringConfigurationProvider')]
+    public function testEmptyStringConfigurationThrowsInvalidOrderingConfigurationException(array $arguments): void
+    {
+        $this->expectException(InvalidOrderingConfigurationException::class);
+
+        $reflection = new ReflectionClass(ScopedOrderingConfig::class);
+        $reflection->newInstanceArgs($arguments);
+    }
+
+    /** @return iterable<string, array{list<mixed>}> */
+    public static function emptyStringConfigurationProvider(): iterable
+    {
+        yield 'empty table' => [['']];
+        yield 'empty scope column' => [['items', '']];
+        yield 'empty id column' => [['items', null, '']];
+        yield 'empty order column' => [['items', null, 'id', '']];
+        yield 'empty deleted-at column' => [['items', null, 'id', 'display_order', '']];
+    }
+
+    /** @return iterable<string, array{'table'|'scopeColumn'|'idColumn'|'orderColumn'|'deletedAtColumn', non-empty-string}> */
     public static function invalidConfigurationProvider(): iterable
     {
         yield 'invalid table' => ['table', 'items; DROP TABLE items'];
