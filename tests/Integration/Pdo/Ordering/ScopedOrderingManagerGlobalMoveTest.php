@@ -94,8 +94,9 @@ final class ScopedOrderingManagerGlobalMoveTest extends MySqlIntegrationTestCase
     {
         $ids = $this->insertGlobalOrders(1, 2, 3);
         $before = $this->reader->globalOrdersById();
+        $missingId = $ids[2] + 100;
 
-        $result = $this->manager->moveWithinScope($this->pdo(), $this->globalConfig(), null, max($ids) + 100, 2);
+        $result = $this->manager->moveWithinScope($this->pdo(), $this->globalConfig(), null, $missingId, 2);
 
         self::assertFalse($result);
         self::assertSame($before, $this->reader->globalOrdersById());
