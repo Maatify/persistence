@@ -47,7 +47,7 @@ Every package must contain these files at its root (the repository root is the p
 ├── CHANGELOG.md                       ← versioned history, starting at [1.0.0]
 ├── {PACKAGE_NAME}_PACKAGE_REFERENCE.md ← complete API reference and design rules (e.g. docs/EVENT_LOGGING_MODULE_REFERENCE.md)
 ├── composer.json                      ← library type, psr-4 autoload, explicit runtime/Composer dependencies only
-├── phpstan.neon                       ← level: max, paths: [src]
+├── phpstan.neon                       ← level: max, paths: [src, tests]
 ├── src/                               ← all PHP source code
 ├── tests/                             ← if applicable
 ├── schema/                            ← if the package owns SQL schema
@@ -662,6 +662,7 @@ parameters:
     level: max
     paths:
         - src
+        - tests
 ```
 
 ### Testing Strategy
