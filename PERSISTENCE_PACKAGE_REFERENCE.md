@@ -101,6 +101,56 @@ Distinguish these package exceptions from propagated `\PDOException` or other `\
 | `InvalidOrderingConfigurationException` | `SystemMaatifyException` | `ErrorCodeEnum::MAATIFY_ERROR` | default | Invalid/unsafe trusted SQL configuration identifiers. |
 | `InvalidOrderingOperationException` | `ValidationMaatifyException` | `ErrorCodeEnum::INVALID_ARGUMENT` | default | Invalid runtime id, new order, or scope usage. |
 | `OrderingTransactionException` | `UnsupportedMaatifyException` | `ErrorCodeEnum::UNSUPPORTED_OPERATION` | `defaultIsSafe(): false` | `moveWithinScope()` called with active PDO transaction. |
+### `Maatify\Persistence\Exception\PersistenceException`
+* **Status**: `interface`
+* **Extends**: `\Throwable`
+* **Description**: It is the package marker interface.
+* **Public Methods**: It has no package-declared methods.
+* **Rules**: It marks package-defined exceptions only. External PDO or infrastructure throwables are not required to implement it.
+
+### `Maatify\Persistence\Exception\InvalidOrderingConfigurationException`
+* **Status**: `final class`
+* **Extends**: `Maatify\Exceptions\Exception\System\SystemMaatifyException`
+* **Implements**: `Maatify\Persistence\Exception\PersistenceException`
+* **Package-Declared Protected Method**:
+  ```php
+  protected function defaultErrorCode(): ErrorCodeInterface
+  ```
+  * Returns: `ErrorCodeEnum::MAATIFY_ERROR`
+* **Public Methods**: No package-declared public methods beyond the inherited shared exception API.
+* **Triggering Conditions**: Invalid trusted SQL configuration identifiers.
+
+### `Maatify\Persistence\Exception\InvalidOrderingOperationException`
+* **Status**: `final class`
+* **Extends**: `Maatify\Exceptions\Exception\Validation\ValidationMaatifyException`
+* **Implements**: `Maatify\Persistence\Exception\PersistenceException`
+* **Package-Declared Protected Method**:
+  ```php
+  protected function defaultErrorCode(): ErrorCodeInterface
+  ```
+  * Returns: `ErrorCodeEnum::INVALID_ARGUMENT`
+* **Public Methods**: No package-declared public methods beyond the inherited shared exception API.
+* **Triggering Conditions**:
+  * Invalid movement id
+  * Invalid new ordering value
+  * Inconsistent scope usage
+
+### `Maatify\Persistence\Exception\OrderingTransactionException`
+* **Status**: `final class`
+* **Extends**: `Maatify\Exceptions\Exception\Unsupported\UnsupportedMaatifyException`
+* **Implements**: `Maatify\Persistence\Exception\PersistenceException`
+* **Package-Declared Protected Methods**:
+  ```php
+  protected function defaultErrorCode(): ErrorCodeInterface
+  ```
+  * Returns: `ErrorCodeEnum::UNSUPPORTED_OPERATION`
+
+  ```php
+  protected function defaultIsSafe(): bool
+  ```
+  * Returns: `false`
+* **Public Methods**: No package-declared public methods beyond the inherited shared exception API.
+* **Triggering Conditions**: Thrown when `moveWithinScope()` is called while PDO already has an active transaction.
 
 ## Integration Requirements
 

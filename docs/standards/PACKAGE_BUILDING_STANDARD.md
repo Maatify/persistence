@@ -129,7 +129,7 @@ src/
 interface {PackageName}ExceptionInterface extends \Throwable {}
 ```
 
-### Extending SystemMaatifyException
+### Example: Package-Defined Storage Exception
 
 ```php
 final class {Domain}DatabaseException extends \Maatify\Exceptions\Exception\System\SystemMaatifyException
@@ -139,7 +139,11 @@ final class {Domain}DatabaseException extends \Maatify\Exceptions\Exception\Syst
 }
 ```
 
-Named constructors SHOULD be used where stable semantic construction exists — never `new SomeException('...')` at call site.
+Named constructors SHOULD be used when a stable semantic constructor exists.
+
+Direct construction MAY be used when no suitable named constructor exists and the package's documented exception contract permits it.
+
+Call sites MUST NOT construct generic or semantically misleading exceptions merely to avoid defining an appropriate package-owned classification.
 
 ### Fail-Open / Fail-Closed Behavior
 
@@ -171,11 +175,21 @@ In any method that uses `beginTransaction()`:
             // ...
             $this->pdo->commit();
         } catch (\Throwable $e) {
-            $this->pdo->rollBack();
-            // Optional semantic conversion goes here
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+
+            // Optional documented semantic conversion may occur here.
+
             throw $e;
         }
 ```
+
+Only package-owned transactions are rolled back by this pattern.
+Rollback must be attempted only while the transaction is active.
+The original throwable is rethrown unless an explicitly documented semantic conversion is performed.
+Swallowing the throwable is forbidden.
+If a semantic conversion wraps the original throwable, the original should be retained as `previous` where supported.
 
 ## 8. Command Rules
 
