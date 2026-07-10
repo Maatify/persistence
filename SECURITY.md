@@ -1,10 +1,14 @@
 # Security Policy
 
+## Supported Versions
+
+No package version has been released yet. Supported release lines will be identified in this document after the first version is published.
+
 ## Reporting a Vulnerability
 
 Please report vulnerabilities privately by emailing `support@maatify.com`.
 
-Do not publish exploitable details in a public issue or pull request.
+Do **not** publish exploitable details in a public issue or pull request.
 
 When reporting a vulnerability, please include where possible:
 * Affected version
@@ -12,6 +16,39 @@ When reporting a vulnerability, please include where possible:
 * Impact
 * Suggested mitigation
 
-## Supported Versions
+## Security Scope
 
-No package version has been released yet. Supported release lines will be identified in this document after the first version is published.
+The scope of this security policy is strictly limited to the boundaries of the `maatify/persistence` package. Valid security vulnerabilities include, but are not limited to:
+
+* Unsafe SQL identifier validation or quoting within the package logic.
+* SQL injection vulnerabilities inside package-owned query construction.
+* Failures in scope isolation (e.g., unintended movement of rows across different scopes).
+* Modification of rows outside the intended scope or affected range.
+* Incorrect transaction ownership behavior.
+* Failure to rollback an owned transaction during an exception or error.
+* Incorrect handling of soft-delete filtering.
+* Unsafe handling of external throwables during operations.
+* Unexpected disclosure of sensitive information through package exception behavior.
+* Vulnerabilities in runtime dependencies that directly affect the package.
+
+## Out of Scope
+
+The following areas are explicitly out of scope for this package's security policy:
+
+* Host application authentication and authorization mechanisms.
+* Host application routing, middleware, controllers, or user interfaces.
+* Host database credentials and connection security.
+* PDO configuration and instantiation owned by the consuming application.
+* Server, firewall, deployment, or infrastructure configuration.
+* MySQL user privileges or configuration managed by the host environment.
+* Misuse of the package that contradicts the documented contracts and intended usage.
+* External schema modifications or data corruption not caused by the package itself.
+
+## Disclosure Policy
+
+Once a security vulnerability is reported via `support@maatify.com`, the Maatify team will:
+1. Acknowledge receipt of the vulnerability report.
+2. Review and investigate the report promptly.
+3. Keep the reporter updated on the status of the investigation and the timeline for a fix.
+4. Prepare a security patch for supported versions.
+5. Publish a security advisory alongside the release of the patch.

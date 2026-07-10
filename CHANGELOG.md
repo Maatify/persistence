@@ -2,54 +2,39 @@
 
 All notable changes to `maatify/persistence` will be documented in this file.
 
-The format is intentionally simple and follows release-style sections:
-`Added`, `Changed`, `Fixed`, `Deprecated`, `Removed`, and `Security`.
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
 ## [1.0.0]
 
 ### Added
+* Standalone PDO scoped-ordering package.
+* Global and scoped ordering.
+* SQL identifier validation and quoting.
+* Configurable id, order, scope, and deleted-at columns.
+* Soft-delete filtering for missing targets.
+* Next-position lookup capability.
+* Scoped row-existence lookup.
+* Transaction-owned movement operations.
+* Scope locking capability (`SELECT ... FOR UPDATE`).
+* Position clamping logic.
+* Package exception marker (`PersistenceException`).
+* Integration with `maatify/exceptions`.
+* Unit, Regression, and MySQL Integration test suites.
+* Rollback failure-injection coverage.
+* PHP compatibility CI.
+* Lowest-supported dependency CI.
+* MySQL repeatability/residue verification.
+* Stable CI Gate.
+* Package reference documentation (`PERSISTENCE_PACKAGE_REFERENCE.md`).
+* Security policy (`SECURITY.md`).
 
-* standalone PDO scoped-ordering package
-* global and scoped ordering
-* SQL identifier validation and quoting
-* configurable id/order/scope/deleted-at columns
-* soft-delete filtering
-* next-position lookup
-* scoped row-existence lookup
-* transaction-owned movement
-* scope locking
-* clamping
-* package exception marker
-* integration with `maatify/exceptions`
-* Unit, Regression, and MySQL Integration test suites
-* rollback failure-injection coverage
-* PHP compatibility CI
-* lowest-supported dependency CI
-* MySQL repeatability/residue verification
-* stable `CI Gate`
-* package reference and security policy
+### Changed
+* Refined exception architecture to distinguish between runtime validation (`InvalidOrderingOperationException`), configuration errors (`InvalidOrderingConfigurationException`), and operational constraints (`OrderingTransactionException`).
+* Enforced strict propagation for original throwables on rollback failures.
+* Enforced real MySQL testing; SQLite substitution is explicitly disabled.
 
-### Exception architecture
-
-* `PersistenceException` (package marker interface extending `\Throwable`)
-* `InvalidOrderingConfigurationException` (extends `SystemMaatifyException`, ErrorCode: `ErrorCodeEnum::MAATIFY_ERROR`)
-* `InvalidOrderingOperationException` (extends `ValidationMaatifyException`, ErrorCode: `ErrorCodeEnum::INVALID_ARGUMENT`)
-* `OrderingTransactionException` (extends `UnsupportedMaatifyException`, ErrorCode: `ErrorCodeEnum::UNSUPPORTED_OPERATION`, `OrderingTransactionException::defaultIsSafe() returns false`)
-
-### Reliability
-
-* rollback and original throwable propagation
-* real MySQL testing
-* repeated Integration runs
-* trigger/table residue verification
-* no SQLite substitution
-
-### Documentation
-
-* Rebuilt the README
-* Added the canonical package reference (`PERSISTENCE_PACKAGE_REFERENCE.md`)
-* Added `SECURITY.md`
-* Rebuilt changelog
-* Clarified the general exception-standard
+### Fixed
+* Fixed gap normalization side effects by keeping operations restricted to the affected range only.
