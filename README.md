@@ -141,6 +141,8 @@ Other important documentation:
 * [Security Policy](SECURITY.md)
 * [Contributing Guide](CONTRIBUTING.md)
 * [Code of Conduct](CODE_OF_CONDUCT.md)
+* [Package Building Standard](docs/standards/PACKAGE_BUILDING_STANDARD.md)
+* [CI Workflow Standard](docs/standards/CI_WORKFLOW_STANDARD.md)
 
 ## Quality Status
 
@@ -155,6 +157,27 @@ Other important documentation:
 * SQLite is not an Integration substitute.
 * MySQL `8.4.10` is the currently verified CI baseline.
 
+## Development and Testing
+
+```bash
+composer validate --strict
+composer analyse
+composer test:unit
+composer test:regression
+vendor/bin/php-cs-fixer fix --dry-run --diff
+```
+
+`composer test:integration` and `composer test` require a real MySQL database. SQLite is explicitly **not** an integration substitute.
+
+Set the following environment variables for Integration tests:
+* `PERSISTENCE_TEST_MYSQL_DSN`
+* `PERSISTENCE_TEST_MYSQL_USER`
+* `PERSISTENCE_TEST_MYSQL_PASSWORD`
+
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Maatify
+
+Developed and maintained by [Maatify](https://github.com/Maatify).
