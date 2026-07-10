@@ -305,8 +305,10 @@ Any standalone Composer package in the Maatify ecosystem MUST verify the followi
 * [ ] example PHP files pass syntax validation where examples exist
 * [ ] minimum supported PHP is tested
 * [ ] latest supported PHP is tested
+* [ ] every currently released PHP minor covered by the declared constraint is tested or has an explicit documented architectural exception
 * [ ] workflow files pass linting when workflows exist
-* [ ] Every externally sourced GitHub Action is pinned to an immutable full commit SHA where applicable
+* [ ] every externally sourced GitHub Action and external reusable workflow is pinned to an immutable full commit SHA
+* [ ] downloaded CI tools and validators use a documented integrity-verifiable installation policy where downloaded tools exist
 * [ ] permissions follow least privilege
 * [ ] no baseline secrets or Host dependencies exist
 * [ ] required gates always report
