@@ -5,14 +5,14 @@ declare(strict_types=1);
 namespace Maatify\Persistence\Exception;
 
 /**
- * Marker interface for all exceptions thrown by maatify/persistence.
+ * Marker interface for all package-defined exceptions in maatify/persistence.
  *
- * This allows consumers to catch all package-level exceptions using:
+ * This allows consumers to catch package-defined exceptions using:
  *
  *     catch (PersistenceException $e) { ... }
  *
- * Package exceptions implement this interface while using the shared
- * maatify/exceptions hierarchy for their concrete exception base classes.
+ * PDO or other external throwables may be passed through unchanged and are not
+ * required to implement this contract.
  */
 interface PersistenceException extends \Throwable
 {
