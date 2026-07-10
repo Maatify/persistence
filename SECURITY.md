@@ -14,4 +14,4 @@ When reporting a vulnerability, please include where possible:
 
 ## Supported Versions
 
-Currently, there are no released versions. Support will be provided for tagged releases once published.
+No package version has been released yet. Supported release lines will be identified in this document after the first version is published.

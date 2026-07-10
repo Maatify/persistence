@@ -108,6 +108,8 @@ src/
 
 ## 7. Exception Rules
 
+### Standard Exception Types
+
 1. Every package-defined exception MUST use the appropriate `maatify/exceptions` hierarchy.
 2. Every package MUST expose a package marker interface extending `\Throwable`.
 3. Stable, package-owned failure classifications SHOULD use named package exceptions.
@@ -119,8 +121,61 @@ src/
 9. When wrapping, preserve the original throwable as `previous` where supported.
 10. Transaction catch blocks must rollback owned transactions and rethrow the original throwable unless an explicitly documented semantic conversion is performed.
 11. Rethrowing the original throwable after rollback is valid and is not a violation of named-exception rules.
-12. Do not force every persistence package to convert every PDO failure into `SystemMaatifyException`.
-13. Do not specialize the general standard around `maatify/persistence`.
+12. Packages MUST NOT be universally required to convert every external infrastructure failure into a package-defined exception. The chosen wrapping or propagation contract must follow the package-owned semantic boundary and be documented.
+
+### Interface
+
+```php
+interface {PackageName}ExceptionInterface extends \Throwable {}
+```
+
+### Extending SystemMaatifyException
+
+```php
+final class {Domain}DatabaseException extends \Maatify\Exceptions\Exception\System\SystemMaatifyException
+    implements {PackageName}ExceptionInterface
+{
+    // Implementation uses Maatify codes
+}
+```
+
+Named constructors SHOULD be used where stable semantic construction exists — never `new SomeException('...')` at call site.
+
+### Fail-Open / Fail-Closed Behavior
+
+Behavior must stay domain-specific:
+- **Authoritative Domains** (e.g. `AuthoritativeAudit`) are fail-closed where required by the domain.
+- **Non-Authoritative Domains** may fail-open only at an explicitly documented boundary.
+- **Repositories and Read Queries** must never silently swallow storage failures.
+
+### What the package catches and converts
+
+```php
+// SQLSTATE 23xxx = integrity constraint violation (duplicate key)
+} catch (\PDOException $e) {
+    if (str_starts_with((string) $e->getCode(), '23')) {
+        throw {Domain}CodeAlreadyExistsException::withCode($command->code);
+    }
+    throw $e; // anything else → propagate as-is
+}
+```
+
+### Transaction Pattern
+
+In any method that uses `beginTransaction()`:
+
+```php
+        $this->pdo->beginTransaction();
+
+        try {
+            // ...
+            $this->pdo->commit();
+        } catch (\Throwable $e) {
+            $this->pdo->rollBack();
+            // Optional semantic conversion goes here
+            throw $e;
+        }
+```
 
 ## 8. Command Rules
 
@@ -308,7 +363,7 @@ $stmt->bindValue(':offset', $offset,  PDO::PARAM_INT);
 $stmt->execute();
 ```
 
-Note: The exception thrown in the total count guard above must follow the package exception policy. Creating a raw `\RuntimeException` here is forbidden if a named package exception or original propagated exception is appropriate.
+Note: The exception thrown in the total count guard above must follow the package exception policy. A raw `\RuntimeException` must not be introduced where a package-defined classification or intentional original throwable propagation is the correct contract.
 
 ### The WHERE Builder Pattern
 

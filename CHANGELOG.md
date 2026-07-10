@@ -34,9 +34,9 @@ The format is intentionally simple and follows release-style sections:
 ### Exception architecture
 
 * `PersistenceException` (package marker interface extending `\Throwable`)
-* `InvalidOrderingConfigurationException` (extends `SystemMaatifyException`, ErrorCode: `MAATIFY_ERROR`)
-* `InvalidOrderingOperationException` (extends `ValidationMaatifyException`, ErrorCode: `INVALID_ARGUMENT`)
-* `OrderingTransactionException` (extends `UnsupportedMaatifyException`, ErrorCode: `UNSUPPORTED_OPERATION`)
+* `InvalidOrderingConfigurationException` (extends `SystemMaatifyException`, ErrorCode: `ErrorCodeEnum::MAATIFY_ERROR`)
+* `InvalidOrderingOperationException` (extends `ValidationMaatifyException`, ErrorCode: `ErrorCodeEnum::INVALID_ARGUMENT`)
+* `OrderingTransactionException` (extends `UnsupportedMaatifyException`, ErrorCode: `ErrorCodeEnum::UNSUPPORTED_OPERATION`, `OrderingTransactionException::defaultIsSafe() returns false`)
 
 ### Reliability
 

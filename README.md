@@ -383,7 +383,7 @@ The exact MySQL Integration environment contract requires these environment vari
 The test user must have package-local table and trigger privileges.
 Trigger-based rollback tests may require the temporary/local MySQL server to permit trusted trigger creators when binary logging is enabled.
 
-CI uses MySQL 8.4.10 as the verified Integration baseline. Other versions are not explicitly excluded unless declared in the package.
+CI currently verifies Integration behavior against MySQL 8.4.10. This is the verified test baseline, not a declaration that every other MySQL version is supported or unsupported.
 
 ### CI Architecture
 

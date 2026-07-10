@@ -19,11 +19,11 @@
 * **Constructor**:
   ```php
   public function __construct(
-      string $table,
-      ?string $scopeColumn = null,
-      string $idColumn = 'id',
-      string $orderColumn = 'display_order',
-      ?string $deletedAtColumn = 'deleted_at'
+      public string $table,
+      public ?string $scopeColumn = null,
+      public string $idColumn = 'id',
+      public string $orderColumn = 'display_order',
+      public ?string $deletedAtColumn = 'deleted_at'
   )
   ```
 * **Public Properties**:
@@ -33,37 +33,56 @@
   * `string $orderColumn`
   * `?string $deletedAtColumn`
 * **Public Methods**:
-  * `public function getQuotedTable(): string`
-  * `public function getQuotedScopeColumn(): string`
-  * `public function getQuotedIdColumn(): string`
-  * `public function getQuotedOrderColumn(): string`
-  * `public function getQuotedDeletedAtColumn(): string`
-  * `public function isGlobal(): bool`
-  * `public function hasSoftDelete(): bool`
+  * `public function quotedTable(): string`
+  * `public function quotedScopeColumn(): ?string`
+  * `public function quotedIdColumn(): string`
+  * `public function quotedOrderColumn(): string`
+  * `public function quotedDeletedAtColumn(): ?string`
 * **Exceptions**: Throws `InvalidOrderingConfigurationException` on invalid identifiers.
 * **Design rules**:
+  * `scopeColumn === null` represents global ordering.
+  * `scopeColumn !== null` represents scoped ordering.
+  * `deletedAtColumn === null` disables soft-delete filtering.
+  * Nullable quoted methods return `null` when their configured column is disabled.
   * `table`: Supports `table` or `schema.table` formats.
   * Identifiers must be application-trusted constants.
 
 ### `Maatify\Persistence\Pdo\Ordering\ScopedOrderingManager`
-* **Status**: `final class`
-* **Constructor**:
-  ```php
-  public function __construct()
-  ```
+* **Status**: `final readonly class`
+* **Constructor**: Stateless class with no explicitly declared constructor.
 * **Public Methods**:
-  * `public function getNextPosition(\PDO $pdo, ScopedOrderingConfig $config, int|string|null $scopeValue): int`
-    * Returns the next available position. Does not lock. Does not create transaction. No-op if table is empty.
+  * `public function getNextPosition(\PDO $pdo, ScopedOrderingConfig $config, int|string|null $scopeValue = null): int`
+    * Returns `MAX(order) + 1` (calculated via `COALESCE(MAX(...), 0) + 1`).
+    * Returns `1` for an empty applicable scope.
+    * Ignores soft-deleted rows when soft-delete filtering is configured.
+    * Does not begin a transaction.
+    * Does not lock.
+    * May throw `InvalidOrderingOperationException` for inconsistent scope usage.
+    * External PDO/database throwables may propagate unchanged.
     * Concurrency note: Use caller-owned lock for concurrent inserts.
-  * `public function rowExistsInScope(\PDO $pdo, ScopedOrderingConfig $config, int|string|null $scopeValue, int|string $id): bool`
-    * Returns boolean. Checks existence. Respects soft deletes.
-  * `public function moveWithinScope(\PDO $pdo, ScopedOrderingConfig $config, int|string|null $scopeValue, int|string $id, int $newOrder): bool`
-    * Locks rows (`SELECT ... FOR UPDATE`). Modifies data in self-owned transaction.
-    * Throws `OrderingTransactionException` if PDO already has active transaction.
-    * Throws `InvalidOrderingOperationException` if `newOrder < 1`.
-    * Returns `true` if move succeeded or no-op. Returns `false` if target missing or update failed.
-    * Rollback behavior: Rolls back and propagates original PDOException.
-* **External Throwable Behavior**: Original `\Throwable` from `PDO` will be rethrown after rollback.
+  * `public function rowExistsInScope(\PDO $pdo, ScopedOrderingConfig $config, int|string|null $scopeValue, int $id): bool`
+    * Returns `false` for `id <= 0`.
+    * Returns `false` when the row is absent from the requested scope.
+    * Treats soft-deleted rows as absent when soft-delete filtering is configured.
+    * May throw `InvalidOrderingOperationException` for inconsistent scope usage.
+    * May propagate external PDO/database throwables unchanged.
+  * `public function moveWithinScope(\PDO $pdo, ScopedOrderingConfig $config, int|string|null $scopeValue, int $id, int $newOrder): bool`
+    * Rejects inconsistent scope usage (`InvalidOrderingOperationException`).
+    * Throws `InvalidOrderingOperationException` for `id <= 0`.
+    * Throws `InvalidOrderingOperationException` for `newOrder <= 0`.
+    * Throws `OrderingTransactionException` when PDO already has an active transaction.
+    * Owns its transaction.
+    * Locks the applicable active scope.
+    * Reads the target order inside the transaction.
+    * Returns `false` if the target is missing.
+    * Clamps above-maximum order to the applicable maximum.
+    * Returns `true` for an already satisfied/clamped no-op.
+    * Shifts only the affected range.
+    * Does not globally normalize pre-existing gaps.
+    * Returns `false` and rolls back if the final target update reports no affected row.
+    * Rolls back an owned transaction when a throwable occurs after transaction startup.
+    * Rethrows the same original throwable.
+    * Does not universally wrap PDO failures as package exceptions.
 
 ## SQL and Trust Boundaries
 
