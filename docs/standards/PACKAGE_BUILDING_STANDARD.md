@@ -108,84 +108,19 @@ src/
 
 ## 7. Exception Rules
 
-### Standard Exception Types
-
-Package exceptions must use the Maatify exception hierarchy where applicable.
-
-Storage/infrastructure exceptions in this package must be domain-specific and extend:
-`Maatify\Exceptions\Exception\System\SystemMaatifyException`
-
-They must use the appropriate Maatify error code enum, e.g.:
-`ErrorCodeEnum::DATABASE_CONNECTION_FAILED`
-
-*Note: `\RuntimeException` is explicitly **forbidden** as the base for storage exceptions.*
-
-### Interface
-
-```php
-interface {PackageName}ExceptionInterface extends \Throwable {}
-```
-
-### Extending SystemMaatifyException
-
-```php
-final class {Domain}DatabaseException extends \Maatify\Exceptions\Exception\System\SystemMaatifyException
-    implements {PackageName}ExceptionInterface
-{
-    // Implementation uses Maatify codes
-}
-```
-
-Named constructors should remain recommended/required where applicable — never `new SomeException('...')` at call site.
-
-### Fail-Open / Fail-Closed Behavior
-
-Behavior must stay domain-specific:
-- **Authoritative Domains** (e.g. `AuthoritativeAudit`) are fail-closed.
-- **Non-Authoritative Domains** are fail-open only at the recorder boundary.
-- **Repositories and Read Queries** must never swallow storage failures.
-
-### What the package catches and converts
-
-```php
-// SQLSTATE 23xxx = integrity constraint violation (duplicate key)
-} catch (\PDOException $e) {
-    if (str_starts_with((string) $e->getCode(), '23')) {
-        throw {Domain}CodeAlreadyExistsException::withCode($command->code);
-    }
-    throw $e; // anything else → propagate as-is
-}
-```
-
-### What the package does NOT catch
-
-- PDO infrastructure errors (connection failure, syntax error) should generally be wrapped in `SystemMaatifyException`.
-- Any `\Throwable` outside the package's business domain → propagate as-is.
-- Never wrap unknown errors in a named package exception if it obfuscates root causes for host.
-
-### Transaction Pattern
-
-In any method that uses `beginTransaction()`:
-
-```php
-$this->pdo->beginTransaction();
-
-try {
-    // ... operations
-    $this->pdo->commit();
-    return true;
-} catch (\Throwable $e) {
-    if ($this->pdo->inTransaction()) {
-        $this->pdo->rollBack();
-    }
-    throw $e; // always rethrow — never swallow
-}
-```
-
-The `throw $e` inside the catch block is **not** a violation of the "use named exceptions" rule.
-It is rethrowing the original error after rollback — not creating a new exception.
-
----
+1. Every package-defined exception MUST use the appropriate `maatify/exceptions` hierarchy.
+2. Every package MUST expose a package marker interface extending `\Throwable`.
+3. Stable, package-owned failure classifications SHOULD use named package exceptions.
+4. A known domain or storage condition MAY be converted to a named package exception when the package owns a stable semantic classification.
+5. Unknown or external `PDOException` / `Throwable` instances MAY propagate unchanged when preserving the original diagnostic contract is intentional.
+6. A package MUST document whether it wraps or propagates infrastructure errors.
+7. Blind catch-all wrapping is forbidden.
+8. Swallowing errors is forbidden.
+9. When wrapping, preserve the original throwable as `previous` where supported.
+10. Transaction catch blocks must rollback owned transactions and rethrow the original throwable unless an explicitly documented semantic conversion is performed.
+11. Rethrowing the original throwable after rollback is valid and is not a violation of named-exception rules.
+12. Do not force every persistence package to convert every PDO failure into `SystemMaatifyException`.
+13. Do not specialize the general standard around `maatify/persistence`.
 
 ## 8. Command Rules
 
@@ -373,7 +308,7 @@ $stmt->bindValue(':offset', $offset,  PDO::PARAM_INT);
 $stmt->execute();
 ```
 
-Note: The exception thrown in the total count guard above must be a domain-specific storage exception (extending `SystemMaatifyException`), in line with the package exception policy. Creating a raw `\RuntimeException` here is forbidden.
+Note: The exception thrown in the total count guard above must follow the package exception policy. Creating a raw `\RuntimeException` here is forbidden if a named package exception or original propagated exception is appropriate.
 
 ### The WHERE Builder Pattern
 

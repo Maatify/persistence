@@ -7,38 +7,49 @@ The format is intentionally simple and follows release-style sections:
 
 ## [Unreleased]
 
+## [1.0.0]
+
 ### Added
 
-- Added PDO scoped ordering utilities:
-  - `Maatify\Persistence\Pdo\Ordering\ScopedOrderingConfig`
-  - `Maatify\Persistence\Pdo\Ordering\ScopedOrderingManager`
-- Added support for global ordering across a full table.
-- Added support for scoped ordering by a configurable scope column, such as `method_id`, `product_id`, or `category_id`.
-- Added configurable SQL identifiers:
-  - table name
-  - scope column
-  - primary key column
-  - ordering column
-  - optional soft-delete column
-- Added SQL identifier validation for table and column names.
-- Added safe SQL identifier quoting for supported identifier formats.
-- Added optional soft-delete filtering via `deleted_at IS NULL`.
-- Added `getNextPosition()` to calculate the next available ordering position.
-- Added `moveWithinScope()` to reorder rows safely within a global or scoped ordering sequence.
-- Added scope-level locking using `SELECT ... FOR UPDATE` during reorder operations.
-- Added target-row order lookup inside the transaction instead of trusting caller-provided current order.
-- Added clamping for `newOrder` to prevent large ordering gaps.
-- Added `rowExistsInScope()` helper.
-- Added package-level custom exceptions:
-  - `Maatify\Persistence\Exception\PersistenceException`
-  - `Maatify\Persistence\Exception\InvalidOrderingConfigurationException`
-  - `Maatify\Persistence\Exception\InvalidOrderingOperationException`
-  - `Maatify\Persistence\Exception\OrderingTransactionException`
-- Added README documentation for installation, usage, design notes, and exception handling.
+* standalone PDO scoped-ordering package
+* global and scoped ordering
+* SQL identifier validation and quoting
+* configurable id/order/scope/deleted-at columns
+* soft-delete filtering
+* next-position lookup
+* scoped row-existence lookup
+* transaction-owned movement
+* scope locking
+* clamping
+* package exception marker
+* integration with `maatify/exceptions`
+* Unit, Regression, and MySQL Integration test suites
+* rollback failure-injection coverage
+* PHP compatibility CI
+* lowest-supported dependency CI
+* MySQL repeatability/residue verification
+* stable `CI Gate`
+* package reference and security policy
 
-### Design Notes
+### Exception architecture
 
-- `ScopedOrderingManager` is intentionally implemented as a stateless service class, not as a static helper.
-- `PDO` is passed per method call so the manager can be reused across repositories and connections.
-- `moveWithinScope()` owns its transaction and must be called outside active PDO transactions.
-- `getNextPosition()` does not start a transaction or lock the scope by itself; callers should use repository/application-level locking for concurrent inserts when needed.
+* `PersistenceException` (package marker interface extending `\Throwable`)
+* `InvalidOrderingConfigurationException` (extends `SystemMaatifyException`, ErrorCode: `MAATIFY_ERROR`)
+* `InvalidOrderingOperationException` (extends `ValidationMaatifyException`, ErrorCode: `INVALID_ARGUMENT`)
+* `OrderingTransactionException` (extends `UnsupportedMaatifyException`, ErrorCode: `UNSUPPORTED_OPERATION`)
+
+### Reliability
+
+* rollback and original throwable propagation
+* real MySQL testing
+* repeated Integration runs
+* trigger/table residue verification
+* no SQLite substitution
+
+### Documentation
+
+* Rebuilt the README
+* Added the canonical package reference (`PERSISTENCE_PACKAGE_REFERENCE.md`)
+* Added `SECURITY.md`
+* Rebuilt changelog
+* Clarified the general exception-standard

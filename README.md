@@ -7,6 +7,7 @@
 ![PHPStan](https://img.shields.io/badge/PHPStan-Level%20Max-4E8CAE)
 
 [![Changelog](https://img.shields.io/badge/Changelog-View-blue)](CHANGELOG.md)
+[![Package Reference](https://img.shields.io/badge/Package_Reference-View-green)](PERSISTENCE_PACKAGE_REFERENCE.md)
 [![Security](https://img.shields.io/badge/Security-Policy-important)](SECURITY.md)
 
 ![Monthly Downloads](https://img.shields.io/packagist/dm/maatify/persistence?label=Monthly%20Downloads&color=00A8E8)
@@ -24,12 +25,15 @@ This package contains infrastructure-level helpers that are shared across reposi
 
 ```bash
 composer require maatify/persistence
-````
+```
 
 ## Requirements
 
 * PHP `>= 8.2`
-* PDO extension
+* ext-pdo
+* maatify/exceptions `^1.0`
+
+Composer installs `maatify/exceptions` automatically as a declared Runtime dependency.
 
 ## Namespace
 
@@ -46,18 +50,35 @@ The package currently provides a scoped ordering manager for tables that use int
 ```php
 Maatify\Persistence\Pdo\Ordering\ScopedOrderingConfig;
 Maatify\Persistence\Pdo\Ordering\ScopedOrderingManager;
+
+Maatify\Persistence\Exception\PersistenceException;
+Maatify\Persistence\Exception\InvalidOrderingConfigurationException;
+Maatify\Persistence\Exception\InvalidOrderingOperationException;
+Maatify\Persistence\Exception\OrderingTransactionException;
 ```
 
 It supports:
 
-* Global ordering across a whole table.
-* Scoped ordering, for example ordering records per `method_id`, `product_id`, `category_id`, etc.
-* Optional soft-delete filtering via `deleted_at IS NULL`.
-* Safe SQL identifier validation for table and column names.
-* Self-owned transactions for reorder operations.
-* Scope locking with `SELECT ... FOR UPDATE` during reorder operations.
-* Custom package exceptions.
+* global ordering
+* scoped ordering
+* SQL identifier validation and quoting
+* optional soft-delete filtering
+* `getNextPosition()` behavior
+* `rowExistsInScope()` behavior
+* `moveWithinScope()` behavior
+* scope locking
+* target-row lookup inside the transaction
+* clamping
+* gaps are not globally normalized
+* scope isolation
+* transaction ownership
+* caller-owned transaction rejection
+* missing target behavior
+* target-update failure behavior
+* rollback behavior
+* PDO/database error propagation
 
+Note that not all failures become package-defined exceptions; some are propagated.
 ---
 
 ## Ordering Configuration
@@ -275,21 +296,25 @@ $ordering->moveWithinScope(
 
 ## Exceptions
 
-All package exceptions implement:
+All package-defined exceptions implement the package marker interface:
 
 ```php
 Maatify\Persistence\Exception\PersistenceException
 ```
 
-### Available Exceptions
+This interface extends `\Throwable` and is implemented only by package-defined exceptions. It does not include every possible throwable emitted by PDO or external infrastructure.
 
-| Exception                               | Meaning                                                                                         |
-| --------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| `InvalidOrderingConfigurationException` | Invalid table/column identifier or unsafe ordering configuration.                               |
-| `InvalidOrderingOperationException`     | Invalid runtime operation arguments, such as invalid id, invalid order, or invalid scope usage. |
-| `OrderingTransactionException`          | `moveWithinScope()` was called while a PDO transaction was already active.                      |
+### Exception Hierarchy
 
-Example:
+| Exception | Base Class | Error Code | Purpose |
+| --------- | ---------- | ---------- | ------- |
+| `InvalidOrderingConfigurationException` | `Maatify\Exceptions\Exception\System\SystemMaatifyException` | `ErrorCodeEnum::MAATIFY_ERROR` | invalid or unsafe trusted SQL configuration identifiers; programming/configuration mistakes |
+| `InvalidOrderingOperationException` | `Maatify\Exceptions\Exception\Validation\ValidationMaatifyException` | `ErrorCodeEnum::INVALID_ARGUMENT` | invalid runtime id; invalid new order; invalid scope usage |
+| `OrderingTransactionException` | `Maatify\Exceptions\Exception\Unsupported\UnsupportedMaatifyException` (defaultIsSafe: false) | `ErrorCodeEnum::UNSUPPORTED_OPERATION` | `moveWithinScope()` called while PDO already has an active transaction |
+
+### Catching
+
+Consumers may catch package-defined exceptions using:
 
 ```php
 use Maatify\Persistence\Exception\PersistenceException;
@@ -303,9 +328,15 @@ try {
         newOrder: 4,
     );
 } catch (PersistenceException $e) {
-    // Handle package-level persistence exception.
+    // Handle package-level persistence exception (e.g. validation, configuration, transaction rules).
+} catch (\PDOException $e) {
+    // Handle PDO/database failures which propagate unchanged.
+} catch (\Throwable $e) {
+    // Outer boundary for any other external failures.
 }
 ```
+
+Do not assume that `PersistenceException` catches every failure originating from a manager call. PDO/database failures propagate unchanged and require a separate catch or an outer `\Throwable` boundary.
 
 ---
 
@@ -328,19 +359,45 @@ The manager is stateless. Passing `PDO` per call allows the same manager instanc
 
 ---
 
-## Development
+## Development and Integration testing
 
-Run static analysis:
+Run static analysis, unit, regression, and integration tests:
 
 ```bash
 composer analyse
-```
-
-Run tests:
-
-```bash
+composer test:unit
+composer test:regression
+composer test:integration
 composer test
 ```
+
+### MySQL Integration testing
+
+Integration tests require real MySQL. SQLite is not supported as an Integration substitute.
+
+The exact MySQL Integration environment contract requires these environment variables:
+* `PERSISTENCE_TEST_MYSQL_DSN`
+* `PERSISTENCE_TEST_MYSQL_USER`
+* `PERSISTENCE_TEST_MYSQL_PASSWORD`
+
+The test user must have package-local table and trigger privileges.
+Trigger-based rollback tests may require the temporary/local MySQL server to permit trusted trigger creators when binary logging is enabled.
+
+CI uses MySQL 8.4.10 as the verified Integration baseline. Other versions are not explicitly excluded unless declared in the package.
+
+### CI Architecture
+
+The current CI architecture tests:
+* PHP 8.2–8.5 Unit/Regression
+* PHP 8.2 and 8.5 Integration
+* latest-compatible dependencies
+* lowest-supported dependencies
+* real MySQL
+* PHPStan max
+* formatter dry-run
+* Composer audit
+* workflow lint
+* stable `CI Gate`
 
 ## License
 
