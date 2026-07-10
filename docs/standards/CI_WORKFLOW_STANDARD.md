@@ -113,18 +113,22 @@ The lowest-dependency job MUST NOT silently pass through `continue-on-error`, `a
 ## 7. PHP Version Compatibility
 
 The declared Composer PHP constraint is a public compatibility contract.
-CI MUST test at least:
-1. the minimum supported PHP version
-2. the latest stable PHP version allowed by the package constraint
 
-Packages SHOULD also test every active intermediate minor version covered by the declared constraint.
+* The minimum supported PHP minor MUST be tested.
+* The latest stable PHP minor permitted by the Composer constraint MUST be tested.
+* Every currently released PHP minor covered by the declared Composer constraint MUST either:
+  * be represented directly in CI, or
+  * have an explicit documented architectural exception.
+* The minimum and latest supported versions MUST NOT be exempted.
+* Future unreleased PHP versions implied by an open-ended constraint are not considered supported CI targets until released.
+* Versions outside the declared Composer constraint MUST NOT be included merely to make a matrix appear broader.
+* Packages SHOULD test every active intermediate minor directly; any omission requires documentation.
 
 Rules:
 * Static analysis and syntax compatibility SHOULD run on the minimum supported PHP version.
 * Unit and Regression suites MUST represent the minimum and latest supported versions.
 * Packages owning database/service behavior MUST run Integration coverage on the minimum and latest supported PHP versions unless the package supports only one PHP minor.
 * Matrix `fail-fast` SHOULD be disabled so all compatibility failures are visible.
-* A package MUST NOT claim support for a PHP version that is not represented by CI without an explicit architectural reason.
 
 ## 8. Mandatory Baseline Quality Checks
 
@@ -197,34 +201,40 @@ Workflows MUST require least privilege:
 permissions:
   contents: read
 ```
-unless a workflow has an explicitly documented need for a narrower additional permission.
+unless an additional permission is explicitly required and documented; only the minimum necessary permission may be granted.
+`contents: read` is the normal verification baseline. Workflows may use a narrower permission set when possible. Any broader/additional permission requires explicit justification.
 
 Rules:
-* Baseline verification workflows MUST NOT have write permissions.
+* Baseline verification workflows MUST NOT receive write permissions.
 * MUST NOT use `pull_request_target` to execute untrusted pull-request code.
 * MUST NOT expose repository or environment secrets to untrusted fork code.
-* Third-party actions and reusable workflows MUST be pinned to immutable full commit SHAs. A human-readable comment MAY document the corresponding release/tag.
-* Floating branches such as `main`, `master`, or `latest` are FORBIDDEN. Major-version tags alone are insufficient.
+* Every externally sourced GitHub Action MUST be pinned to an immutable full commit SHA. This includes GitHub-owned actions such as actions under the `actions/*` organization.
+* Every external reusable workflow MUST be pinned to an immutable full commit SHA.
+* Human-readable comments MAY document the corresponding release/tag.
+* Floating branches and tags such as `main`, `master`, `latest`, `v1`, `v2`, or other mutable references MUST NOT be used in required workflows.
+* Local actions stored within the same repository are resolved from the checked-out repository commit and are not required to use an external SHA reference.
+* Any downloaded CI binary or validator must use a version/checksum or another integrity-verifiable installation policy documented by the repository.
 * Container/service images MUST use explicit versions, and digests SHOULD be used for high-assurance environments.
 * MUST NOT upload credentials, database dumps, `.env` files, or sensitive logs as artifacts.
 
 ## 13. Execution Reliability
 
-Required jobs MUST define appropriate:
-* `timeout-minutes`
-* `concurrency`
-* `cancel-in-progress`
+* Every required job MUST define an appropriate `timeout-minutes`.
+* Every required workflow architecture MUST define an explicit concurrency and cancellation policy.
+* `concurrency` MAY be configured at workflow level or job level according to the architecture.
+* Job-level concurrency groups MUST be scoped so matrix siblings and independent required jobs do not cancel one another.
+* Pull-request superseded runs SHOULD be cancelled.
+* Default/protected-branch runs MUST NOT be cancelled in a way that hides the newest merged verification result.
+* `cancel-in-progress` must be applied according to event/ref context, not blindly to every run.
+* Required jobs must remain fail-closed.
 
 Rules:
-* Pull-request superseded runs SHOULD be cancelled.
-* Default-branch verification MUST NOT be cancelled in a way that hides the latest merged result.
 * Matrix jobs SHOULD use `fail-fast: false`.
 * Required jobs MUST NOT use `continue-on-error`.
 * Required commands MUST NOT use `|| true`.
 * Shell scripts SHOULD use strict failure behavior such as `set -euo pipefail` where supported.
 * Missing dependencies, services, privileges, or extensions MUST fail clearly.
 * Tests MUST NOT be silently skipped because CI setup is incomplete.
-* Required checks MUST fail closed.
 
 ## 14. Cache Policy
 
@@ -291,14 +301,15 @@ Any standalone Composer package in the Maatify ecosystem MUST verify the followi
 * [ ] Unit suite passes where applicable
 * [ ] Regression suite passes where applicable
 * [ ] Integration suite uses real services where applicable
-* [ ] full suite passes
+* [ ] full PHPUnit suite passes where PHPUnit/tests are applicable
+* [ ] example PHP files pass syntax validation where examples exist
 * [ ] minimum supported PHP is tested
 * [ ] latest supported PHP is tested
-* [ ] workflow files pass linting
-* [ ] actions are pinned immutably
+* [ ] workflow files pass linting when workflows exist
+* [ ] Every externally sourced GitHub Action is pinned to an immutable full commit SHA where applicable
 * [ ] permissions follow least privilege
 * [ ] no baseline secrets or Host dependencies exist
 * [ ] required gates always report
 * [ ] branch protection requires stable gates only
 * [ ] no continue-on-error or hidden failures exist
-* [ ] package-created service/database state is cleaned up
+* [ ] package-created service/database state is cleaned up where Integration tests create such state

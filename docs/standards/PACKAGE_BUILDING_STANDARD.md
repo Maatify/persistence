@@ -782,6 +782,7 @@ CI pipelines MUST be:
 - [ ] PHPStan max passes
 - [ ] Code-style dry-run passes (if configured)
 - [ ] PHPUnit full suite passes (Unit, Regression, Integration where applicable)
+- [ ] Example PHP files are syntax-checked where examples exist
 - [ ] DB integration tests use real service dependencies where applicable
 - [ ] Composer security audit passes
 - [ ] Workflow files pass linting
