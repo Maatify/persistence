@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Maatify\Persistence\Exception;
 
-use InvalidArgumentException;
+use Maatify\Exceptions\Exception\Validation\InvalidArgumentMaatifyException;
 
 /**
  * Thrown when an ordering operation is called with invalid runtime arguments.
@@ -15,6 +15,6 @@ use InvalidArgumentException;
  * - Scope value provided without a scope column.
  * - Scope column configured but no scope value provided.
  */
-final class InvalidOrderingOperationException extends InvalidArgumentException implements PersistenceException
+final class InvalidOrderingOperationException extends InvalidArgumentMaatifyException implements PersistenceException
 {
 }

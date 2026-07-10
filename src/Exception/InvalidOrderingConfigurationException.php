@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Maatify\Persistence\Exception;
 
-use InvalidArgumentException;
+use Maatify\Exceptions\Exception\Validation\InvalidArgumentMaatifyException;
 
 /**
  * Thrown when an ordering configuration is invalid.
@@ -17,6 +17,6 @@ use InvalidArgumentException;
  * This exception is intended for configuration/programming mistakes, not for
  * user-input validation failures.
  */
-final class InvalidOrderingConfigurationException extends InvalidArgumentException implements PersistenceException
+final class InvalidOrderingConfigurationException extends InvalidArgumentMaatifyException implements PersistenceException
 {
 }

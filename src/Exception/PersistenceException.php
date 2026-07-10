@@ -11,9 +11,9 @@ namespace Maatify\Persistence\Exception;
  *
  *     catch (PersistenceException $e) { ... }
  *
- * while individual exceptions may still extend SPL exception types such as
- * InvalidArgumentException or RuntimeException for compatibility.
+ * Package exceptions implement this interface while using the shared
+ * maatify/exceptions hierarchy for their concrete exception base classes.
  */
-interface PersistenceException
+interface PersistenceException extends \Throwable
 {
 }
