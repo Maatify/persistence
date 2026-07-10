@@ -187,9 +187,11 @@ jobs:
       PERSISTENCE_TEST_MYSQL_PASSWORD: persistence_ci_password
     steps:
       - name: Checkout
+        id: checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - name: Setup PHP
+        id: setup-php
         uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # 2.37.2
         with:
           php-version: '8.2'
@@ -227,6 +229,29 @@ jobs:
           vendor/bin/phpstan analyse -c phpstan.neon --no-progress
           vendor/bin/php-cs-fixer fix --dry-run --diff
 
+
+      - name: Configure MySQL trigger creation policy
+        shell: bash
+        run: |
+          set -euo pipefail
+          container_id='${{ job.services.mysql.id }}'
+          value="$(docker exec \
+            -e MYSQL_PWD=root_ci_password \
+            "$container_id" \
+            mysql \
+            --user=root \
+            --batch \
+            --skip-column-names \
+            --execute="
+              SET GLOBAL log_bin_trust_function_creators = 1;
+              SELECT @@GLOBAL.log_bin_trust_function_creators;
+            ")"
+
+          if [[ "$value" != "1" ]]; then
+            echo "Expected @@GLOBAL.log_bin_trust_function_creators to be 1, got: $value"
+            exit 1
+          fi
+
       - name: Run test suites
         shell: bash
         run: |
@@ -238,6 +263,7 @@ jobs:
           vendor/bin/phpunit
 
       - name: Verify MySQL residue
+        if: ${{ always() && !cancelled() && steps.setup-php.outcome == 'success' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -293,6 +319,7 @@ jobs:
           PHP
 
       - name: Repository integrity
+        if: ${{ always() && !cancelled() && steps.checkout.outcome == 'success' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -329,9 +356,11 @@ jobs:
       PERSISTENCE_TEST_MYSQL_PASSWORD: persistence_ci_password
     steps:
       - name: Checkout
+        id: checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - name: Setup PHP
+        id: setup-php
         uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # 2.37.2
         with:
           php-version: ${{ matrix.php }}
@@ -360,6 +389,29 @@ jobs:
             --no-interaction \
             --abandoned=fail
 
+
+      - name: Configure MySQL trigger creation policy
+        shell: bash
+        run: |
+          set -euo pipefail
+          container_id='${{ job.services.mysql.id }}'
+          value="$(docker exec \
+            -e MYSQL_PWD=root_ci_password \
+            "$container_id" \
+            mysql \
+            --user=root \
+            --batch \
+            --skip-column-names \
+            --execute="
+              SET GLOBAL log_bin_trust_function_creators = 1;
+              SELECT @@GLOBAL.log_bin_trust_function_creators;
+            ")"
+
+          if [[ "$value" != "1" ]]; then
+            echo "Expected @@GLOBAL.log_bin_trust_function_creators to be 1, got: $value"
+            exit 1
+          fi
+
       - name: Run Integration and full suites
         shell: bash
         run: |
@@ -369,6 +421,7 @@ jobs:
           vendor/bin/phpunit
 
       - name: Verify MySQL residue
+        if: ${{ always() && !cancelled() && steps.setup-php.outcome == 'success' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -424,6 +477,7 @@ jobs:
           PHP
 
       - name: Repository integrity
+        if: ${{ always() && !cancelled() && steps.checkout.outcome == 'success' }}
         shell: bash
         run: |
           set -euo pipefail
