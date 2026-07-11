@@ -337,104 +337,301 @@ displayOrder: (is_int($displayOrder) || is_string($displayOrder)) ? (int) $displ
 
 ## 11. Pagination Pattern
 
-### The Return Shape — always this exact structure
+This section governs reusable PDO offset pagination. It defines the canonical boundary between the caller-owned query and the pagination component. Pagination code MUST remain framework-agnostic, host-agnostic, HTTP-independent, PDO-based, and deterministic.
+
+### Ownership Boundary
+
+The caller Repository / QueryReader MUST own:
+
+- mandatory security, tenant, ownership, visibility, and soft-delete constraints
+- optional search and filter construction
+- JOINs and selected columns
+- SQL placeholder selection
+- semantic alignment between count and data queries
+- row mapping into the host's expected array or DTO
+
+The pagination component MUST own:
+
+- page and per-page normalization
+- total and filtered count execution
+- deterministic whitelist-based sorting
+- the stable internal tie-breaker
+- `LIMIT` / `OFFSET` calculation and binding
+- result metadata
+- row-mapper invocation
+
+The pagination component MUST NOT become a filter builder, search builder, general Query Builder, ORM, HTTP adapter, request parser, controller, or response emitter.
+
+### Canonical Query Descriptor
+
+The caller MUST provide three separate SQL statements and three separate parameter maps:
+
+1. `totalSql` / `totalParams`
+2. `filteredCountSql` / `filteredParams`
+3. `dataSql` / `dataParams`
+
+`totalSql` counts the base visible dataset after all mandatory constraints and before optional search/filter.
+
+`filteredCountSql` counts the same base visible dataset after optional search/filter.
+
+`dataSql` returns the same filtered dataset represented by `filteredCountSql`, excluding ordering and pagination.
+
+Even when no optional filters exist, both count statements remain required and MAY be identical.
+
+The caller MUST keep `filteredCountSql`, `filteredParams`, `dataSql`, and `dataParams` semantically aligned. The pagination component does not parse SQL to prove semantic equivalence.
+
+All SQL strings MUST:
+
+- be non-empty after trimming
+- omit a trailing semicolon
+- be trusted application-built SQL
+- contain no raw user-controlled SQL fragments
+
+`dataSql` MUST be suitable for appending one `ORDER BY`, one `LIMIT`, and one `OFFSET` clause. It MUST NOT already contain conflicting top-level pagination or ordering clauses. This is a caller contract; a pagination component MUST NOT claim to provide a complete SQL parser.
+
+### Parameter Contract
+
+Caller parameter maps MUST use keys without a leading colon:
 
 ```php
-/**
- * @param  array<string, string|int>  $columnFilters
- * @return array{data: list<SomeListItemDTO>, pagination: array{page: int, per_page: int, total: int, filtered: int}}
- */
-public function list(
-    int     $page,
-    int     $perPage,
-    ?string $globalSearch,
-    array   $columnFilters,
-    ?int    $languageId = null,
-): array;
+[
+    'status' => 1,
+    'tenant_id' => 15,
+]
 ```
 
-### The SQL Pattern — three queries, always in this order
+Supported parameter value types are:
 
 ```php
-// 1. Total — unfiltered count of the entire table (no WHERE)
-$stmtTotal = $this->pdo->query('SELECT COUNT(*) FROM maa_something');
-if ($stmtTotal === false) {
-    throw SomeDomainDatabaseException::queryFailed('Failed to count maa_something');
-}
-$total = (int) $stmtTotal->fetchColumn();
-
-// 2. Filtered count — same WHERE as data query, no LIMIT
-$stmtFiltered = $this->pdo->prepare(
-    "SELECT COUNT(s.id) FROM maa_something s {$joinSql} {$whereSql}"
-);
-$stmtFiltered->execute($params);
-$filtered = (int) $stmtFiltered->fetchColumn();
-
-// 3. Data — with LIMIT + OFFSET
-$offset = ($page - 1) * $perPage;
-$stmt   = $this->pdo->prepare(
-    "SELECT ... FROM maa_something s {$joinSql} {$whereSql} ORDER BY ... LIMIT :limit OFFSET :offset"
-);
-foreach ($params as $key => $value) {
-    $stmt->bindValue(':' . $key, $value);
-}
-$stmt->bindValue(':limit',  $perPage, PDO::PARAM_INT);
-$stmt->bindValue(':offset', $offset,  PDO::PARAM_INT);
-$stmt->execute();
+string|int|bool|null
 ```
 
-Note: The exception thrown in the total count guard above must follow the package exception policy. A raw `\RuntimeException` must not be introduced where a package-defined classification or intentional original throwable propagation is the correct contract.
+Floats MUST NOT be accepted; decimal values must be supplied as validated decimal strings.
 
-### The WHERE Builder Pattern
+The reserved internal parameter names are:
 
-```php
-$where  = [];
-$params = [];
-
-if ($globalSearch !== null && trim($globalSearch) !== '') {
-    $globalSearchValue = '%' . trim($globalSearch) . '%';
-
-    $where[]              = '(s.name LIKE :global_name OR s.code LIKE :global_code)';
-    $params['global_name'] = $globalSearchValue;
-    $params['global_code'] = $globalSearchValue;
-}
-
-if (isset($columnFilters['id'])) {
-    $where[]      = 's.id = :id';
-    $params['id'] = (int) $columnFilters['id'];
-}
-
-if (isset($columnFilters['is_active'])) {
-    $where[]             = 's.is_active = :is_active';
-    $params['is_active'] = (int) $columnFilters['is_active'];
-}
-
-if (isset($columnFilters['deleted'])) {
-    $where[] = (int) $columnFilters['deleted'] === 1
-        ? 's.deleted_at IS NOT NULL'
-        : 's.deleted_at IS NULL';
-}
-
-$whereSql = $where ? 'WHERE ' . implode(' AND ', $where) : '';
+```text
+__pagination_limit
+__pagination_offset
 ```
 
-### The Return Array
+Caller maps MUST NOT use either reserved key.
+
+The component adds the leading colon internally and binds values by type:
+
+- `int` => `PDO::PARAM_INT`
+- `bool` => `PDO::PARAM_BOOL`
+- `null` => `PDO::PARAM_NULL`
+- `string` => `PDO::PARAM_STR`
+
+`LIMIT` and `OFFSET` MUST be bound explicitly using `PDO::PARAM_INT`.
+
+### Request Normalization
+
+The canonical defaults are:
+
+```text
+defaultPerPage = 20
+minPerPage     = 1
+maxPerPage     = 200
+```
+
+A package-specific variation requires an explicit documented contract.
+
+Accepted page and per-page inputs are integers or trimmed decimal-integer strings that fit inside the PHP integer range. Decimal points and exponent notation are invalid.
+
+Normalization rules:
+
+- missing, empty, malformed, or unrepresentable `page` => `1`
+- representable `page < 1` => `1`
+- valid `page` => the parsed integer
+- missing, empty, malformed, or unrepresentable `per_page` => `defaultPerPage`
+- representable `per_page < minPerPage` => `minPerPage`
+- representable `per_page > maxPerPage` => `maxPerPage`
+- valid `per_page` => the parsed integer
+
+User-input normalization failures MUST fall back and MUST NOT throw package exceptions.
+
+### Count and Overflow Semantics
+
+Counts MUST execute in this order:
+
+1. total count
+2. filtered count
+3. data query, unless the filtered count is zero
+
+Both count statements MUST return one non-negative integer scalar that fits inside the PHP integer range. A non-integer, negative, absent, or unrepresentable count is an execution failure.
+
+Definitions:
+
+- `total` = base visible dataset after mandatory constraints and before optional search/filter
+- `filtered` = the same base visible dataset after optional search/filter
+- `total_pages` = pages calculated from `filtered`, not `total`
+
+The total-page calculation MUST avoid integer-overflow-prone addition:
 
 ```php
-return [
-    'data'       => $items,
+$totalPages = $filtered === 0
+    ? 0
+    : intdiv($filtered - 1, $perPage) + 1;
+```
+
+When `filtered === 0`:
+
+- effective page = `1`
+- `total_pages = 0`
+- data query is not executed
+- `data = []`
+- `has_next = false`
+- `has_previous = false`
+
+When the normalized requested page is greater than a positive `total_pages`, the effective page MUST reset to `1`, and the first page of the filtered result set is returned.
+
+The component MUST NOT retry automatically when concurrent writes make count and data results differ. Callers requiring a consistent snapshot may use a caller-owned transaction.
+
+### Deterministic Sorting
+
+Every paginated data query MUST have deterministic ordering.
+
+User-selected sorting MUST be resolved through a trusted whitelist. Raw request values, raw column names, directions, expressions, or SQL fragments MUST NOT be interpolated into `ORDER BY`.
+
+Version 1 supports:
+
+- one user/default primary sort
+- one internal stable tie-breaker
+- directions `ASC` and `DESC` only
+
+Whitelist values MUST be validated identifier paths, not arbitrary SQL expressions. Supported examples:
+
+```text
+created_at
+v.created_at
+catalog.products.created_at
+```
+
+Every identifier segment MUST match:
+
+```text
+[A-Za-z_][A-Za-z0-9_]*
+```
+
+The component MUST quote each segment internally.
+
+Functions, arithmetic, JSON expressions, collations, `CASE`, commas, directions, comments, semicolons, `LIMIT`, and `OFFSET` are outside the version-1 whitelist contract.
+
+Invalid `sort_by` falls back to the configured default key. Invalid `sort_direction` falls back to the configured default direction. Applied sort metadata MUST report the actual fallback or accepted values, not the invalid raw input.
+
+If the effective primary sort and configured tie-breaker resolve to the same quoted identifier, the component MUST emit that identifier once using the effective primary direction. Otherwise it appends the tie-breaker using its configured direction.
+
+Canonical final SQL shape:
+
+```sql
+{dataSql}
+ORDER BY {quoted_primary_identifier} {ASC|DESC},
+         {quoted_tie_breaker_identifier} {ASC|DESC}
+LIMIT :__pagination_limit
+OFFSET :__pagination_offset
+```
+
+The second ordering expression is omitted when it duplicates the resolved primary identifier.
+
+### Mapper Contract
+
+A reusable paginator MUST require a row mapper with the conceptual signature:
+
+```php
+callable(array<string, mixed> $row): array|object
+```
+
+Rows MUST be fetched as associative arrays without mutating connection-wide PDO fetch-mode attributes.
+
+The mapper:
+
+- transforms one fetched row into the caller's array or DTO
+- MUST NOT perform pagination logic
+- MAY intentionally return the raw row through an explicit identity mapper
+
+The result data collection MUST always be a list. Mapper-thrown `Throwable` instances propagate unchanged. A mapper result that is neither an array nor an object is a package-owned execution failure.
+
+### Canonical Result Contract
+
+A typed result object MUST own the canonical result and implement `JsonSerializable`. Its array / JSON representation MUST be:
+
+```php
+[
+    'data' => $items,
     'pagination' => [
-        'page'     => $page,
+        'page' => $page,
         'per_page' => $perPage,
-        'total'    => $total,     // unfiltered — entire table count
-        'filtered' => $filtered,  // count after WHERE applied
+        'total' => $total,
+        'filtered' => $filtered,
+        'total_pages' => $totalPages,
+        'has_next' => $hasNext,
+        'has_previous' => $hasPrevious,
+        'sort_by' => $effectiveSortBy,
+        'sort_direction' => $effectiveSortDirection,
     ],
-];
+]
 ```
 
-`total` = rows in the table regardless of any filter.
-`filtered` = rows that match the current search/filters.
-Frontend uses both to render pagination controls correctly.
+Contract rules:
+
+- `data` is always a list
+- empty data is `[]`
+- `page` is the effective page after normalization and overflow handling
+- `sort_by` and `sort_direction` are the applied values
+- `sort_direction` is uppercase
+- internal `offset` is never exposed
+
+### Transaction Contract
+
+A read paginator MUST NOT own transactions.
+
+It MUST:
+
+- execute on the provided PDO connection
+- allow execution inside a caller-owned active transaction
+- leave caller-owned transaction state unchanged
+
+It MUST NOT:
+
+- call `beginTransaction()`
+- call `commit()`
+- call `rollBack()`
+- reject an active caller-owned transaction
+
+### Exception and Error Propagation
+
+Invalid trusted configuration, invalid query-descriptor structure, and non-throwing PDO failure states SHOULD use stable package-defined exceptions following the package exception policy.
+
+Actual `PDOException` instances and unknown external `Throwable` instances MAY propagate unchanged when preserving the original diagnostic contract is intentional.
+
+Blind catch-all wrapping and swallowed errors are forbidden.
+
+### Backward-Compatible Adoption
+
+This is the canonical contract for new pagination implementations and for explicitly approved migrations.
+
+Existing endpoints MUST NOT have their public response shape changed silently. Migration MAY:
+
+- return the canonical shape directly when additive fields are approved
+- preserve an existing legacy shape through a host-owned adapter
+- proceed endpoint-by-endpoint after compatibility review
+
+A reusable pagination component MUST be implemented and verified before host repositories are migrated. Mass migration is forbidden unless separately approved.
+
+### Required Verification
+
+A pagination implementation MUST include:
+
+- Unit coverage for normalization, configuration, identifier validation, query descriptors, and result serialization
+- Regression coverage for exact public API signatures and result keys
+- real supported-database Integration coverage for counts, overflow, sorting, binding, mapper behavior, transaction participation, and failure propagation
+- deterministic duplicate-sort-value fixtures proving tie-breaker stability
+- verification that raw user sort input never enters final SQL
+- verification that no transaction is started, committed, or rolled back by the paginator
+
+SQLite MUST NOT substitute for MySQL-owned behavior. Integration testing must follow `CI_WORKFLOW_STANDARD.md`.
 
 ---
 
