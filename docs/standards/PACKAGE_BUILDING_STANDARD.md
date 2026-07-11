@@ -628,11 +628,13 @@ Hard-delete gap compaction is not defined by the currently published stable Orde
 
 ## 17. Image Rules
 
-- `image` column is `VARCHAR(255) NULL` — stores path or URL only, never binary data
-- Never in `CreateCommand` or `UpdateCommand`
-- Updated via dedicated `updateImage(int $id, ?string $image): void`
-- `null` clears the image (column set to NULL)
-- Translation images follow the same rule via `updateTranslationImage(int $id, ?string $image): void`
+- An `image` column is `VARCHAR(255) NULL` and stores a path or URL only, never binary data
+- `image` MUST NOT be accepted by `CreateCommand` or `UpdateCommand`
+- image changes MUST be exposed through dedicated package operations rather than generic update commands
+- the Command Repository image-update operation MUST return `bool` to report whether the target row existed and was updated
+- a Service MAY expose a `void` image-update operation and convert a Repository `false` result into the approved not-found exception
+- `null` clears the image by setting the column to `NULL`
+- translation-image updates MUST follow the same Repository `bool` / Service `void` layer contract
 
 ---
 
@@ -694,8 +696,20 @@ parameters:
     level: max
     paths:
         - src
+```
+
+The `src` path is mandatory.
+
+When a `tests/` directory exists, it MUST also be included in `parameters.paths`:
+
+```neon
+parameters:
+    paths:
+        - src
         - tests
 ```
+
+Repositories MUST configure PHPStan from their actual package-owned paths and MUST NOT reference a non-existent path merely to copy this example. Existing package-owned tests MUST NOT be excluded from static analysis.
 
 ### Testing Strategy
 
