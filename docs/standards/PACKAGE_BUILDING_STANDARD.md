@@ -57,14 +57,40 @@ Every package must contain these files at its root (the repository root is the p
 ```
 ├── README.md                          ← installation, quick examples, what it does / does not
 ├── CHANGELOG.md                       ← Keep a Changelog; release history begins at [1.0.0]
-├── {PACKAGE_NAME}_PACKAGE_REFERENCE.md ← complete API reference and design rules (e.g. docs/EVENT_LOGGING_MODULE_REFERENCE.md)
+├── {PACKAGE_NAME}_PACKAGE_REFERENCE.md ← canonical stable package contract (e.g. EVENT_LOGGING_MODULE_REFERENCE.md)
 ├── composer.json                      ← governed by COMPOSER_PACKAGE_STANDARD.md
 ├── phpstan.neon                       ← governed by Section 21
 ├── src/                               ← all PHP source code
 ├── tests/                             ← if applicable
 ├── schema/                            ← if the package owns SQL schema
-└── docs/                              ← for architecture/integration/audits
+└── docs/                              ← detailed architecture, integration, roadmap, and audit documents
 ```
+
+### Canonical Package Reference Location
+
+Every standalone Maatify package MUST maintain exactly one canonical Package Reference at the repository root.
+
+The canonical path is:
+
+```text
+/{PACKAGE_NAME}_PACKAGE_REFERENCE.md
+```
+
+The root Package Reference owns:
+
+- the complete stable package contract
+- the public Runtime API inventory
+- stable behavior and exception guarantees
+- package boundaries and non-goals
+- links to detailed supporting documentation
+
+Detailed architecture decisions, proposed implementation contracts, integration guides, roadmaps, deferred scope, and audits belong under `docs/`.
+
+Supporting documents under `docs/` MAY provide deeper detail, but they MUST NOT become a second competing Package Reference. They SHOULD link back to the root Package Reference when they define or explain part of the stable package contract.
+
+The root Package Reference SHOULD index the relevant detailed documents under `docs/`.
+
+A multi-domain package still has one canonical root Package Reference unless a domain is extracted into a separate Composer package with its own repository and package contract.
 
 ---
 
