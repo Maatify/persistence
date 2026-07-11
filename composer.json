@@ -7,8 +7,11 @@
     "mysql",
     "ordering",
     "scoped-ordering",
+    "global-ordering",
     "display-order",
+    "sort-order",
     "transaction",
+    "php",
     "maatify"
   ],
   "homepage": "https://github.com/Maatify/persistence",
