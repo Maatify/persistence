@@ -29,7 +29,12 @@ To maintain standalone Composer package boundaries and a framework-agnostic arch
 - **Clock/Date-Time:** Clock and date-time contracts must depend on `maatify/shared-common`
   Repository: https://github.com/Maatify/SharedCommon
 
-**Rule:** Packages must not define a local duplicate exception hierarchy or local clock abstraction if the contract or base is available in Maatify shared packages.
+- **Persistence Utilities:** Packages that require reusable PDO ordering or pagination capabilities must depend on `maatify/persistence`
+  Repository: https://github.com/Maatify/persistence
+
+**Rule:** Packages MUST NOT define package-local duplicates of a capability that is available through a stable public API in a Maatify shared package. This prohibition includes exception hierarchies, clock abstractions, PDO ordering mechanics, and PDO pagination mechanics.
+
+A consuming package MUST declare the minimum stable dependency version that exposes every shared API it uses. Proposed architecture documents, unreleased branches, commits, and implementation contracts are not consumable public APIs and MUST NOT be copied into consumer packages.
 
 The declaration, constraint, ordering, and validation rules for these dependencies are governed by [COMPOSER_PACKAGE_STANDARD.md](COMPOSER_PACKAGE_STANDARD.md).
 
@@ -37,6 +42,7 @@ This ensures:
 - Explicit Composer/runtime dependencies only
 - Public API stability
 - Backward compatibility as much as possible
+- One authoritative implementation for shared ecosystem capabilities
 
 ---
 
@@ -280,7 +286,7 @@ final readonly class SomethingCollectionDTO implements \IteratorAggregate, \Json
 | `create()` | `int` | `lastInsertId()` |
 | `update()` | `bool` | `rowCount() > 0` |
 | `updateStatus()` | `bool` | `rowCount() > 0` |
-| `updateDisplayOrder()` | `bool` | delegated to `ScopedOrderingManager` |
+| `updateDisplayOrder()` | `bool` | delegated to `Maatify\Persistence\Pdo\Ordering\ScopedOrderingManager` from `maatify/persistence` |
 | `updateImage()` | `bool` | `rowCount() > 0` |
 | `softDelete()` | `bool` | `rowCount() > 0` |
 | `hardDelete()` | `bool` | `rowCount() > 0` after transaction |
@@ -335,361 +341,109 @@ displayOrder: (is_int($displayOrder) || is_string($displayOrder)) ? (int) $displ
 
 ---
 
-## 11. Pagination Pattern
+## 11. Shared Ordering and Pagination Utilities
 
-This section governs reusable PDO offset pagination. It defines the canonical boundary between the caller-owned query and the pagination component. Pagination code MUST remain framework-agnostic, host-agnostic, HTTP-independent, PDO-based, and deterministic.
+This section governs how standalone Maatify packages consume shared PDO ordering and pagination capabilities. It is a dependency and integration policy, not an implementation blueprint.
 
-### Ownership Boundary
+The authoritative owner is:
 
-The caller Repository / QueryReader MUST own:
+```text
+Package:    maatify/persistence
+Repository: https://github.com/Maatify/persistence
+```
+
+### Non-Duplication Rule
+
+A consumer package MUST NOT create a local replacement for stable ordering or pagination behavior provided by `maatify/persistence`.
+
+Forbidden duplication includes:
+
+- ordering managers, position-shifting algorithms, scope-locking logic, and ordering transaction behavior
+- page and per-page normalization
+- total and filtered count orchestration
+- pagination offset calculation
+- whitelist-based sorting and deterministic tie-breaker behavior
+- canonical pagination result objects and metadata
+- package-local copies of persistence exceptions or public value objects
+
+A consumer package MUST NOT copy Runtime code, tests, internal algorithms, or documentation-only contracts from `maatify/persistence`.
+
+### Capability Availability and Composer Dependency
+
+A package may consume only an API that exists in a stable published release of `maatify/persistence`.
+
+The consumer MUST:
+
+- declare `maatify/persistence` as a direct Composer dependency when its public API is referenced
+- require the minimum stable version that contains the needed capability
+- confirm availability from the published package reference and stable release documentation
+- avoid depending on an unreleased branch, commit, proposed contract, or target version as though it were an available Runtime API
+
+A documentation-only architecture contract inside `maatify/persistence` establishes ownership and future implementation rules. It does not authorize another package to implement or consume the proposed API before a stable release publishes it.
+
+### Ordering Integration
+
+Ordering operations MUST use the stable public API under:
+
+```text
+Maatify\Persistence\Pdo\Ordering
+```
+
+The consumer Repository / Service may:
+
+- provide the PDO connection
+- construct trusted ordering configuration from its own table and column identifiers
+- pass domain ids, scope values, and requested positions
+- translate the stable persistence result into its own existing public contract through a thin adapter
+
+The consumer MUST NOT reproduce ordering SQL shifts, transaction ownership, scope locking, identifier validation, or persistence exception behavior locally.
+
+### Pagination Integration
+
+After a stable `maatify/persistence` release publishes the Pagination API, paginated Repository / QueryReader operations MUST delegate reusable pagination mechanics to the stable public API under:
+
+```text
+Maatify\Persistence\Pdo\Pagination
+```
+
+The consumer remains responsible for domain-owned concerns:
 
 - mandatory security, tenant, ownership, visibility, and soft-delete constraints
 - optional search and filter construction
 - JOINs and selected columns
-- SQL placeholder selection
+- trusted SQL and matching parameter values
 - semantic alignment between count and data queries
-- row mapping into the host's expected array or DTO
+- row mapping into the consumer's array or DTO
+- preserving its own existing public response contract
 
-The pagination component MUST own:
+`maatify/persistence` owns the reusable mechanics exposed by its stable API, including normalization, count execution, deterministic sorting, limit/offset handling, mapper invocation, and canonical pagination metadata.
 
-- page and per-page normalization
-- total and filtered count execution
-- deterministic whitelist-based sorting
-- the stable internal tie-breaker
-- `LIMIT` / `OFFSET` calculation and binding
-- result metadata
-- row-mapper invocation
+Adopting the shared paginator MUST NOT silently change an existing endpoint, DTO, or package return shape. A thin consumer-owned adapter MAY preserve an established public contract.
 
-The pagination component MUST NOT become a filter builder, search builder, general Query Builder, ORM, HTTP adapter, request parser, controller, or response emitter.
+### Thin Adapters
 
-### Canonical Query Descriptor
+A consumer-owned adapter is permitted only when it:
 
-The caller MUST provide three separate SQL statements and three separate parameter maps:
+- translates domain inputs into the stable `maatify/persistence` API
+- delegates the shared operation without reimplementing its algorithms
+- maps the returned result into an already approved consumer contract
+- adds no competing exception hierarchy, pagination engine, or ordering engine
 
-1. `totalSql` / `totalParams`
-2. `filteredCountSql` / `filteredParams`
-3. `dataSql` / `dataParams`
+An adapter MUST NOT become a fork of the shared capability.
 
-`totalSql` counts the base visible dataset after all mandatory constraints and before optional search/filter.
+### Missing Capability
 
-`filteredCountSql` counts the same base visible dataset after optional search/filter.
+When a required reusable behavior is absent from the stable public API, the default action is to propose and review the capability in `maatify/persistence`.
 
-`dataSql` returns the same filtered dataset represented by `filteredCountSql`, excluding ordering and pagination.
+A package-local alternative is forbidden unless an explicit owner-approved architectural decision proves that the behavior is domain-specific and outside the shared package's scope.
 
-Even when no optional filters exist, both count statements remain required and MAY be identical.
+Temporary copying of an unpublished persistence contract is not an acceptable workaround.
 
-The caller MUST keep `filteredCountSql`, `filteredParams`, `dataSql`, and `dataParams` semantically aligned. The pagination component does not parse SQL to prove semantic equivalence.
+### Source of Truth
 
-All SQL strings MUST:
+Consumer packages MUST follow the stable public API, package reference, and published integration documentation in `maatify/persistence`.
 
-- be non-empty after trimming
-- omit a trailing semicolon
-- be trusted application-built SQL
-- contain no raw user-controlled SQL fragments
-
-`dataSql` MUST be suitable for appending one `ORDER BY`, one `LIMIT`, and one `OFFSET` clause. It MUST NOT already contain conflicting top-level pagination or ordering clauses. This is a caller contract; a pagination component MUST NOT claim to provide a complete SQL parser.
-
-### Parameter Contract
-
-Version 1 supports named placeholders only. Positional `?` placeholders and statements that mix positional and named placeholders are unsupported.
-
-Caller parameter maps MUST use keys without a leading colon:
-
-```php
-[
-    'status' => 1,
-    'tenant_id' => 15,
-]
-```
-
-Supported parameter value types are:
-
-```php
-string|int|bool|null
-```
-
-Floats MUST NOT be accepted; decimal values must be supplied as validated decimal strings.
-
-The complete reserved internal parameter namespace is:
-
-```text
-__pagination_*
-```
-
-Caller maps MUST NOT use any key beginning with `__pagination_`. Caller SQL statements MUST NOT contain any named placeholder beginning with `:__pagination_`. Either prefix collision is an invalid query descriptor.
-
-The package currently uses:
-
-```text
-__pagination_limit
-__pagination_offset
-```
-
-This reserved-prefix collision check does not imply general SQL parsing.
-
-Within one SQL statement:
-
-- every named placeholder MUST have one unique occurrence
-- every named placeholder MUST have one matching parameter-map entry
-- every parameter-map key MUST be used by one matching named placeholder
-- reusing the same logical value requires distinct placeholder names and matching parameter entries
-
-These are caller contracts for compatibility with native prepared statements. A pagination component MUST NOT claim to parse SQL or preflight general placeholder correspondence. Violations may surface as an original `PDOException` or a package-classified non-throwing PDO failure state.
-
-The component adds the leading colon internally and binds values by type:
-
-- `int` => `PDO::PARAM_INT`
-- `bool` => `PDO::PARAM_BOOL`
-- `null` => `PDO::PARAM_NULL`
-- `string` => `PDO::PARAM_STR`
-
-`LIMIT` and `OFFSET` MUST be bound explicitly using `PDO::PARAM_INT`.
-
-### Request Normalization
-
-The canonical defaults are:
-
-```text
-defaultPerPage = 20
-minPerPage     = 1
-maxPerPage     = 200
-```
-
-These are the canonical constructor defaults. Callers MAY configure different valid values through the approved pagination configuration object, provided its documented invariants remain satisfied.
-
-Accepted page and per-page inputs are integers or trimmed decimal-integer strings that fit inside the PHP integer range. Decimal points and exponent notation are invalid.
-
-Normalization rules:
-
-- missing, empty, malformed, or unrepresentable `page` => `1`
-- representable `page < 1` => `1`
-- valid `page` => the parsed integer
-- missing, empty, malformed, or unrepresentable `per_page` => `defaultPerPage`
-- representable `per_page < minPerPage` => `minPerPage`
-- representable `per_page > maxPerPage` => `maxPerPage`
-- valid `per_page` => the parsed integer
-
-User-input normalization failures MUST fall back and MUST NOT throw package exceptions.
-
-### Count and Overflow Semantics
-
-Counts MUST execute in this order:
-
-1. total count
-2. filtered count
-3. data query, unless the filtered count is zero
-
-Both count statements MUST return exactly one row containing exactly one column. The component MUST verify both cardinalities before accepting the value.
-
-That single value MUST be a non-negative integer representation fitting inside the PHP integer range. A non-integer, negative, absent, unrepresentable, multi-row, or multi-column count result is an execution failure.
-
-Definitions:
-
-- `total` = base visible dataset after mandatory constraints and before optional search/filter
-- `filtered` = the same base visible dataset after optional search/filter
-- `total_pages` = pages calculated from `filtered`, not `total`
-
-The total-page calculation MUST avoid integer-overflow-prone addition:
-
-```php
-$totalPages = $filtered === 0
-    ? 0
-    : intdiv($filtered - 1, $perPage) + 1;
-```
-
-After zero-result and overflow normalization, and only when `filtered > 0`, offset MUST be calculated exactly as:
-
-```php
-$offset = ($page - 1) * $perPage;
-```
-
-This is integer-safe because the effective page cannot exceed `totalPages`, so the page start cannot exceed `filtered - 1`.
-
-When `filtered === 0`:
-
-- effective page = `1`
-- `total_pages = 0`
-- data query is not executed
-- `data = []`
-- `has_next = false`
-- `has_previous = false`
-
-When the normalized requested page is greater than a positive `total_pages`, the effective page MUST reset to `1`, and the first page of the filtered result set is returned.
-
-The component MUST NOT retry automatically when concurrent writes make count and data results differ. Callers requiring a consistent snapshot may use a caller-owned transaction.
-
-### Deterministic Sorting
-
-Every paginated data query MUST have deterministic ordering.
-
-User-selected sorting MUST be resolved through a trusted whitelist. Raw request values, raw column names, directions, expressions, or SQL fragments MUST NOT be interpolated into `ORDER BY`.
-
-Version 1 supports:
-
-- one user/default primary sort
-- one internal stable tie-breaker
-- directions `ASC` and `DESC` only
-
-The resolved final tie-breaker identifier MUST be unique within every filtered dataset to which the configuration is applied. A primary key such as `id` is the usual choice. The caller owns this guarantee because the component cannot inspect schema constraints or prove uniqueness.
-
-When the primary and tie-breaker resolve to the same identifier, that identifier itself MUST be unique. A non-unique final tie-breaker is a trusted configuration defect even when Runtime validation cannot detect it.
-
-Whitelist values MUST be validated identifier paths, not arbitrary SQL expressions. Supported examples:
-
-```text
-created_at
-v.created_at
-catalog.products.created_at
-```
-
-Every identifier segment MUST match:
-
-```text
-[A-Za-z_][A-Za-z0-9_]*
-```
-
-The component MUST quote each segment internally.
-
-Functions, arithmetic, JSON expressions, collations, `CASE`, commas, directions, comments, semicolons, `LIMIT`, and `OFFSET` are outside the version-1 whitelist contract.
-
-Invalid `sort_by` falls back to the configured default key. Invalid `sort_direction` falls back to the configured default direction. Applied sort metadata MUST report the actual fallback or accepted values, not the invalid raw input.
-
-If the effective primary sort and configured tie-breaker resolve to the same quoted identifier, the component MUST emit that identifier once using the effective primary direction. Otherwise it appends the tie-breaker using its configured direction.
-
-Canonical final SQL shape:
-
-```sql
-{dataSql}
-ORDER BY {quoted_primary_identifier} {ASC|DESC},
-         {quoted_tie_breaker_identifier} {ASC|DESC}
-LIMIT :__pagination_limit
-OFFSET :__pagination_offset
-```
-
-The second ordering expression is omitted when it duplicates the resolved primary identifier.
-
-### Mapper Contract
-
-A reusable paginator MUST require a row mapper with the conceptual signature:
-
-```php
-callable(array<string, mixed> $row): array|object
-```
-
-Rows MUST be fetched as associative arrays without mutating connection-wide PDO fetch-mode attributes.
-
-The mapper:
-
-- transforms one fetched row into the caller's array or DTO
-- MUST NOT perform pagination logic
-- MAY intentionally return the raw row through an explicit identity mapper
-
-The result data collection MUST always be a list. Mapper-thrown `Throwable` instances propagate unchanged. A mapper result that is neither an array nor an object is a package-owned execution failure.
-
-### Canonical Result Contract
-
-A typed result object MUST own the canonical result and implement `JsonSerializable`. Its array / JSON representation MUST be:
-
-```php
-[
-    'data' => $items,
-    'pagination' => [
-        'page' => $page,
-        'per_page' => $perPage,
-        'total' => $total,
-        'filtered' => $filtered,
-        'total_pages' => $totalPages,
-        'has_next' => $hasNext,
-        'has_previous' => $hasPrevious,
-        'sort_by' => $effectiveSortBy,
-        'sort_direction' => $effectiveSortDirection,
-    ],
-]
-```
-
-Contract rules:
-
-- `data` is always a list
-- empty data is `[]`
-- `page` is the effective page after normalization and overflow handling
-- `sort_by` and `sort_direction` are the applied values
-- `sort_direction` is uppercase
-- internal `offset` is never exposed
-
-The typed result object MUST reject inconsistent state. At minimum:
-
-- `data` is verified with `array_is_list()`
-- every item in `data` is an array or object
-- `count($data) <= $perPage`
-- `page >= 1` and `per_page >= 1`
-- `total`, `filtered`, and `total_pages` are non-negative
-- `total_pages` exactly equals `0` when `filtered === 0`, otherwise `intdiv($filtered - 1, $per_page) + 1`
-- `filtered === 0` requires `data === []`
-- `total_pages === 0` requires page `1` and both navigation flags `false`
-- a positive `total_pages` requires `page <= total_pages`
-- navigation flags exactly match the effective page and `total_pages`
-- `sort_by` matches `^[A-Za-z_][A-Za-z0-9_]*$`
-
-An empty `data` list while `filtered > 0` remains valid because concurrent writes may change the dataset between the count and data statements.
-
-An inconsistent result state is a package-owned execution failure.
-
-### Transaction Contract
-
-A read paginator MUST NOT own transactions.
-
-It MUST:
-
-- execute on the provided PDO connection
-- allow execution inside a caller-owned active transaction
-
-It MUST NOT:
-
-- call `beginTransaction()`
-- call `commit()`
-- call `rollBack()`
-- reject an active caller-owned transaction
-
-The guarantee is limited to the paginator making none of those explicit transaction-control calls. External database/driver behavior and mapper-owned code may affect transaction state and are outside the paginator guarantee. Verification MUST NOT claim that every possible external failure preserves an active caller transaction.
-
-### Exception and Error Propagation
-
-Invalid trusted configuration, Runtime-checkable invalid query-descriptor structure, and non-throwing PDO failure states SHOULD use stable package-defined exceptions following the package exception policy.
-
-Non-throwing `PDO::prepare()`, `PDOStatement::bindValue()`, and `PDOStatement::execute()` failures are package-owned execution classifications.
-
-General placeholder correspondence, repetition, positional-placeholder, and mixed-placeholder violations remain caller contracts because the component does not provide a SQL parser. They are not guaranteed constructor-time query-descriptor exceptions.
-
-Actual `PDOException` instances and unknown external `Throwable` instances MAY propagate unchanged when preserving the original diagnostic contract is intentional.
-
-Blind catch-all wrapping and swallowed errors are forbidden.
-
-### Backward-Compatible Adoption
-
-This is the canonical contract for new pagination implementations and for explicitly approved migrations.
-
-Existing endpoints MUST NOT have their public response shape changed silently. Migration MAY:
-
-- return the canonical shape directly when additive fields are approved
-- preserve an existing legacy shape through a host-owned adapter
-- proceed endpoint-by-endpoint after compatibility review
-
-A reusable pagination component MUST be implemented and verified before host repositories are migrated. Mass migration is forbidden unless separately approved.
-
-### Required Verification
-
-A pagination implementation MUST include:
-
-- Unit coverage for normalization, configuration, identifier validation, query descriptors, result serialization, complete result invariants, reserved-prefix collisions, and package-owned non-throwing PDO failure classifications
-- Regression coverage for exact public API signatures, result keys, named-placeholder-only caller boundaries, and the caller-owned tie-breaker uniqueness guarantee
-- real supported-database Integration coverage for exact count cardinality, count failures, overflow, sorting, binding, mapper behavior, transaction participation, and failure propagation
-- native-prepared-statement coverage for repeated, missing, unused, positional, and mixed placeholder violations without claiming constructor SQL parsing
-- deterministic duplicate-primary-value fixtures using a caller-guaranteed unique tie-breaker
-- verification that raw user sort input never enters final SQL
-- verification that no transaction is started, committed, or rolled back by the paginator
-
-SQLite MUST NOT substitute for MySQL-owned behavior. Integration testing must follow `CI_WORKFLOW_STANDARD.md`.
-
+Exact class signatures, internal formulas, SQL assembly rules, exception classifications, and verification requirements belong in the owning repository. They MUST NOT be duplicated in this general package-building standard or independently redefined by consumer packages.
 ---
 
 ## 12. Translation Pattern
