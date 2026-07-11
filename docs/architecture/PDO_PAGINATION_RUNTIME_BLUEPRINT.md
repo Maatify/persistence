@@ -1,6 +1,6 @@
 # Runtime Blueprint — PDO Pagination `v1.1.0`
 
-**الحالة:** جاهز لمراجعة واعتماد المالك.
+**الحالة:** Owner-approved Runtime Blueprint; Runtime implementation is pending.
 **مصدر الحقيقة:** `docs/architecture/PDO_PAGINATION_CONTRACT.md` على `main`.
 **النطاق:** تنفيذ Runtime فقط داخل `src/**`.
 
@@ -895,6 +895,6 @@ feat(pagination): implement PDO offset pagination runtime
 ## القرار الحالي
 
 ```text
-BLUEPRINT_STATUS: READY_FOR_OWNER_APPROVAL
-NEXT_ACTION: APPROVE_BLUEPRINT_THEN_SEND_TO_CODEX
+BLUEPRINT_STATUS: OWNER_APPROVED
+NEXT_ACTION: SEND_TO_CODEX
 ```
