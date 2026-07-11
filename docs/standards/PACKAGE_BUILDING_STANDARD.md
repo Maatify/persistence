@@ -29,10 +29,10 @@ To maintain standalone Composer package boundaries and a framework-agnostic arch
 - **Clock/Date-Time:** Clock and date-time contracts must depend on `maatify/shared-common`
   Repository: https://github.com/Maatify/SharedCommon
 
-- **Persistence Utilities:** Packages that require reusable PDO ordering or pagination capabilities must depend on `maatify/persistence`
+- **Persistence Utilities:** Packages that require reusable PDO row-position/display-order management or pagination capabilities must depend on `maatify/persistence`
   Repository: https://github.com/Maatify/persistence
 
-**Rule:** Packages MUST NOT define package-local duplicates of a capability that is available through a stable public API in a Maatify shared package. This prohibition includes exception hierarchies, clock abstractions, PDO ordering mechanics, and PDO pagination mechanics.
+**Rule:** Packages MUST NOT define package-local duplicates of a capability that is available through a stable public API in a Maatify shared package. This prohibition includes exception hierarchies, clock abstractions, PDO row-position/display-order mechanics, and PDO pagination mechanics.
 
 A consuming package MUST declare the minimum stable dependency version that exposes every shared API it uses. Proposed architecture documents, unreleased branches, commits, and implementation contracts are not consumable public APIs and MUST NOT be copied into consumer packages.
 
@@ -383,7 +383,9 @@ A documentation-only architecture contract inside `maatify/persistence` establis
 
 ### Ordering Integration
 
-Ordering operations MUST use the stable public API under:
+In this section, `Ordering` means reusable row-position and display-order management exposed by `Maatify\Persistence\Pdo\Ordering`. It does not include ordinary consumer-owned read-query sorting expressed through `ORDER BY`.
+
+Reusable row-position and display-order operations covered by the stable `maatify/persistence` Ordering API MUST use:
 
 ```text
 Maatify\Persistence\Pdo\Ordering
