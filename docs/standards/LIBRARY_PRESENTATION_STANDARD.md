@@ -330,7 +330,7 @@ Unless a subsequent decision alters this Standard.
 
 ## 14. SECURITY Presentation States
 
-There are two defined states for the Security Policy:
+There are three defined states for the Security Policy:
 
 ### 14.1 Development State
 When no approved version and no Final Release Candidate exist, the file MAY state that there is currently no supported release line.
@@ -358,6 +358,26 @@ The Final Release Candidate presentation sets up the final state before the Tag,
 * There is a clear release intent.
 * Approval of the polish immediately precedes the release.
 * If the version or date changes before publication, the files MUST be updated before the Tag.
+
+### 14.3 Published Stable State
+
+After the first stable Tag is published, the Security Policy enters the Published Stable State.
+
+In this state, `SECURITY.md` MUST:
+
+- describe only release lines that are currently supported by published stable releases
+- identify every supported major line when more than one major line is actively supported
+- direct users to the latest stable release within each supported line before reporting a vulnerability
+- remove any wording that describes the package as unreleased, pre-release, or awaiting publication
+- remain synchronized with the actual support policy whenever a supported line is added, replaced, or retired
+
+The Supported Versions wording from Section 14.2 MAY remain unchanged after publication when it accurately describes the published stable state.
+
+A future release line MUST NOT be presented as actively supported before its first stable Tag exists, except during the explicitly approved Final Release Candidate transition defined in Section 14.2.
+
+Publishing a patch or minor release within an already supported major line does not require a Security Policy change unless the file names an exact version, changes the support scope, or otherwise becomes inaccurate.
+
+If support for a release line is withdrawn, `SECURITY.md` MUST be updated as part of the same owner-approved release or governance change that withdraws support.
 
 ## 15. CHANGELOG Presentation Standard
 
