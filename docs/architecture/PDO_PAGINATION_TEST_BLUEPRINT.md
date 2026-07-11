@@ -1,6 +1,6 @@
 # Test Blueprint — PDO Pagination `v1.1.0`
 
-**الحالة:** جاهز لمراجعة واعتماد المالك.
+**الحالة:** Owner-approved Test Blueprint; test implementation is pending.
 **مصدر الحقيقة:**
 
 ```text
@@ -1639,6 +1639,6 @@ test(pagination): cover PDO pagination contracts
 # 30. القرار الحالي
 
 ```text
-TEST_BLUEPRINT_STATUS: READY_FOR_OWNER_APPROVAL
-NEXT_ACTION: APPROVE_TEST_BLUEPRINT_THEN_SEND_TO_JULES
+TEST_BLUEPRINT_STATUS: OWNER_APPROVED
+NEXT_ACTION: SEND_TO_JULES
 ```
