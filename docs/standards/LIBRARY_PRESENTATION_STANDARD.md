@@ -46,7 +46,11 @@ Every other language or ecosystem MUST have a separate Standard when needed.
 
 The canonical footer approved for this Standard is:
 ```markdown
+<div align="center">
+
 [Built with ❤️ by Maatify.dev — Unified Ecosystem for Modern PHP Libraries](https://www.maatify.dev)
+
+</div>
 ```
 Do not replace `PHP Libraries` with `Software Libraries` or any other generic term.
 
