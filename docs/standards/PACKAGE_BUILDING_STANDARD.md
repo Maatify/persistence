@@ -615,7 +615,7 @@ The package-level integration contract is:
 - `display_order` MUST NOT be accepted by `CreateCommand` or `UpdateCommand`
 - creation-time position assignment MUST delegate to the stable Ordering API when automatic assignment applies
 - movement MUST be exposed through a dedicated package operation rather than a generic update command
-- a Command Repository MAY return `bool` to report whether the target row existed and was moved
+- the Command Repository operation MUST return `bool` to report whether the target row existed and was moved
 - a Service MAY expose a `void` operation and convert a Repository `false` result into the approved not-found exception
 - shifting, clamping, scope locking, transaction ownership, identifier validation, and persistence exception behavior MUST remain delegated to `maatify/persistence`
 - a consumer MUST NOT reproduce or fork the Ordering engine locally
