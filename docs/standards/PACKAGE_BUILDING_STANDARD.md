@@ -40,6 +40,8 @@ This ensures:
 
 ## 3. Required Files
 
+Repository presentation, governance-document identity, release-facing metadata, and visual consistency MUST follow [LIBRARY_PRESENTATION_STANDARD.md](LIBRARY_PRESENTATION_STANDARD.md).
+
 Every package must contain these files at its root (the repository root is the package root):
 
 ```

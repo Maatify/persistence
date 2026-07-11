@@ -166,6 +166,7 @@ Other important documentation:
 * [Code of Conduct](CODE_OF_CONDUCT.md)
 * [Package Building Standard](docs/standards/PACKAGE_BUILDING_STANDARD.md)
 * [CI Workflow Standard](docs/standards/CI_WORKFLOW_STANDARD.md)
+* [Library Presentation Standard](docs/standards/LIBRARY_PRESENTATION_STANDARD.md)
 
 ## ✅ Quality Status
 
