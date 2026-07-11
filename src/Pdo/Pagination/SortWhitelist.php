@@ -51,7 +51,11 @@ final readonly class SortWhitelist
 
         $quotedSorts = [];
         foreach ($sorts as $key => $identifierPath) {
-            if (! is_string($key) || ! preg_match(self::IDENTIFIER_PATTERN, $key)) {
+            if (! is_string($key) || $key === '') {
+                throw new InvalidPaginationConfigurationException('Invalid pagination sort key.');
+            }
+
+            if (! preg_match(self::IDENTIFIER_PATTERN, $key)) {
                 throw new InvalidPaginationConfigurationException('Invalid pagination sort key.');
             }
 
