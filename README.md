@@ -210,4 +210,8 @@ Backend Lead & Technical Architect<br>
 
 ---
 
+<div align="center">
+
 [Built with ❤️ by Maatify.dev — Unified Ecosystem for Modern PHP Libraries](https://www.maatify.dev)
+
+</div>
