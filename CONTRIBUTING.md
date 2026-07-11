@@ -85,7 +85,7 @@ When contributing code, you must adhere to the following architectural rules:
 * **No Global Normalization**: Do not perform global normalization of gaps as a side effect of a scoped operation.
 * **Rollback Behavior**: Rollbacks must preserve the original error/exception.
 * **Exception Handling**: Do not catch every `\PDOException` or external `\Throwable` randomly to wrap it in a package exception. `PersistenceException` is strictly for package-defined exceptions.
-* **Composer Lock**: Do not commit or submit `composer.lock`. It is intentionally untracked for this reusable library. Remove any locally generated `composer.lock` file before final delivery.
+* **Composer Lock**: This reusable library does not track `composer.lock`, in accordance with the [Composer Package Standard](docs/standards/COMPOSER_PACKAGE_STANDARD.md). Remove any locally generated `composer.lock` before submitting changes.
 
 ## Pull Request Rules
 

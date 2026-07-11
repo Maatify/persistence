@@ -448,16 +448,21 @@ Do not replace `Modern PHP Libraries` with any other generic wording within this
 
 ## 19. Package and Repository Metadata
 
-This Standard covers presentation-facing metadata only.
+This Standard covers presentation-facing consistency only.
 
 ### Composer Metadata
-* `description` MUST be accurate.
-* `keywords` MUST be relevant to the library.
-* `homepage` MUST point to the correct repository.
-* Authors MUST be correct.
-* License MUST match `LICENSE`.
 
-This Standard does not alter dependencies or constraints; that is the responsibility of the Package Building Standard.
+The canonical construction and validation rules for Composer metadata are defined by [COMPOSER_PACKAGE_STANDARD.md](COMPOSER_PACKAGE_STANDARD.md).
+
+This section governs only presentation-facing consistency between Composer, README, Packagist, and GitHub metadata.
+
+* `description` MUST remain accurate and consistent with the public package presentation.
+* `keywords` MUST remain relevant and MUST NOT contradict GitHub Topics.
+* `homepage` MUST point to the current repository.
+* Author metadata MUST match the approved Maatify identity.
+* License metadata MUST match `LICENSE`.
+
+Dependency declarations, constraints, autoloading, scripts, configuration, stability, and lock-file policy are governed exclusively by [COMPOSER_PACKAGE_STANDARD.md](COMPOSER_PACKAGE_STANDARD.md).
 
 ### GitHub Metadata
 The following MUST be reviewed:

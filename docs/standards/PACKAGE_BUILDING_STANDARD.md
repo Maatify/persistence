@@ -31,6 +31,8 @@ To maintain standalone Composer package boundaries and a framework-agnostic arch
 
 **Rule:** Packages must not define a local duplicate exception hierarchy or local clock abstraction if the contract or base is available in Maatify shared packages.
 
+The declaration, constraint, ordering, and validation rules for these dependencies are governed by [COMPOSER_PACKAGE_STANDARD.md](COMPOSER_PACKAGE_STANDARD.md).
+
 This ensures:
 - Explicit Composer/runtime dependencies only
 - Public API stability
@@ -41,6 +43,8 @@ This ensures:
 ## 3. Required Files
 
 Repository presentation, governance-document identity, release-facing metadata, and visual consistency MUST follow [LIBRARY_PRESENTATION_STANDARD.md](LIBRARY_PRESENTATION_STANDARD.md).
+Composer package metadata, dependency declarations, autoloading, scripts, configuration, stability, and lock-file policy MUST follow [COMPOSER_PACKAGE_STANDARD.md](COMPOSER_PACKAGE_STANDARD.md).
+
 
 Every package must contain these files at its root (the repository root is the package root):
 
@@ -48,7 +52,7 @@ Every package must contain these files at its root (the repository root is the p
 ├── README.md                          ← installation, quick examples, what it does / does not
 ├── CHANGELOG.md                       ← versioned history, starting at [1.0.0]
 ├── {PACKAGE_NAME}_PACKAGE_REFERENCE.md ← complete API reference and design rules (e.g. docs/EVENT_LOGGING_MODULE_REFERENCE.md)
-├── composer.json                      ← library type, psr-4 autoload, explicit runtime/Composer dependencies only
+├── composer.json                      ← governed by COMPOSER_PACKAGE_STANDARD.md
 ├── phpstan.neon                       ← level: max, paths: [src, tests]
 ├── src/                               ← all PHP source code
 ├── tests/                             ← if applicable
@@ -797,7 +801,7 @@ CI pipelines MUST be:
 - [ ] `README.md` written with installation steps and quick examples
 - [ ] `CHANGELOG.md` written starting at `[1.0.0]`
 - [ ] `{PACKAGE}_PACKAGE_REFERENCE.md` complete — full API, design rules, extension guide
-- [ ] `composer.json` metadata is correct and lists explicit runtime/Composer dependencies only (no phantom extensions)
+- [ ] `composer.json` complies with [COMPOSER_PACKAGE_STANDARD.md](COMPOSER_PACKAGE_STANDARD.md).
 - [ ] Every public service/repository capability intended for infrastructure substitution has a matching contract (interface)
 - [ ] Domain-specific failure semantics are documented
 - [ ] Transaction catch blocks rethrow the original `\Throwable` after rollback — never swallow
