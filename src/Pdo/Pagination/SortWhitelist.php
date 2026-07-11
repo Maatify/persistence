@@ -61,11 +61,6 @@ final readonly class SortWhitelist
 
             $quotedSorts[$key] = $this->quoteIdentifierPath($identifierPath);
         }
-
-        if ($quotedSorts === []) {
-            throw new InvalidPaginationConfigurationException('Sort whitelist cannot be empty.');
-        }
-
         return $quotedSorts;
     }
 
