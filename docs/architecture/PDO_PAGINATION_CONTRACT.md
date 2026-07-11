@@ -228,6 +228,8 @@ Constructor validation:
 
 `defaultSortBy` and `tieBreakerSortBy` MAY resolve to the same identifier.
 
+The values `20`, `1`, and `200` are the canonical constructor defaults. Callers MAY configure different valid per-page values through `PaginationConfig`; no separate architectural exception is required when the constructor invariants remain satisfied.
+
 ### 6.5 `PdoPaginationQuery`
 
 ```php
@@ -284,6 +286,21 @@ public function __construct(
     public SortDirection $sortDirection,
 );
 ```
+
+Constructor invariants:
+
+- `data` MUST satisfy `array_is_list($data)`
+- `page >= 1`
+- `perPage >= 1`
+- `total >= 0`
+- `filtered >= 0`
+- `totalPages >= 0`
+- when `totalPages === 0`, `page === 1` and both navigation flags are `false`
+- when `totalPages > 0`, `page <= totalPages`
+- `hasNext === ($page < $totalPages)`
+- `hasPrevious === ($page > 1 && $totalPages > 0)`
+
+An inconsistent result state is a package-owned execution failure and MUST throw `PaginationExecutionException`.
 
 Public serialization signatures:
 
@@ -534,7 +551,10 @@ The descriptor constructor MUST reject:
 - invalid parameter keys
 - parameter keys beginning with `:`
 - reserved pagination keys
+- any SQL string containing `:__pagination_limit` or `:__pagination_offset`
 - unsupported parameter value types
+
+Checking for the two exact reserved placeholder names is a narrow collision check, not general SQL parsing.
 
 The component does not provide a SQL parser. Top-level `ORDER BY`, `LIMIT`, `OFFSET`, locking clauses, multi-statement content, SELECT compatibility, and semantic alignment remain explicit caller contracts except where PDO itself reports failure.
 
@@ -577,6 +597,8 @@ Decimals are validated strings owned by the caller.
 
 Each SQL statement is executed only with its matching parameter map. One shared map MUST NOT be bound blindly to all statements.
 
+Within one SQL statement, each named placeholder MUST have one unique occurrence. When the same logical value is needed more than once, the caller MUST use distinct placeholder names and matching parameter entries. This avoids driver-dependent behavior when native prepared statements are enabled.
+
 The paginator MUST NOT change PDO connection attributes.
 
 ## 11. Count Validation and Metadata
@@ -607,6 +629,14 @@ $totalPages = $filtered === 0
     ? 0
     : intdiv($filtered - 1, $perPage) + 1;
 ```
+
+After zero-result and overflow normalization, and only when `filtered > 0`, offset calculation is exactly:
+
+```php
+$offset = ($page - 1) * $perPage;
+```
+
+The multiplication is integer-safe under this contract because the effective page is never greater than `totalPages`, and the resulting page start cannot exceed `filtered - 1`.
 
 The paginator MUST NOT enforce `filtered <= total` at Runtime. Concurrent writes between independent count statements can temporarily violate that relationship unless the caller supplies an appropriate consistent transaction.
 
@@ -760,7 +790,8 @@ It MUST NOT:
 - commit a transaction
 - roll back a transaction
 - reject an active transaction
-- alter transaction state after success or failure
+
+The paginator guarantee is limited to never explicitly calling `beginTransaction()`, `commit()`, or `rollBack()`. External database/driver behavior and mapper-owned code may affect transaction state and remain outside the paginator guarantee. Documentation and tests MUST NOT claim that every possible external failure preserves transaction state.
 
 Without a caller-owned consistent transaction, the three statements are independent reads. Concurrent changes may produce:
 
@@ -948,8 +979,9 @@ The canonical fields are additive conceptually, but an endpoint response is not 
 - mapper arrays and objects
 - invalid mapper result
 - PDO exception propagation
-- operation inside caller transaction
-- caller transaction remains active
+- successful operation inside caller transaction
+- caller transaction remains active after successful pagination
+- no claim that every external PDO/driver failure preserves transaction state
 - no transaction created outside caller transaction
 - repeated execution and fixture cleanup
 

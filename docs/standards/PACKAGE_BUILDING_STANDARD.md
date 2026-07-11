@@ -415,7 +415,9 @@ __pagination_limit
 __pagination_offset
 ```
 
-Caller maps MUST NOT use either reserved key.
+Caller maps MUST NOT use either reserved key. Caller SQL statements MUST NOT contain `:__pagination_limit` or `:__pagination_offset`; either occurrence is an invalid query descriptor. This exact-name collision check does not imply general SQL parsing.
+
+Within one SQL statement, each named placeholder MUST have one unique occurrence. Reusing the same logical value requires distinct placeholder names and matching parameter entries so behavior remains valid with native prepared statements.
 
 The component adds the leading colon internally and binds values by type:
 
@@ -436,7 +438,7 @@ minPerPage     = 1
 maxPerPage     = 200
 ```
 
-A package-specific variation requires an explicit documented contract.
+These are the canonical constructor defaults. Callers MAY configure different valid values through the approved pagination configuration object, provided its documented invariants remain satisfied.
 
 Accepted page and per-page inputs are integers or trimmed decimal-integer strings that fit inside the PHP integer range. Decimal points and exponent notation are invalid.
 
@@ -475,6 +477,14 @@ $totalPages = $filtered === 0
     ? 0
     : intdiv($filtered - 1, $perPage) + 1;
 ```
+
+After zero-result and overflow normalization, and only when `filtered > 0`, offset MUST be calculated exactly as:
+
+```php
+$offset = ($page - 1) * $perPage;
+```
+
+This is integer-safe because the effective page cannot exceed `totalPages`, so the page start cannot exceed `filtered - 1`.
 
 When `filtered === 0`:
 
@@ -583,6 +593,17 @@ Contract rules:
 - `sort_direction` is uppercase
 - internal `offset` is never exposed
 
+The typed result object MUST reject inconsistent state. At minimum:
+
+- `data` is verified with `array_is_list()`
+- `page >= 1` and `per_page >= 1`
+- `total`, `filtered`, and `total_pages` are non-negative
+- `total_pages === 0` requires page `1` and both navigation flags `false`
+- a positive `total_pages` requires `page <= total_pages`
+- navigation flags exactly match the effective page and `total_pages`
+
+An inconsistent result state is a package-owned execution failure.
+
 ### Transaction Contract
 
 A read paginator MUST NOT own transactions.
@@ -591,7 +612,6 @@ It MUST:
 
 - execute on the provided PDO connection
 - allow execution inside a caller-owned active transaction
-- leave caller-owned transaction state unchanged
 
 It MUST NOT:
 
@@ -599,6 +619,8 @@ It MUST NOT:
 - call `commit()`
 - call `rollBack()`
 - reject an active caller-owned transaction
+
+The guarantee is limited to the paginator making none of those explicit transaction-control calls. External database/driver behavior and mapper-owned code may affect transaction state and are outside the paginator guarantee. Verification MUST NOT claim that every possible external failure preserves an active caller transaction.
 
 ### Exception and Error Propagation
 
