@@ -56,10 +56,10 @@ Every package must contain these files at its root (the repository root is the p
 
 ```
 ├── README.md                          ← installation, quick examples, what it does / does not
-├── CHANGELOG.md                       ← versioned history, starting at [1.0.0]
+├── CHANGELOG.md                       ← Keep a Changelog; release history begins at [1.0.0]
 ├── {PACKAGE_NAME}_PACKAGE_REFERENCE.md ← complete API reference and design rules (e.g. docs/EVENT_LOGGING_MODULE_REFERENCE.md)
 ├── composer.json                      ← governed by COMPOSER_PACKAGE_STANDARD.md
-├── phpstan.neon                       ← level: max, paths: [src, tests]
+├── phpstan.neon                       ← governed by Section 21
 ├── src/                               ← all PHP source code
 ├── tests/                             ← if applicable
 ├── schema/                            ← if the package owns SQL schema
@@ -229,10 +229,10 @@ final readonly class CreateSomethingCommand
 Rules:
 - `final readonly` — always
 - Validation only in the constructor — no business logic
-- Never contains `display_order` — auto-assigned on create
-- Never contains `image` — updated via dedicated method
+- Display-order inputs MUST follow Section 16; `CreateCommand` and `UpdateCommand` do not accept `display_order`
+- Image inputs MUST follow Section 17; `CreateCommand` and `UpdateCommand` do not accept `image`
 - Host IDs (e.g. `methodId`, `currencyId`) must be validated with `>= 1` guard
-- Decimal strings must be validated with `preg_match('/^\d+(?:\.\d{1,4})?$/', $value)` before any `bcmath` call
+- Monetary and fixed-precision decimal inputs MUST follow Section 19
 - Date/time strings must be validated with `new \DateTimeImmutable($value)` in a try/catch
 
 ---
@@ -291,6 +291,8 @@ final readonly class SomethingCollectionDTO implements \IteratorAggregate, \Json
 | `softDelete()` | `bool` | `rowCount() > 0` |
 | `hardDelete()` | `bool` | `rowCount() > 0` after transaction |
 | `findById()` | `?DTO` | `null` if not found — Service decides whether to throw |
+
+This table defines Repository-level return contracts. A Service MAY expose `updateDisplayOrder(...): void`, call the Repository operation, and convert `false` into the approved not-found exception according to Section 13. The Repository and Service signatures belong to different layers and MUST NOT be treated as competing alternatives.
 
 ### `findById` Pattern
 
@@ -446,6 +448,7 @@ Temporary copying of an unpublished persistence contract is not an acceptable wo
 Consumer packages MUST follow the stable public API, package reference, and published integration documentation in `maatify/persistence`.
 
 Exact class signatures, internal formulas, SQL assembly rules, exception classifications, and verification requirements belong in the owning repository. They MUST NOT be duplicated in this general package-building standard or independently redefined by consumer packages.
+
 ---
 
 ## 12. Translation Pattern
@@ -605,12 +608,21 @@ Remember to uphold the core principles: maintain a standalone, framework-agnosti
 
 ## 16. display_order Rules
 
-- Auto-assigned on `create` via `ScopedOrderingManager::getNextPosition()`
-- Never in `CreateCommand` or `UpdateCommand`
-- Updated via dedicated `updateDisplayOrder(int $id, int $displayOrder): void`
-- `ScopedOrderingManager::moveWithinScope()` handles shift + clamp to valid range
-- Soft delete: **no compact** — record still exists in DB
-- Hard delete: `compactScopeAfterRemoval()` inside transaction — closes the gap
+When persisted entities expose mutable row-position or display-order behavior, the package MUST consume the stable public Ordering API from `maatify/persistence`.
+
+The package-level integration contract is:
+
+- `display_order` MUST NOT be accepted by `CreateCommand` or `UpdateCommand`
+- creation-time position assignment MUST delegate to the stable Ordering API when automatic assignment applies
+- movement MUST be exposed through a dedicated package operation rather than a generic update command
+- a Command Repository MAY return `bool` to report whether the target row existed and was moved
+- a Service MAY expose a `void` operation and convert a Repository `false` result into the approved not-found exception
+- shifting, clamping, scope locking, transaction ownership, identifier validation, and persistence exception behavior MUST remain delegated to `maatify/persistence`
+- a consumer MUST NOT reproduce or fork the Ordering engine locally
+
+Exact class names, method signatures, transaction behavior, and Runtime semantics are owned by the stable `maatify/persistence` public API and `PERSISTENCE_PACKAGE_REFERENCE.md`.
+
+Hard-delete gap compaction is not defined by the currently published stable Ordering API. This Standard does not authorize a package-local compaction algorithm or a copied unpublished contract. Any future hard-delete compaction behavior requires a separate owner-approved architectural decision and a stable `maatify/persistence` API before consumer adoption.
 
 ---
 
@@ -687,10 +699,9 @@ parameters:
 
 ### Testing Strategy
 
-- **Testing Requirements**: Packages that own persistence/database behavior must provide integration tests where practical. Unit/Regression suites are required where applicable.
-- **Database Tests**: DB-dependent integration tests must use the real service targeted by the package-owned persistence. They must not depend on host application databases, host schemas, framework bindings, or secrets.
-- **MySQL & SQLite Rules**: For MySQL-owned packages, integration tests must use a real MySQL service/DSN, not SQLite. SQLite fallback/support is forbidden for MySQL-owned packages unless SQLite is explicitly declared as a real supported persistence target for that package.
-- **Example Code**: Must be purely illustrative, validated via syntax checks (`php -l`), devoid of real credentials or framework bindings.
+- Packages that own persistence, database, or external-service behavior MUST define appropriate Integration coverage. Unit and Regression suites remain required where applicable.
+- Package-owned test behavior, fixtures, and suite responsibilities belong to the package architecture and reference documentation.
+- CI execution requirements — including real-service provisioning, MySQL/SQLite enforcement, PHP matrices, cleanup/repeatability checks, and example syntax validation — are governed exclusively by [`CI_WORKFLOW_STANDARD.md`](CI_WORKFLOW_STANDARD.md).
 
 ### PDO fetch results — always annotate
 
@@ -702,40 +713,9 @@ $row = $stmt->fetch(PDO::FETCH_ASSOC);
 $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 ```
 
-### IteratorAggregate — generic annotations required
+### DTO and Hydration Annotations
 
-```php
-/** @implements \IteratorAggregate<int, SomethingDTO> */
-final readonly class SomethingCollectionDTO implements \IteratorAggregate, \JsonSerializable
-
-/** @return \ArrayIterator<int, SomethingDTO> */
-public function getIterator(): \ArrayIterator
-```
-
-### list type annotations
-
-```php
-/** @var list<SomethingDTO> */
-private array $items;
-
-/** @param list<SomethingDTO> $items */
-public function __construct(array $items)
-```
-
-### Hydration — extract before cast
-
-```php
-// ❌ PHPStan max rejects direct cast of mixed
-isActive:     (bool) ($row['is_active']     ?? false),
-displayOrder: (int)  ($row['display_order'] ?? 0),
-
-// ✅ extract, check type, then cast
-$isActive     = $row['is_active']     ?? null;
-$displayOrder = $row['display_order'] ?? null;
-
-isActive:     (is_int($isActive)     || is_string($isActive)) && (int) $isActive === 1,
-displayOrder: (is_int($displayOrder) || is_string($displayOrder)) ? (int) $displayOrder : 0,
-```
+Collection generics and list annotations are governed by Section 9. PDO-row hydration and mixed-value extraction rules are governed by Section 10. This section MUST NOT redefine those contracts.
 
 ### LIMIT / OFFSET — always PDO::PARAM_INT
 
@@ -776,40 +756,18 @@ private function findRawById(int $id): ?array
 
 Every new standalone Composer package in the Maatify ecosystem must adhere to the CI workflow standards defined in [`CI_WORKFLOW_STANDARD.md`](CI_WORKFLOW_STANDARD.md).
 
-CI pipelines MUST be:
-- **compliant with `CI_WORKFLOW_STANDARD.md`** (which serves as the single detailed source of truth)
-- **reliable always-reporting required checks** (using stable gates, not fragile matrix jobs)
-- **testing minimum and latest PHP compatibility**
-- **testing lowest and latest dependency compatibility**
-- **enforcing PHPStan max**
-- **enforcing code-style dry-run** (when configured)
-- **using real service Integration tests** (where applicable)
-- **running Composer security audit**
-- **running workflow linting**
-- **following least-privilege and immutable action pinning**
-- **free of hidden failures** (no silent continue-on-error)
-- **free of required secrets or Host dependencies in baseline CI**
+`CI_WORKFLOW_STANDARD.md` is the single detailed source of truth for workflow architecture, path relevance, dependency resolution, PHP compatibility matrices, quality checks, real-service Integration execution, security audit, workflow linting, permissions, immutable action pinning, execution reliability, and stable required gates.
+
+Compliance requires the repository's CI to pass the current Compliance Checklist defined by that Standard. This Package Building Standard MUST NOT independently redefine those CI mechanics.
 
 ---
 
 ## 23. The Package Is NOT Done Until
 
-- [ ] All PHPStan max errors resolved — zero errors, no suppressions
-- [ ] CI workflows exist and pass
-- [ ] CI workflows comply fully with `CI_WORKFLOW_STANDARD.md`
-- [ ] Minimum and latest PHP compatibility tested
-- [ ] Lowest and latest dependency compatibility tested
-- [ ] PHPStan max passes
-- [ ] Code-style dry-run passes (if configured)
-- [ ] PHPUnit full suite passes (Unit, Regression, Integration where applicable)
-- [ ] Example PHP files are syntax-checked where examples exist
-- [ ] DB integration tests use real service dependencies where applicable
-- [ ] Composer security audit passes
-- [ ] Workflow files pass linting
-- [ ] Required gates always report a stable status
-- [ ] No baseline CI depends on host app code, host schema, framework bindings, or secrets
+- [ ] CI workflows exist, pass, and satisfy the current Compliance Checklist in `CI_WORKFLOW_STANDARD.md`
+- [ ] Package-owned runtime and test architecture is represented in CI where applicable
 - [ ] `README.md` written with installation steps and quick examples
-- [ ] `CHANGELOG.md` written starting at `[1.0.0]`
+- [ ] `CHANGELOG.md` follows `LIBRARY_PRESENTATION_STANDARD.md`, retains `[Unreleased]` at the top, and begins release history at `[1.0.0]`
 - [ ] `{PACKAGE}_PACKAGE_REFERENCE.md` complete — full API, design rules, extension guide
 - [ ] `composer.json` complies with [COMPOSER_PACKAGE_STANDARD.md](COMPOSER_PACKAGE_STANDARD.md).
 - [ ] Every public service/repository capability intended for infrastructure substitution has a matching contract (interface)
@@ -819,4 +777,4 @@ CI pipelines MUST be:
 - [ ] Schema docs align with MySQL/domain-owned tables, no generic `logs` or `event_logs` tables
 - [ ] Framework-agnostic boundaries preserved: no host app namespaces, no framework bindings required
 - [ ] No generic logger, recorder, or repository
-- [ ] Docs reflect current exception rules (using `SystemMaatifyException`), and the package explicitly relies on `maatify/exceptions` and `maatify/shared-common` instead of defining local duplicates
+- [ ] Docs reflect current exception rules, package-defined exceptions use `maatify/exceptions`, and any clock/date-time contract uses `maatify/shared-common` instead of a local duplicate

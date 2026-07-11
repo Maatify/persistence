@@ -31,8 +31,8 @@ It explicitly does **not** govern:
 
 ### Relationship to other standards:
 * `PACKAGE_BUILDING_STANDARD.md`: Governs library building, code architecture, and the package contract.
+* `COMPOSER_PACKAGE_STANDARD.md`: Governs Composer metadata, dependencies, autoloading, scripts, configuration, stability, and lock-file policy.
 * `CI_WORKFLOW_STANDARD.md`: Governs CI, quality gates, and automated testing.
-* `LIBRARY_PRESENTATION_STANDARD.md`: Governs appearance, identity, public documentation, and release-facing presentation.
 
 Each Standard has clear boundaries and must not duplicate the content of another.
 
@@ -44,14 +44,7 @@ The current version of this Standard applies exclusively to:
 It MUST NOT be generalized to JavaScript, Rust, or any other language.
 Every other language or ecosystem MUST have a separate Standard when needed.
 
-The canonical footer approved for this Standard is:
-```markdown
-<div align="center">
-
-[Built with ❤️ by Maatify.dev — Unified Ecosystem for Modern PHP Libraries](https://www.maatify.dev)
-
-</div>
-```
+The canonical README footer is defined exclusively in [Section 18](#18-canonical-maatify-footer).
 Do not replace `PHP Libraries` with `Software Libraries` or any other generic term.
 
 ## 4. Canonical Placeholders
@@ -440,10 +433,14 @@ The absolutely final element in the README MUST be:
 ```markdown
 ---
 
+<div align="center">
+
 [Built with ❤️ by Maatify.dev — Unified Ecosystem for Modern PHP Libraries](https://www.maatify.dev)
+
+</div>
 ```
 
-No text may appear after it.
+No text may appear after the closing `</div>`.
 Do not replace `Modern PHP Libraries` with any other generic wording within this Standard.
 
 ## 19. Package and Repository Metadata
