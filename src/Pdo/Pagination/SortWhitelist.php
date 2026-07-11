@@ -18,25 +18,7 @@ final readonly class SortWhitelist
      */
     public function __construct(array $sorts)
     {
-        if ($sorts === []) {
-            throw new InvalidPaginationConfigurationException('Sort whitelist cannot be empty.');
-        }
-
-        $quotedSorts = [];
-        foreach ($sorts as $key => $identifierPath) {
-            if (! is_string($key) || ! preg_match(self::IDENTIFIER_PATTERN, $key)) {
-                throw new InvalidPaginationConfigurationException('Invalid pagination sort key.');
-            }
-
-            if (! is_string($identifierPath)) {
-                throw new InvalidPaginationConfigurationException('Invalid pagination sort identifier.');
-            }
-
-            $quotedSorts[$key] = $this->quoteIdentifierPath($identifierPath);
-        }
-
-        /** @var non-empty-array<non-empty-string, non-empty-string> $quotedSorts */
-        $this->quotedSorts = $quotedSorts;
+        $this->quotedSorts = $this->normalizeSorts($sorts);
     }
 
     public function contains(string $key): bool
@@ -57,12 +39,43 @@ final readonly class SortWhitelist
     }
 
     /**
+     * @param array<mixed, mixed> $sorts
+     *
+     * @return non-empty-array<non-empty-string, non-empty-string>
+     */
+    private function normalizeSorts(array $sorts): array
+    {
+        if ($sorts === []) {
+            throw new InvalidPaginationConfigurationException('Sort whitelist cannot be empty.');
+        }
+
+        $quotedSorts = [];
+        foreach ($sorts as $key => $identifierPath) {
+            if (! is_string($key) || ! preg_match(self::IDENTIFIER_PATTERN, $key)) {
+                throw new InvalidPaginationConfigurationException('Invalid pagination sort key.');
+            }
+
+            if (! is_string($identifierPath)) {
+                throw new InvalidPaginationConfigurationException('Invalid pagination sort identifier.');
+            }
+
+            $quotedSorts[$key] = $this->quoteIdentifierPath($identifierPath);
+        }
+
+        if ($quotedSorts === []) {
+            throw new InvalidPaginationConfigurationException('Sort whitelist cannot be empty.');
+        }
+
+        return $quotedSorts;
+    }
+
+    /**
      * @return non-empty-string
      */
     private function quoteIdentifierPath(string $identifierPath): string
     {
         $segments = explode('.', $identifierPath);
-        if (count($segments) < 1 || count($segments) > 3) {
+        if (count($segments) > 3) {
             throw new InvalidPaginationConfigurationException('Invalid pagination sort identifier path.');
         }
 

@@ -8,7 +8,7 @@ use JsonSerializable;
 use Maatify\Persistence\Exception\PaginationExecutionException;
 
 /**
- * @template T of array|object
+ * @template T of array<array-key, mixed>|object
  */
 final readonly class PageResult implements JsonSerializable
 {
@@ -61,16 +61,24 @@ final readonly class PageResult implements JsonSerializable
         return $this->toArray();
     }
 
-    private function assertValid(): void
+    /**
+     * @param array<mixed, mixed> $data
+     */
+    private function assertData(array $data): void
     {
-        if (! array_is_list($this->data)) {
+        if (! array_is_list($data)) {
             throw new PaginationExecutionException('Pagination data must be a list.');
         }
-        foreach ($this->data as $item) {
+        foreach ($data as $item) {
             if (! is_array($item) && ! is_object($item)) {
                 throw new PaginationExecutionException('Pagination data item must be array or object.');
             }
         }
+    }
+
+    private function assertValid(): void
+    {
+        $this->assertData($this->data);
         if ($this->page < 1 || $this->perPage < 1 || $this->total < 0 || $this->filtered < 0 || $this->totalPages < 0 || count($this->data) > $this->perPage || ! preg_match(self::PUBLIC_KEY_PATTERN, $this->sortBy)) {
             throw new PaginationExecutionException('Invalid pagination result state.');
         }

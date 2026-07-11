@@ -8,9 +8,6 @@ use Maatify\Persistence\Exception\PaginationExecutionException;
 use PDO;
 use PDOStatement;
 
-/**
- * @template T of array|object
- */
 final readonly class PdoPaginator
 {
     private const PUBLIC_KEY_PATTERN = '/^[A-Za-z_][A-Za-z0-9_]*$/';
@@ -19,7 +16,7 @@ final readonly class PdoPaginator
     private const OFFSET_PARAMETER = '__pagination_offset';
 
     /**
-     * @template TItem of array|object
+     * @template TItem of array<array-key, mixed>|object
      *
      * @param callable(array<string, mixed>): TItem $mapper
      *
@@ -36,12 +33,14 @@ final readonly class PdoPaginator
         $perPage = $this->normalizePerPage($request->perPage, $config);
         $sortBy = $this->resolveSortBy($request->sortBy, $config);
         $sortDirection = $this->resolveSortDirection($request->sortDirection, $config);
+        /** @var list<TItem> $data */
+        $data = [];
         $total = $this->executeCount($pdo, $query->totalSql, $query->totalParams);
         $filtered = $this->executeCount($pdo, $query->filteredCountSql, $query->filteredCountParams);
         $totalPages = $filtered === 0 ? 0 : intdiv($filtered - 1, $perPage) + 1;
 
         if ($filtered === 0) {
-            return new PageResult([], 1, $perPage, $total, $filtered, 0, false, false, $sortBy, $sortDirection);
+            return new PageResult($data, 1, $perPage, $total, $filtered, 0, false, false, $sortBy, $sortDirection);
         }
 
         if ($page > $totalPages) {
@@ -58,7 +57,6 @@ final readonly class PdoPaginator
             throw new PaginationExecutionException('Failed to execute pagination data query.');
         }
 
-        $data = [];
         while (true) {
             $row = $this->fetchAssociativeOrEof($statement);
             if ($row === false) {
@@ -66,9 +64,7 @@ final readonly class PdoPaginator
             }
             $this->assertAssociativeDataRow($row);
             $item = $mapper($row);
-            if (! is_array($item) && ! is_object($item)) {
-                throw new PaginationExecutionException('Pagination mapper must return array or object.');
-            }
+            $this->assertMappedItem($item);
             $data[] = $item;
         }
 
@@ -205,13 +201,24 @@ final readonly class PdoPaginator
     private function fetchAssociativeOrEof(PDOStatement $statement): array|false
     {
         $row = $statement->fetch(PDO::FETCH_ASSOC);
-        if ($row !== false) {
-            return $row;
+        if ($row === false) {
+            if ($statement->errorCode() === '00000') {
+                return false;
+            }
+            throw new PaginationExecutionException('Failed to fetch pagination row.');
         }
-        if ($statement->errorCode() === '00000') {
-            return false;
+        if (! is_array($row)) {
+            throw new PaginationExecutionException('Pagination fetch must return an associative array.');
         }
-        throw new PaginationExecutionException('Failed to fetch pagination row.');
+        $associativeRow = [];
+        foreach ($row as $key => $value) {
+            if (! is_string($key)) {
+                throw new PaginationExecutionException('Pagination row keys must be strings.');
+            }
+            $associativeRow[$key] = $value;
+        }
+
+        return $associativeRow;
     }
 
     /** @param array<mixed, mixed> $row */
@@ -220,10 +227,12 @@ final readonly class PdoPaginator
         if ($row === []) {
             throw new PaginationExecutionException('Pagination data row must contain at least one column.');
         }
-        foreach (array_keys($row) as $key) {
-            if (! is_string($key)) {
-                throw new PaginationExecutionException('Pagination data row keys must be strings.');
-            }
+    }
+
+    private function assertMappedItem(mixed $item): void
+    {
+        if (! is_array($item) && ! is_object($item)) {
+            throw new PaginationExecutionException('Pagination mapper must return array or object.');
         }
     }
 
