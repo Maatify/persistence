@@ -693,7 +693,27 @@ The package-level integration contract is:
 
 Exact class names, method signatures, transaction behavior, and Runtime semantics are owned by the stable `maatify/persistence` public API and `PERSISTENCE_PACKAGE_REFERENCE.md`.
 
-Hard-delete gap compaction is not defined by the currently published stable Ordering API. This Standard does not authorize a package-local compaction algorithm or a copied unpublished contract. Any future hard-delete compaction behavior requires a separate owner-approved architectural decision and a stable `maatify/persistence` API before consumer adoption.
+### Hard-Delete Gap Compaction
+
+The owner-approved architectural boundary is:
+
+- the consuming project owns entity lookup, authorization, domain deletion rules, and the physical `DELETE`
+- `maatify/persistence` owns ordering-scope locking, removed-position capture support, and the gap-compaction algorithm
+- the project MUST execute preparation, deletion, and compaction inside one caller-owned transaction using the same PDO connection
+- the applicable ordering scope MUST be locked and the target row's current scope and `display_order` MUST be captured before the project executes the `DELETE`
+- after a successful `DELETE` and before commit, the project MUST invoke the stable Persistence compaction operation
+- compaction MUST affect only active rows in the same ordering scope whose `display_order` is greater than the removed position, decrementing each by exactly one
+- zero shifted rows is a successful result when the removed row was the final active position
+- the project MUST commit only after both deletion and compaction succeed
+- any failure MUST cause the caller to roll back the complete transaction and rethrow the original throwable unless an explicitly approved semantic conversion applies
+- deleting a row that was already excluded from active ordering, such as an already soft-deleted row, MUST NOT shift active rows
+- a consumer MUST NOT implement, copy, or fork a package-local compaction algorithm
+
+Acquiring the ordering-scope lock only after deletion is forbidden because it does not preserve the required concurrency order between deletion and other ordering mutations.
+
+The approved package-specific architecture is documented in [`PDO_ORDERING_HARD_DELETE_COMPACTION_CONTRACT.md`](../architecture/PDO_ORDERING_HARD_DELETE_COMPACTION_CONTRACT.md).
+
+This decision does not claim that the Runtime capability already exists. Consumer adoption remains forbidden until `maatify/persistence` publishes the required stable API and records it in `PERSISTENCE_PACKAGE_REFERENCE.md`.
 
 ---
 
