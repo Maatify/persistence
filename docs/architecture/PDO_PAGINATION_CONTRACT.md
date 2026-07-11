@@ -290,15 +290,20 @@ public function __construct(
 Constructor invariants:
 
 - `data` MUST satisfy `array_is_list($data)`
+- `count($data) <= $perPage`
 - `page >= 1`
 - `perPage >= 1`
 - `total >= 0`
 - `filtered >= 0`
 - `totalPages >= 0`
+- `totalPages` MUST equal the canonical value calculated from `filtered` and `perPage`:
+  `0` when `filtered === 0`, otherwise `intdiv($filtered - 1, $perPage) + 1`
 - when `totalPages === 0`, `page === 1` and both navigation flags are `false`
 - when `totalPages > 0`, `page <= totalPages`
 - `hasNext === ($page < $totalPages)`
 - `hasPrevious === ($page > 1 && $totalPages > 0)`
+
+An empty `data` list while `filtered > 0` is valid because concurrent writes may change the dataset between the count and data statements.
 
 An inconsistent result state is a package-owned execution failure and MUST throw `PaginationExecutionException`.
 
@@ -550,11 +555,11 @@ The descriptor constructor MUST reject:
 - SQL ending in a semicolon after right trimming
 - invalid parameter keys
 - parameter keys beginning with `:`
-- reserved pagination keys
-- any SQL string containing `:__pagination_limit` or `:__pagination_offset`
+- parameter keys beginning with the reserved `__pagination_` prefix
+- any SQL string containing a named placeholder beginning with `:__pagination_`
 - unsupported parameter value types
 
-Checking for the two exact reserved placeholder names is a narrow collision check, not general SQL parsing.
+The complete `__pagination_` namespace is reserved for package-owned bindings. Detecting that prefix in caller parameter keys or SQL placeholder names is a narrow collision check, not general SQL parsing.
 
 The component does not provide a SQL parser. Top-level `ORDER BY`, `LIMIT`, `OFFSET`, locking clauses, multi-statement content, SELECT compatibility, and semantic alignment remain explicit caller contracts except where PDO itself reports failure.
 
@@ -570,7 +575,15 @@ Parameter keys MUST match:
 
 They MUST be stored without a leading colon.
 
-Reserved keys:
+Reserved namespace:
+
+```text
+__pagination_*
+```
+
+Caller parameter keys beginning with `__pagination_` are invalid. Caller SQL placeholder names beginning with `:__pagination_` are also invalid.
+
+The package currently uses:
 
 ```text
 __pagination_limit
@@ -603,7 +616,9 @@ The paginator MUST NOT change PDO connection attributes.
 
 ## 11. Count Validation and Metadata
 
-The paginator reads the first column of the first count row.
+Each count statement MUST return exactly one row containing exactly one column. The paginator MUST verify both cardinalities before accepting the value.
+
+The single count value is then validated using the following representation contract.
 
 Accepted count representation:
 
@@ -621,6 +636,8 @@ Rejected:
 - negative value
 - value larger than `PHP_INT_MAX`
 - any other type
+- zero rows or more than one row
+- a row containing zero columns or more than one column
 
 `totalPages` calculation:
 

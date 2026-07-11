@@ -408,14 +408,22 @@ string|int|bool|null
 
 Floats MUST NOT be accepted; decimal values must be supplied as validated decimal strings.
 
-The reserved internal parameter names are:
+The complete reserved internal parameter namespace is:
+
+```text
+__pagination_*
+```
+
+Caller maps MUST NOT use any key beginning with `__pagination_`. Caller SQL statements MUST NOT contain any named placeholder beginning with `:__pagination_`. Either prefix collision is an invalid query descriptor.
+
+The package currently uses:
 
 ```text
 __pagination_limit
 __pagination_offset
 ```
 
-Caller maps MUST NOT use either reserved key. Caller SQL statements MUST NOT contain `:__pagination_limit` or `:__pagination_offset`; either occurrence is an invalid query descriptor. This exact-name collision check does not imply general SQL parsing.
+This reserved-prefix collision check does not imply general SQL parsing.
 
 Within one SQL statement, each named placeholder MUST have one unique occurrence. Reusing the same logical value requires distinct placeholder names and matching parameter entries so behavior remains valid with native prepared statements.
 
@@ -462,7 +470,9 @@ Counts MUST execute in this order:
 2. filtered count
 3. data query, unless the filtered count is zero
 
-Both count statements MUST return one non-negative integer scalar that fits inside the PHP integer range. A non-integer, negative, absent, or unrepresentable count is an execution failure.
+Both count statements MUST return exactly one row containing exactly one column. The component MUST verify both cardinalities before accepting the value.
+
+That single value MUST be a non-negative integer representation fitting inside the PHP integer range. A non-integer, negative, absent, unrepresentable, multi-row, or multi-column count result is an execution failure.
 
 Definitions:
 
@@ -596,11 +606,15 @@ Contract rules:
 The typed result object MUST reject inconsistent state. At minimum:
 
 - `data` is verified with `array_is_list()`
+- `count($data) <= $perPage`
 - `page >= 1` and `per_page >= 1`
 - `total`, `filtered`, and `total_pages` are non-negative
+- `total_pages` exactly equals `0` when `filtered === 0`, otherwise `intdiv($filtered - 1, $per_page) + 1`
 - `total_pages === 0` requires page `1` and both navigation flags `false`
 - a positive `total_pages` requires `page <= total_pages`
 - navigation flags exactly match the effective page and `total_pages`
+
+An empty `data` list while `filtered > 0` remains valid because concurrent writes may change the dataset between the count and data statements.
 
 An inconsistent result state is a package-owned execution failure.
 
