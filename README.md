@@ -164,6 +164,7 @@ Other important documentation:
 * [Security Policy](SECURITY.md)
 * [Contributing Guide](CONTRIBUTING.md)
 * [Code of Conduct](CODE_OF_CONDUCT.md)
+* [Architecture Decision Records](docs/adr/README.md)
 * [Package Building Standard](docs/standards/PACKAGE_BUILDING_STANDARD.md)
 * [CI Workflow Standard](docs/standards/CI_WORKFLOW_STANDARD.md)
 * [Library Presentation Standard](docs/standards/LIBRARY_PRESENTATION_STANDARD.md)

@@ -2,19 +2,21 @@
 
 ## 1. Status and Authority
 
-**Status:** Proposed documentation-only implementation contract for owner review.
+**Status:** Owner-approved implementation contract; Runtime implementation is pending.
 
-**Implementation authorization:** Not granted by this document alone. Runtime work may begin only after explicit owner approval of the merged contract.
+**Architecture decision:** [ADR 0001 — PDO Pagination Architecture](../adr/0001-pdo-pagination-architecture.md).
+
+**Implementation authorization:** Not granted by this document alone. Runtime work may begin only after a separate explicit owner instruction.
 
 **Target release:** `v1.1.0`, only after Runtime implementation, complete verification, public documentation alignment, and final owner approval.
 
-Once approved and merged, this document becomes the package-specific source of truth for implementing:
+This document is the package-specific source of truth for implementing:
 
 ```text
 Maatify\Persistence\Pdo\Pagination
 ```
 
-Once approved, it supersedes earlier host-project pagination proposals when they conflict with this contract.
+It supersedes earlier host-project pagination proposals when they conflict with this contract.
 
 Until implementation is merged, this document MUST NOT be presented as proof that the Runtime capability already exists.
 
