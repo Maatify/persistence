@@ -391,6 +391,8 @@ All SQL strings MUST:
 
 ### Parameter Contract
 
+Version 1 supports named placeholders only. Positional `?` placeholders and statements that mix positional and named placeholders are unsupported.
+
 Caller parameter maps MUST use keys without a leading colon:
 
 ```php
@@ -425,7 +427,14 @@ __pagination_offset
 
 This reserved-prefix collision check does not imply general SQL parsing.
 
-Within one SQL statement, each named placeholder MUST have one unique occurrence. Reusing the same logical value requires distinct placeholder names and matching parameter entries so behavior remains valid with native prepared statements.
+Within one SQL statement:
+
+- every named placeholder MUST have one unique occurrence
+- every named placeholder MUST have one matching parameter-map entry
+- every parameter-map key MUST be used by one matching named placeholder
+- reusing the same logical value requires distinct placeholder names and matching parameter entries
+
+These are caller contracts for compatibility with native prepared statements. A pagination component MUST NOT claim to parse SQL or preflight general placeholder correspondence. Violations may surface as an original `PDOException` or a package-classified non-throwing PDO failure state.
 
 The component adds the leading colon internally and binds values by type:
 
@@ -521,6 +530,10 @@ Version 1 supports:
 - one internal stable tie-breaker
 - directions `ASC` and `DESC` only
 
+The resolved final tie-breaker identifier MUST be unique within every filtered dataset to which the configuration is applied. A primary key such as `id` is the usual choice. The caller owns this guarantee because the component cannot inspect schema constraints or prove uniqueness.
+
+When the primary and tie-breaker resolve to the same identifier, that identifier itself MUST be unique. A non-unique final tie-breaker is a trusted configuration defect even when Runtime validation cannot detect it.
+
 Whitelist values MUST be validated identifier paths, not arbitrary SQL expressions. Supported examples:
 
 ```text
@@ -606,13 +619,16 @@ Contract rules:
 The typed result object MUST reject inconsistent state. At minimum:
 
 - `data` is verified with `array_is_list()`
+- every item in `data` is an array or object
 - `count($data) <= $perPage`
 - `page >= 1` and `per_page >= 1`
 - `total`, `filtered`, and `total_pages` are non-negative
 - `total_pages` exactly equals `0` when `filtered === 0`, otherwise `intdiv($filtered - 1, $per_page) + 1`
+- `filtered === 0` requires `data === []`
 - `total_pages === 0` requires page `1` and both navigation flags `false`
 - a positive `total_pages` requires `page <= total_pages`
 - navigation flags exactly match the effective page and `total_pages`
+- `sort_by` matches `^[A-Za-z_][A-Za-z0-9_]*$`
 
 An empty `data` list while `filtered > 0` remains valid because concurrent writes may change the dataset between the count and data statements.
 
@@ -638,7 +654,11 @@ The guarantee is limited to the paginator making none of those explicit transact
 
 ### Exception and Error Propagation
 
-Invalid trusted configuration, invalid query-descriptor structure, and non-throwing PDO failure states SHOULD use stable package-defined exceptions following the package exception policy.
+Invalid trusted configuration, Runtime-checkable invalid query-descriptor structure, and non-throwing PDO failure states SHOULD use stable package-defined exceptions following the package exception policy.
+
+Non-throwing `PDO::prepare()`, `PDOStatement::bindValue()`, and `PDOStatement::execute()` failures are package-owned execution classifications.
+
+General placeholder correspondence, repetition, positional-placeholder, and mixed-placeholder violations remain caller contracts because the component does not provide a SQL parser. They are not guaranteed constructor-time query-descriptor exceptions.
 
 Actual `PDOException` instances and unknown external `Throwable` instances MAY propagate unchanged when preserving the original diagnostic contract is intentional.
 
@@ -660,10 +680,11 @@ A reusable pagination component MUST be implemented and verified before host rep
 
 A pagination implementation MUST include:
 
-- Unit coverage for normalization, configuration, identifier validation, query descriptors, and result serialization
-- Regression coverage for exact public API signatures and result keys
-- real supported-database Integration coverage for counts, overflow, sorting, binding, mapper behavior, transaction participation, and failure propagation
-- deterministic duplicate-sort-value fixtures proving tie-breaker stability
+- Unit coverage for normalization, configuration, identifier validation, query descriptors, result serialization, complete result invariants, reserved-prefix collisions, and package-owned non-throwing PDO failure classifications
+- Regression coverage for exact public API signatures, result keys, named-placeholder-only caller boundaries, and the caller-owned tie-breaker uniqueness guarantee
+- real supported-database Integration coverage for exact count cardinality, count failures, overflow, sorting, binding, mapper behavior, transaction participation, and failure propagation
+- native-prepared-statement coverage for repeated, missing, unused, positional, and mixed placeholder violations without claiming constructor SQL parsing
+- deterministic duplicate-primary-value fixtures using a caller-guaranteed unique tie-breaker
 - verification that raw user sort input never enters final SQL
 - verification that no transaction is started, committed, or rolled back by the paginator
 

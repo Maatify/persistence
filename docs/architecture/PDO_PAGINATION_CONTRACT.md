@@ -228,6 +228,8 @@ Constructor validation:
 
 `defaultSortBy` and `tieBreakerSortBy` MAY resolve to the same identifier.
 
+The tie-breaker uniqueness guarantee defined in section 8.4 is caller-owned. `PaginationConfig` validates public keys and whitelist membership, but it cannot prove database uniqueness from configuration alone.
+
 The values `20`, `1`, and `200` are the canonical constructor defaults. Callers MAY configure different valid per-page values through `PaginationConfig`; no separate architectural exception is required when the constructor invariants remain satisfied.
 
 ### 6.5 `PdoPaginationQuery`
@@ -290,6 +292,7 @@ public function __construct(
 Constructor invariants:
 
 - `data` MUST satisfy `array_is_list($data)`
+- every item in `data` MUST be an array or object
 - `count($data) <= $perPage`
 - `page >= 1`
 - `perPage >= 1`
@@ -298,10 +301,12 @@ Constructor invariants:
 - `totalPages >= 0`
 - `totalPages` MUST equal the canonical value calculated from `filtered` and `perPage`:
   `0` when `filtered === 0`, otherwise `intdiv($filtered - 1, $perPage) + 1`
+- when `filtered === 0`, `data === []`
 - when `totalPages === 0`, `page === 1` and both navigation flags are `false`
 - when `totalPages > 0`, `page <= totalPages`
 - `hasNext === ($page < $totalPages)`
 - `hasPrevious === ($page > 1 && $totalPages > 0)`
+- `sortBy` MUST match `^[A-Za-z_][A-Za-z0-9_]*$`
 
 An empty `data` list while `filtered > 0` is valid because concurrent writes may change the dataset between the count and data statements.
 
@@ -501,6 +506,10 @@ Version 1 forbids arbitrary ordering expressions, including:
 
 One internal tie-breaker is mandatory for deterministic pagination.
 
+The resolved tie-breaker identifier MUST produce a unique final ordering within every filtered dataset to which the configuration is applied. A primary key such as `id` is the usual choice.
+
+The caller owns this uniqueness guarantee. The component validates and quotes the identifier but does not inspect schema constraints or prove uniqueness.
+
 If the effective primary and tie-breaker public keys resolve to different quoted identifiers:
 
 ```sql
@@ -513,7 +522,9 @@ If they resolve to the same quoted identifier, including through two different p
 ORDER BY {primary} {effective_direction}
 ```
 
-The effective primary direction wins; the tie-breaker direction is not emitted in that case.
+In the duplicate-identifier case, that single resolved identifier MUST itself be unique within the filtered dataset. The effective primary direction wins; the tie-breaker direction is not emitted.
+
+Using a non-unique final tie-breaker is a trusted configuration defect even though version 1 cannot detect it at Runtime.
 
 ## 9. SQL Descriptor Contract
 
@@ -561,11 +572,15 @@ The descriptor constructor MUST reject:
 
 The complete `__pagination_` namespace is reserved for package-owned bindings. Detecting that prefix in caller parameter keys or SQL placeholder names is a narrow collision check, not general SQL parsing.
 
-The component does not provide a SQL parser. Top-level `ORDER BY`, `LIMIT`, `OFFSET`, locking clauses, multi-statement content, SELECT compatibility, and semantic alignment remain explicit caller contracts except where PDO itself reports failure.
+The descriptor constructor does not preflight general placeholder correspondence, repeated placeholder usage, positional placeholder usage, or mixed placeholder styles.
+
+The component does not provide a SQL parser. Top-level `ORDER BY`, `LIMIT`, `OFFSET`, locking clauses, multi-statement content, SELECT compatibility, placeholder correspondence, and semantic alignment remain explicit caller contracts except where PDO itself reports failure.
 
 The documentation and tests MUST NOT claim that Regex checks prove complete SQL grammar safety.
 
 ## 10. Parameter Binding Contract
+
+Version 1 supports named placeholders only. Positional `?` placeholders and statements that mix positional and named placeholders are unsupported.
 
 Parameter keys MUST match:
 
@@ -610,7 +625,14 @@ Decimals are validated strings owned by the caller.
 
 Each SQL statement is executed only with its matching parameter map. One shared map MUST NOT be bound blindly to all statements.
 
-Within one SQL statement, each named placeholder MUST have one unique occurrence. When the same logical value is needed more than once, the caller MUST use distinct placeholder names and matching parameter entries. This avoids driver-dependent behavior when native prepared statements are enabled.
+Within one SQL statement:
+
+- every named placeholder MUST have one unique occurrence
+- every named placeholder MUST have one matching parameter-map entry
+- every parameter-map key MUST be used by one matching named placeholder
+- reusing the same logical value requires distinct placeholder names and matching parameter entries
+
+These are caller contracts so behavior remains valid with native prepared statements. The component does not parse SQL to prove them, and `PdoPaginationQuery` MUST NOT claim general placeholder preflight validation. Violations may surface as an unchanged `PDOException` or as a package-classified non-throwing PDO failure state, depending on the connection configuration.
 
 The paginator MUST NOT change PDO connection attributes.
 
@@ -845,6 +867,8 @@ Triggered by:
 - missing tie-breaker sort key
 - explicit lookup of an unknown whitelist key
 
+Tie-breaker uniqueness remains a caller-owned semantic configuration guarantee. Version 1 does not promise Runtime detection or an exception for a non-unique database value set.
+
 ### 18.2 `InvalidPaginationQueryException`
 
 ```text
@@ -859,10 +883,12 @@ Triggered by:
 - trailing semicolon
 - invalid parameter key
 - leading-colon key
-- reserved-key collision
+- reserved `__pagination_` parameter-key or SQL-placeholder prefix collision
 - unsupported parameter value type
 
-It classifies invalid trusted caller descriptors, not end-user validation.
+It classifies Runtime-checkable invalid trusted caller descriptors, not end-user validation.
+
+General placeholder correspondence, repetition, positional-placeholder, and mixed-placeholder violations are caller contracts rather than guaranteed constructor classifications. They may surface through PDO during execution.
 
 ### 18.3 `PaginationExecutionException`
 
@@ -875,10 +901,12 @@ Safety behavior: inherited `SystemMaatifyException` default
 Triggered by package-owned execution classifications such as:
 
 - `PDO::prepare()` returns `false`
+- `PDOStatement::bindValue()` returns `false`
 - `PDOStatement::execute()` returns `false`
 - invalid count result
 - invalid mapper result type
 - unexpected non-associative fetched row state
+- inconsistent `PageResult` state
 
 ### 18.4 Propagation Rules
 
@@ -915,7 +943,7 @@ The paginator guarantees:
 - directions come only from `SortDirection`
 - identifier paths are validated and quoted
 - runtime values are bound
-- internal pagination names cannot collide with caller maps
+- internal pagination names cannot collide with caller parameter maps or caller SQL placeholder names
 
 The paginator cannot guarantee:
 
@@ -923,6 +951,8 @@ The paginator cannot guarantee:
 - mandatory-scope alignment across three statements
 - correctness of filters or JOINs
 - SQL semantic equivalence
+- uniqueness of the caller-selected tie-breaker
+- general placeholder correspondence without parsing SQL
 - index quality or query performance
 - consistent snapshot without caller transaction
 
@@ -965,8 +995,11 @@ The canonical fields are additive conceptually, but an endpoint response is not 
 - config invariants
 - descriptor SQL validation
 - parameter key/type validation
-- reserved keys
+- reserved `__pagination_` prefix collisions in parameter maps and SQL placeholder names
+- package-owned non-throwing `prepare()`, `bindValue()`, and `execute()` failure classifications
 - `PageResult` serialization
+- `PageResult` invariant rejection for non-list data, scalar items, oversized pages, zero-filtered non-empty data, invalid sort keys, inconsistent total pages, and inconsistent navigation flags
+- acceptance of empty data while `filtered > 0`
 
 ### Regression
 
@@ -978,19 +1011,25 @@ The canonical fields are additive conceptually, but an endpoint response is not 
 - result field names and nesting
 - no offset field
 - exception bases, marker, and error codes
+- named-placeholder-only caller contract without a claimed general SQL parser
+- caller-owned tie-breaker uniqueness guarantee
 - Ordering public API unchanged
 
 ### Real MySQL Integration
 
 - total and filtered semantics
 - no-filter identical count statements
+- count results with exactly one row and one column
+- rejection of zero-row, multi-row, and multi-column count results
 - separate parameter maps
 - int/string/bool/null binding
 - internal integer limit/offset binding
+- native prepared statements
+- repeated, missing, unused, positional, and mixed placeholder violations surfacing through the documented PDO failure contract rather than constructor SQL parsing
 - default and requested sorting
 - invalid-sort fallback
-- duplicate primary values proving stable tie-breaker
-- duplicate resolved primary/tie-breaker emitted once
+- duplicate primary values with a unique tie-breaker proving stable ordering
+- duplicate resolved primary/tie-breaker emitted once only when the resolved identifier is caller-guaranteed unique
 - zero filtered rows skip data execution
 - page overflow returns first page
 - mapper arrays and objects
