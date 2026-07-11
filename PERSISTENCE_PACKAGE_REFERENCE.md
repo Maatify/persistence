@@ -95,6 +95,23 @@
 All package exceptions implement `Maatify\Persistence\Exception\PersistenceException`.
 Distinguish these package exceptions from propagated `\PDOException` or other `\Throwable`.
 
+### Intentional `1.x` Marker Naming Exception
+
+`Maatify\Persistence\Exception\PersistenceException` is intentionally retained as the package exception marker throughout the supported `1.x` release line.
+
+The ecosystem naming standard requires interface names, including package exception marker interfaces, to end with the `Interface` suffix. This package published `PersistenceException` as part of its stable `v1.0.0` public API before that naming rule was fully enforced.
+
+For the entire `1.x` line:
+
+- the marker name MUST remain `PersistenceException`
+- a parallel `PersistenceExceptionInterface` MUST NOT be introduced solely to normalize naming
+- every package-defined exception, including exceptions added by new `1.x` features, MUST implement `PersistenceException` directly or indirectly
+- consumers MAY continue to use `PersistenceException` as the package-wide catch boundary
+
+This is a package-specific compatibility exception. It MUST NOT be copied into new packages or used as precedent for naming new interfaces.
+
+Renaming the marker MAY be reconsidered only as part of a separately approved, meaningful future major release. A major release MUST NOT be created solely to rename this marker.
+
 | Exception | Maatify Base Class | Error Code | Safety Behavior | Triggering Conditions |
 | --------- | ------------------ | ---------- | --------------- | --------------------- |
 | `PersistenceException` | `\Throwable` | N/A | N/A | Interface implemented by all package exceptions. |

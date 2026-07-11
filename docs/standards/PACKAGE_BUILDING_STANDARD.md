@@ -105,6 +105,27 @@ Maatify\{NextPackage}\
 
 *Note: Host app namespaces such as `App\`, `Athar`, or `EP4N` are strictly forbidden.*
 
+### Type Naming Convention
+
+Public and internal type names MUST make the declared artifact type immediately clear to implementers and reviewers.
+
+The required suffixes are:
+
+- every interface MUST end with `Interface`
+- every enum MUST end with `Enum`
+- every Data Transfer Object MUST end with `DTO`
+- every exception class MUST end with `Exception`
+
+Exception marker interfaces are not exempt from the interface rule. A new package marker MUST therefore use:
+
+```text
+{PackageName}ExceptionInterface
+```
+
+The PHP filename MUST match the declared type name.
+
+New packages and unpublished APIs MUST NOT introduce alternative names that omit the required suffix. Package-specific compatibility exceptions are permitted only under the legacy-public-API rule in Section 7.
+
 ---
 
 ## 5. Directory Structure Inside `src/`
@@ -166,6 +187,30 @@ src/
 ```php
 interface {PackageName}ExceptionInterface extends \Throwable {}
 ```
+
+The canonical package marker location is:
+
+```text
+Maatify\{PackageName}\Exception\{PackageName}ExceptionInterface
+```
+
+Every package-defined exception MUST implement this marker directly or indirectly. External `PDOException` or other propagated infrastructure throwables MUST NOT be forced to implement the package marker.
+
+### Legacy Published Marker Names
+
+A package that already published a stable marker interface without the required `Interface` suffix MAY retain that name when renaming it would require an otherwise unnecessary major release.
+
+This exception:
+
+- MUST be documented explicitly in the root Package Reference
+- MUST identify the affected major release line
+- MUST remain internally consistent throughout that major line
+- MUST require every package-defined exception added during that major line to implement the retained marker directly or indirectly
+- MUST NOT introduce a parallel marker solely to normalize naming
+- MUST remain package-specific and MUST NOT be copied into new packages
+- MUST be reconsidered only during a separately approved, meaningful future major release
+
+A major release MUST NOT be created solely to rename a legacy marker.
 
 ### Example: Package-Defined Storage Exception
 
