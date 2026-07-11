@@ -68,7 +68,7 @@ The component MUST remain:
 - framework-agnostic
 - host-agnostic
 - PDO-based
-- MySQL-verified
+- MySQL-verified (initial support is PDO driver `mysql` only)
 - independent of Slim
 - independent of PSR-7
 - independent of HTTP request/response objects
@@ -95,9 +95,9 @@ The approved Runtime files are:
 ```text
 src/Pdo/Pagination/PageRequest.php
 src/Pdo/Pagination/PaginationConfig.php
-src/Pdo/Pagination/SortDirection.php
+src/Pdo/Pagination/SortDirectionEnum.php
 src/Pdo/Pagination/SortWhitelist.php
-src/Pdo/Pagination/PdoPaginationQuery.php
+src/Pdo/Pagination/PdoPaginationQueryDescriptor.php
 src/Pdo/Pagination/PdoPaginator.php
 src/Pdo/Pagination/PageResult.php
 
@@ -147,17 +147,18 @@ final readonly class PageRequest
 
 Contract:
 
+- `PageRequest` is a request value object.
 - Represents caller-supplied values before final normalization.
 - Contains no HTTP or PSR-7 knowledge.
 - Does not normalize or execute queries.
-- `sortDirection` is raw input; the final applied direction is represented by `SortDirection`.
+- `sortDirection` is raw input; the final applied direction is represented by `SortDirectionEnum`.
 
-### 6.2 `SortDirection`
+### 6.2 `SortDirectionEnum`
 
 ```php
 namespace Maatify\Persistence\Pdo\Pagination;
 
-enum SortDirection: string
+enum SortDirectionEnum: string
 {
     case ASC = 'ASC';
     case DESC = 'DESC';
@@ -209,9 +210,9 @@ final readonly class PaginationConfig
     public function __construct(
         public SortWhitelist $sortWhitelist,
         public string $defaultSortBy,
-        public SortDirection $defaultSortDirection,
+        public SortDirectionEnum $defaultSortDirection,
         public string $tieBreakerSortBy,
-        public SortDirection $tieBreakerDirection,
+        public SortDirectionEnum $tieBreakerDirection,
         public int $defaultPerPage = 20,
         public int $minPerPage = 1,
         public int $maxPerPage = 200,
@@ -234,23 +235,23 @@ The tie-breaker uniqueness guarantee defined in section 8.4 is caller-owned. `Pa
 
 The values `20`, `1`, and `200` are the canonical constructor defaults. Callers MAY configure different valid per-page values through `PaginationConfig`; no separate architectural exception is required when the constructor invariants remain satisfied.
 
-### 6.5 `PdoPaginationQuery`
+### 6.5 `PdoPaginationQueryDescriptor`
 
 ```php
 namespace Maatify\Persistence\Pdo\Pagination;
 
-final readonly class PdoPaginationQuery
+final readonly class PdoPaginationQueryDescriptor
 {
     /**
      * @param array<string, string|int|bool|null> $totalParams
-     * @param array<string, string|int|bool|null> $filteredParams
+     * @param array<string, string|int|bool|null> $filteredCountParams
      * @param array<string, string|int|bool|null> $dataParams
      */
     public function __construct(
         public string $totalSql,
         public array $totalParams,
         public string $filteredCountSql,
-        public array $filteredParams,
+        public array $filteredCountParams,
         public string $dataSql,
         public array $dataParams,
     ) {
@@ -259,6 +260,10 @@ final readonly class PdoPaginationQuery
 ```
 
 All three SQL strings and all three parameter maps are required, including empty parameter maps.
+
+Contract:
+
+- `PdoPaginationQueryDescriptor` is a SQL descriptor and does not execute SQL.
 
 ### 6.6 `PageResult`
 
@@ -287,9 +292,14 @@ public function __construct(
     public bool $hasNext,
     public bool $hasPrevious,
     public string $sortBy,
-    public SortDirection $sortDirection,
+    public SortDirectionEnum $sortDirection,
 );
 ```
+
+Contract:
+
+- `PageResult` is a result value object.
+- Direct instantiation of `PageResult` is supported Public API provided invariants are respected.
 
 Constructor invariants:
 
@@ -374,7 +384,7 @@ Public signature:
  */
 public function paginate(
     \PDO $pdo,
-    PdoPaginationQuery $query,
+    PdoPaginationQueryDescriptor $query,
     PageRequest $request,
     PaginationConfig $config,
     callable $mapper,
@@ -459,8 +469,8 @@ The response returns the effective public key.
 
 `sortDirection` is trimmed and compared case-insensitively:
 
-- `asc` / `ASC` => `SortDirection::ASC`
-- `desc` / `DESC` => `SortDirection::DESC`
+- `asc` / `ASC` => `SortDirectionEnum::ASC`
+- `desc` / `DESC` => `SortDirectionEnum::DESC`
 - missing, empty, or invalid => `defaultSortDirection`
 
 The response always emits uppercase enum values.
@@ -565,7 +575,7 @@ It excludes:
 The descriptor constructor MUST reject:
 
 - SQL empty after trimming
-- SQL ending in a semicolon after right trimming
+- any semicolon inside SQL strings to prevent multi-statements
 - invalid parameter keys
 - parameter keys beginning with `:`
 - parameter keys beginning with the reserved `__pagination_` prefix
@@ -576,7 +586,7 @@ The complete `__pagination_` namespace is reserved for package-owned bindings. D
 
 The descriptor constructor does not preflight general placeholder correspondence, repeated placeholder usage, positional placeholder usage, or mixed placeholder styles.
 
-The component does not provide a SQL parser. Top-level `ORDER BY`, `LIMIT`, `OFFSET`, locking clauses, multi-statement content, SELECT compatibility, placeholder correspondence, and semantic alignment remain explicit caller contracts except where PDO itself reports failure.
+The component does not provide a SQL parser. Top-level `ORDER BY`, `LIMIT`, `OFFSET`, locking clauses, SELECT compatibility, placeholder correspondence, and semantic alignment remain explicit caller contracts except where PDO itself reports failure.
 
 The documentation and tests MUST NOT claim that Regex checks prove complete SQL grammar safety.
 
@@ -634,9 +644,9 @@ Within one SQL statement:
 - every parameter-map key MUST be used by one matching named placeholder
 - reusing the same logical value requires distinct placeholder names and matching parameter entries
 
-These are caller contracts so behavior remains valid with native prepared statements. The component does not parse SQL to prove them, and `PdoPaginationQuery` MUST NOT claim general placeholder preflight validation. Violations may surface as an unchanged `PDOException` or as a package-classified non-throwing PDO failure state, depending on the connection configuration.
+These are caller contracts so behavior remains valid with native prepared statements. The component does not parse SQL to prove them, and `PdoPaginationQueryDescriptor` MUST NOT claim general placeholder preflight validation. Violations may surface as an unchanged `PDOException` or as a package-classified non-throwing PDO failure state, depending on the connection configuration.
 
-The paginator MUST NOT change PDO connection attributes.
+The paginator MUST NOT change PDO connection attributes. Runtime does not inspect or reject `PDO::ATTR_DRIVER_NAME` in version 1; using a non-`mysql` driver is simply an unsupported out-of-contract usage without introducing a new preflight exception.
 
 ## 11. Count Validation and Metadata
 
@@ -719,7 +729,7 @@ The exact operation order is:
 3. resolve effective primary sort key and direction
 4. execute `totalSql` with `totalParams`
 5. validate total count
-6. execute `filteredCountSql` with `filteredParams`
+6. execute `filteredCountSql` with `filteredCountParams`
 7. validate filtered count
 8. calculate `totalPages`
 9. apply zero-result and page-overflow policy
@@ -768,6 +778,13 @@ callable(array<string, mixed> $row): array|object
 
 The paginator explicitly fetches each row using `PDO::FETCH_ASSOC`.
 
+Fetch failure rules for count and data statements:
+- When `fetch(PDO::FETCH_ASSOC)` returns `false`, `PDOStatement::errorCode()` MUST be checked.
+- The value `'00000'` indicates a normal end of results.
+- Any other value is a non-throwing fetch failure and MUST convert to `PaginationExecutionException`.
+- Partial success return is prohibited upon fetch failure.
+- `PDOException` passes unchanged.
+
 The mapper MAY return:
 
 - an array
@@ -808,6 +825,10 @@ static fn (array $row): array => $row
 
 Rules:
 
+- `PageResult::toArray()` and `jsonSerialize()` return the same shallow envelope.
+- Mapped arrays are returned as is.
+- Mapped objects remain the exact same object instances inside `data`.
+- The package MUST NOT call `toArray()` or `jsonSerialize()` internally on the items and does not guarantee their serialization format.
 - `data` is always a list
 - no `offset` field
 - no raw invalid request values
@@ -882,7 +903,7 @@ Safety behavior: inherited `SystemMaatifyException` default
 Triggered by:
 
 - missing/empty SQL
-- trailing semicolon
+- any semicolon in SQL
 - invalid parameter key
 - leading-colon key
 - reserved `__pagination_` parameter-key or SQL-placeholder prefix collision
@@ -905,6 +926,7 @@ Triggered by package-owned execution classifications such as:
 - `PDO::prepare()` returns `false`
 - `PDOStatement::bindValue()` returns `false`
 - `PDOStatement::execute()` returns `false`
+- non-throwing fetch failure
 - invalid count result
 - invalid mapper result type
 - unexpected non-associative fetched row state
@@ -942,7 +964,7 @@ Untrusted input:
 The paginator guarantees:
 
 - raw sort input is never SQL
-- directions come only from `SortDirection`
+- directions come only from `SortDirectionEnum`
 - identifier paths are validated and quoted
 - runtime values are bound
 - internal pagination names cannot collide with caller parameter maps or caller SQL placeholder names
@@ -996,12 +1018,18 @@ The canonical fields are additive conceptually, but an endpoint response is not 
 - identifier quoting
 - config invariants
 - descriptor SQL validation
+- exception trigger for any semicolon
 - parameter key/type validation
 - reserved `__pagination_` prefix collisions in parameter maps and SQL placeholder names
 - package-owned non-throwing `prepare()`, `bindValue()`, and `execute()` failure classifications
-- `PageResult` serialization
+- normal EOF vs non-throwing fetch failure
+- count fetch failure
+- data fetch failure after partial rows (no partial success)
+- direct valid `PageResult` construction
 - `PageResult` invariant rejection for non-list data, scalar items, oversized pages, zero-filtered non-empty data, invalid sort keys, inconsistent total pages, and inconsistent navigation flags
 - acceptance of empty data while `filtered > 0`
+- mapper not called when `filtered === 0`
+- shallow object identity in `toArray()` and `jsonSerialize()`
 
 ### Regression
 
@@ -1009,12 +1037,15 @@ The canonical fields are additive conceptually, but an endpoint response is not 
 - final/readonly modifiers
 - enum cases
 - constructor parameter names, order, types, and defaults
+- exact `filteredCountParams` property/parameter
 - `paginate()` parameter and return types
 - result field names and nesting
 - no offset field
 - exception bases, marker, and error codes
 - named-placeholder-only caller contract without a claimed general SQL parser
 - caller-owned tie-breaker uniqueness guarantee
+- exact renamed API check
+- exact final SQL assembly check
 - Ordering public API unchanged
 
 ### Real MySQL Integration
@@ -1035,8 +1066,11 @@ The canonical fields are additive conceptually, but an endpoint response is not 
 - zero filtered rows skip data execution
 - page overflow returns first page
 - mapper arrays and objects
+- mapper throwable propagation
 - invalid mapper result
 - PDO exception propagation
+- PDO attributes not changing
+- `filtered > total` scenario
 - successful operation inside caller transaction
 - caller transaction remains active after successful pagination
 - no claim that every external PDO/driver failure preserves transaction state
@@ -1072,15 +1106,27 @@ SQLite is forbidden as a substitute for MySQL Integration proof.
 
 ## 23. Implementation Gate
 
-Codex implementation is authorized only after this contract and the matching Pagination section of `PACKAGE_BUILDING_STANDARD.md` are reviewed and explicitly approved.
+Codex Runtime delivery for `src/**` is authorized only after explicit authorization.
+Jules will execute complete tests, documentation, and compliance implementation in a separate phase after Runtime review.
 
 Implementation delivery MUST:
 
 - match the exact Public API in section 6
-- add complete tests
 - keep all Ordering files behaviorally unchanged
 - avoid unrelated refactors
 - avoid documentation claims outside implemented behavior
 - create no `composer.lock`
+
+## 24. Feature Acceptance Gate
+
+The final implementation is accepted only when it passes:
+
+- Runtime
+- Unit / Regression / MySQL Integration
+- PHPStan
+- Package Reference
+- README
+- CHANGELOG
+- Composer metadata
 
 Merge, tag creation, GitHub Release publication, and Packagist publication remain separate owner-controlled actions.

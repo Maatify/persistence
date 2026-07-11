@@ -29,7 +29,7 @@ The consuming repository or query reader owns:
 - base SQL and JOIN structure
 - mandatory tenant, ownership, visibility, and soft-delete scopes
 - optional filter and search construction
-- parameter values for package-supplied SQL
+- parameter values for consumer-supplied SQL
 - semantic alignment between total, filtered-count, and data queries
 - row mapping into arrays or DTOs
 
@@ -39,6 +39,8 @@ The package owns:
 
 - page and per-page normalization
 - total and filtered-count execution
+- data query execution using consumer-supplied SQL
+- calling the mapper and validating the result type
 - safe whitelist-based sorting
 - deterministic tie-breaker composition
 - `LIMIT` and `OFFSET` calculation and binding
