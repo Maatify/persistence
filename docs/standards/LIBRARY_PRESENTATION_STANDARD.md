@@ -64,6 +64,9 @@ The examples in this Standard use canonical placeholders. When applying these te
 * `{SUPPORTED_MAJOR_LINE}`: The actively supported release line.
 * `{RELEASE_VERSION}`: The version number for the release.
 * `{RELEASE_DATE}`: The date of the release.
+* `{BADGE_AREA}`: The complete rendered badge groups selected for the current library according to the badge architecture defined by this Standard.
+* `{PACKAGE_SUMMARY}`: A concise and technically accurate summary of the library's primary purpose and supported scope.
+* `{ENCODED_COMPOSER_PACKAGE_NAME}`: The URL-encoded Composer package name used inside shields.io badge text, with `/` encoded as `%2F`.
 
 *Note: This standard MUST NOT contain hardcoded names of specific existing packages as default templates. Always use the placeholders.*
 
@@ -156,6 +159,8 @@ Where applicable, the following MUST be prepared:
 
 ### 8.4 Release Candidate Rule
 > Final Release Candidate MUST include the complete release-facing badge set before Tag creation when the package is intended to be published immediately after owner approval.
+
+This rule applies only when Packagist is the library's selected package registry or when immediate Packagist publication is part of the approved release plan.
 
 It is forbidden to remove:
 * Latest Version.
@@ -515,7 +520,7 @@ An explicit search for reference repository names MUST be conducted before submi
 
 * [ ] README header and Maatify identity are present.
 * [ ] Required badges exist and point to the current package.
-* [ ] Packagist badges are complete for the final release candidate.
+* [ ] Packagist badges are complete when the library uses or is being prepared for immediate publication on Packagist.
 * [ ] README sections match the package's actual behavior.
 * [ ] Critical runtime contracts remain documented.
 * [ ] CODE_OF_CONDUCT identity badges are correct.
