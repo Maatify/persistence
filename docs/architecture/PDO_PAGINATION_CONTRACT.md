@@ -68,7 +68,7 @@ The component MUST remain:
 - framework-agnostic
 - host-agnostic
 - PDO-based
-- MySQL-verified (initial support is `PDO MySQL` only; other PDO drivers are unsupported)
+- MySQL-verified (initial support is PDO driver `mysql` only)
 - independent of Slim
 - independent of PSR-7
 - independent of HTTP request/response objects
@@ -575,7 +575,6 @@ It excludes:
 The descriptor constructor MUST reject:
 
 - SQL empty after trimming
-- SQL ending in a semicolon after right trimming
 - any semicolon inside SQL strings to prevent multi-statements
 - invalid parameter keys
 - parameter keys beginning with `:`
@@ -587,7 +586,7 @@ The complete `__pagination_` namespace is reserved for package-owned bindings. D
 
 The descriptor constructor does not preflight general placeholder correspondence, repeated placeholder usage, positional placeholder usage, or mixed placeholder styles.
 
-The component does not provide a SQL parser. Top-level `ORDER BY`, `LIMIT`, `OFFSET`, locking clauses, multi-statement content, SELECT compatibility, placeholder correspondence, and semantic alignment remain explicit caller contracts except where PDO itself reports failure.
+The component does not provide a SQL parser. Top-level `ORDER BY`, `LIMIT`, `OFFSET`, locking clauses, SELECT compatibility, placeholder correspondence, and semantic alignment remain explicit caller contracts except where PDO itself reports failure.
 
 The documentation and tests MUST NOT claim that Regex checks prove complete SQL grammar safety.
 
@@ -647,7 +646,7 @@ Within one SQL statement:
 
 These are caller contracts so behavior remains valid with native prepared statements. The component does not parse SQL to prove them, and `PdoPaginationQueryDescriptor` MUST NOT claim general placeholder preflight validation. Violations may surface as an unchanged `PDOException` or as a package-classified non-throwing PDO failure state, depending on the connection configuration.
 
-The paginator MUST NOT change PDO connection attributes.
+The paginator MUST NOT change PDO connection attributes. Runtime does not inspect or reject `PDO::ATTR_DRIVER_NAME` in version 1; using a non-`mysql` driver is simply an unsupported out-of-contract usage without introducing a new preflight exception.
 
 ## 11. Count Validation and Metadata
 
@@ -779,10 +778,12 @@ callable(array<string, mixed> $row): array|object
 
 The paginator explicitly fetches each row using `PDO::FETCH_ASSOC`.
 
-Fetch failure rules:
+Fetch failure rules for count and data statements:
+- When `fetch(PDO::FETCH_ASSOC)` returns `false`, `PDOStatement::errorCode()` MUST be checked.
+- The value `'00000'` indicates a normal end of results.
+- Any other value is a non-throwing fetch failure and MUST convert to `PaginationExecutionException`.
+- Partial success return is prohibited upon fetch failure.
 - `PDOException` passes unchanged.
-- non-throwing fetch failure converts to `PaginationExecutionException`.
-- partial success return is prohibited.
 
 The mapper MAY return:
 
@@ -824,7 +825,10 @@ static fn (array $row): array => $row
 
 Rules:
 
-- `PageResult::toArray()` and `jsonSerialize()` ensure only the outer envelope is converted, and do not deep-convert mapped objects
+- `PageResult::toArray()` and `jsonSerialize()` return the same shallow envelope.
+- Mapped arrays are returned as is.
+- Mapped objects remain the exact same object instances inside `data`.
+- The package MUST NOT call `toArray()` or `jsonSerialize()` internally on the items and does not guarantee their serialization format.
 - `data` is always a list
 - no `offset` field
 - no raw invalid request values
@@ -899,7 +903,7 @@ Safety behavior: inherited `SystemMaatifyException` default
 Triggered by:
 
 - missing/empty SQL
-- trailing semicolon
+- any semicolon in SQL
 - invalid parameter key
 - leading-colon key
 - reserved `__pagination_` parameter-key or SQL-placeholder prefix collision
@@ -922,6 +926,7 @@ Triggered by package-owned execution classifications such as:
 - `PDO::prepare()` returns `false`
 - `PDOStatement::bindValue()` returns `false`
 - `PDOStatement::execute()` returns `false`
+- non-throwing fetch failure
 - invalid count result
 - invalid mapper result type
 - unexpected non-associative fetched row state
@@ -1013,14 +1018,18 @@ The canonical fields are additive conceptually, but an endpoint response is not 
 - identifier quoting
 - config invariants
 - descriptor SQL validation
-- semicolon rejection
+- exception trigger for any semicolon
 - parameter key/type validation
 - reserved `__pagination_` prefix collisions in parameter maps and SQL placeholder names
 - package-owned non-throwing `prepare()`, `bindValue()`, and `execute()` failure classifications
-- fetch failures
-- `PageResult` serialization (shallow object serialization)
+- normal EOF vs non-throwing fetch failure
+- count fetch failure
+- data fetch failure after partial rows (no partial success)
+- direct valid `PageResult` construction
 - `PageResult` invariant rejection for non-list data, scalar items, oversized pages, zero-filtered non-empty data, invalid sort keys, inconsistent total pages, and inconsistent navigation flags
 - acceptance of empty data while `filtered > 0`
+- mapper not called when `filtered === 0`
+- shallow object identity in `toArray()` and `jsonSerialize()`
 
 ### Regression
 
@@ -1028,6 +1037,7 @@ The canonical fields are additive conceptually, but an endpoint response is not 
 - final/readonly modifiers
 - enum cases
 - constructor parameter names, order, types, and defaults
+- exact `filteredCountParams` property/parameter
 - `paginate()` parameter and return types
 - result field names and nesting
 - no offset field
@@ -1096,13 +1106,12 @@ SQLite is forbidden as a substitute for MySQL Integration proof.
 
 ## 23. Implementation Gate
 
-Codex implementation for `src/**` is authorized only after explicit authorization.
-Jules will execute tests, documentation, and compliance implementation later.
+Codex Runtime delivery for `src/**` is authorized only after explicit authorization.
+Jules will execute complete tests, documentation, and compliance implementation in a separate phase after Runtime review.
 
 Implementation delivery MUST:
 
 - match the exact Public API in section 6
-- add complete tests
 - keep all Ordering files behaviorally unchanged
 - avoid unrelated refactors
 - avoid documentation claims outside implemented behavior
