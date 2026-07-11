@@ -203,8 +203,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 👤 Author
 
-Engineered by **Mohamed Abdulalim** ([@megyptm](https://github.com/megyptm))
-Backend Lead & Technical Architect
+Engineered by **Mohamed Abdulalim** ([@megyptm](https://github.com/megyptm))<br>
+Backend Lead & Technical Architect<br>
 [https://www.maatify.dev](https://www.maatify.dev)
 
 ---
