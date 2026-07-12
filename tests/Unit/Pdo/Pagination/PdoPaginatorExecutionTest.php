@@ -64,8 +64,8 @@ OFFSET :__pagination_offset', $pdo->preparedSql[2]);
         self::assertSame(1, $r->page);
         self::assertSame(0, $r->totalPages);
         self::assertFalse($called);
-        self::assertCount(2,$pdo->preparedSql);
-        self::assertSame(0,$pdo->beginTransactionCalls + $pdo->commitCalls + $pdo->rollBackCalls);
-        self::assertSame([],$pdo->setAttributeCalls);
+        self::assertCount(2, $pdo->preparedSql);
+        self::assertSame(0, $pdo->beginTransactionCalls + $pdo->commitCalls + $pdo->rollBackCalls);
+        self::assertSame([], $pdo->setAttributeCalls);
     }
 }
