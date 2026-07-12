@@ -22,7 +22,9 @@
 [![Maatify Ecosystem](https://img.shields.io/badge/Maatify-Ecosystem-blueviolet)](https://github.com/Maatify)
 [![Install](https://img.shields.io/badge/Install-composer%20require%20maatify%2Fpersistence-blue)](https://packagist.org/packages/maatify/persistence)
 
-*Standalone, framework-agnostic PDO utilities for Maatify projects, providing robust scoped and global ordering tools. Designed and verified for MySQL environments.*
+*Standalone, framework-agnostic PDO utilities for Maatify projects, providing robust scoped and global ordering, and pagination tools. Designed and verified for MySQL environments.*
+
+> **Note:** PDO Pagination is implemented and verified on `main` and is targeted for `v1.1.0`. It is not included in the currently released `v1.0.0`.
 
 </div>
 
@@ -35,6 +37,7 @@
 * **SQL Identifier Validation**: Ensures table and column configurations are safe and properly quoted.
 * **Soft-Delete Filtering**: Optional support for ignoring soft-deleted rows in ordering calculations.
 * **Scope Isolation**: Ensures only the affected range within the configured scope is updated.
+* **PDO Pagination**: Deterministic offset pagination with strict normalization, bounds checking, and safe whitelist-based sorting.
 
 ## ⚙️ Requirements
 
@@ -86,22 +89,79 @@ $success = $ordering->moveWithinScope(
 );
 ```
 
+### PDO Pagination
+
+```php
+use Maatify\Persistence\Pdo\Pagination\PaginationConfig;
+use Maatify\Persistence\Pdo\Pagination\PageRequest;
+use Maatify\Persistence\Pdo\Pagination\PdoPaginationQueryDescriptor;
+use Maatify\Persistence\Pdo\Pagination\PdoPaginator;
+use Maatify\Persistence\Pdo\Pagination\SortWhitelist;
+use Maatify\Persistence\Pdo\Pagination\SortDirectionEnum;
+
+$config = new PaginationConfig(
+    defaultPerPage: 10,
+    maxPerPage: 100,
+    minPerPage: 1,
+    sortWhitelist: new SortWhitelist([
+        'id' => 'id',
+        'created' => 'created_at',
+        'name' => 'user_name',
+    ]),
+    defaultSortBy: 'created',
+    defaultSortDirection: SortDirectionEnum::DESC,
+    tieBreakerSortBy: 'id',
+    tieBreakerDirection: SortDirectionEnum::DESC
+);
+
+$query = new PdoPaginationQueryDescriptor(
+    totalSql: 'SELECT COUNT(*) FROM users',
+    totalParams: [],
+    filteredCountSql: 'SELECT COUNT(*) FROM users WHERE status = :status',
+    filteredCountParams: ['status' => 'active'],
+    dataSql: 'SELECT id, user_name, created_at FROM users WHERE status = :status',
+    dataParams: ['status' => 'active']
+);
+
+$request = new PageRequest(page: 2, perPage: 15, sortBy: 'name', sortDirection: 'ASC');
+
+$paginator = new PdoPaginator();
+$result = $paginator->paginate(
+    pdo: $pdo,
+    query: $query,
+    request: $request,
+    config: $config,
+    mapper: fn(array $row) => (object) $row
+);
+```
+
 ### Note on `getNextPosition()` Concurrency
 `getNextPosition()` does not start a transaction and does not lock the scope. When using it for concurrent inserts, the host application must provide an appropriate transaction and locking mechanism at the repository/application level.
 
 ## 🧩 Public Runtime API
 
-The package currently provides the following public classes for PDO ordering:
+The package currently provides the following public classes for PDO ordering and pagination:
 
 ```php
 Maatify\Persistence\Pdo\Ordering\ScopedOrderingConfig;
 Maatify\Persistence\Pdo\Ordering\ScopedOrderingManager;
+
+Maatify\Persistence\Pdo\Pagination\PageRequest;
+Maatify\Persistence\Pdo\Pagination\SortDirectionEnum;
+Maatify\Persistence\Pdo\Pagination\SortWhitelist;
+Maatify\Persistence\Pdo\Pagination\PaginationConfig;
+Maatify\Persistence\Pdo\Pagination\PdoPaginationQueryDescriptor;
+Maatify\Persistence\Pdo\Pagination\PageResult;
+Maatify\Persistence\Pdo\Pagination\PdoPaginator;
 
 // Exceptions
 Maatify\Persistence\Exception\PersistenceException;
 Maatify\Persistence\Exception\InvalidOrderingConfigurationException;
 Maatify\Persistence\Exception\InvalidOrderingOperationException;
 Maatify\Persistence\Exception\OrderingTransactionException;
+Maatify\Persistence\Exception\InvalidPaginationConfigurationException;
+Maatify\Persistence\Exception\InvalidPaginationQueryException;
+Maatify\Persistence\Exception\PaginationExecutionException;
 ```
 
 ## ⚠️ Critical Runtime Behavior
@@ -130,6 +190,13 @@ Maatify\Persistence\Exception\OrderingTransactionException;
 * Treats soft-deleted rows as non-existent if `deletedAtColumn` is configured.
 * Throws `InvalidOrderingOperationException` on invalid scope usage.
 * External PDO errors propagate unmodified.
+
+**PDO Pagination:**
+* Normalizes page and per-page limits strictly.
+* Uses safe whitelist-based sorting.
+* Host application owns SQL, scopes, mapping, and filters.
+* Package handles count queries and offset calculation.
+* Does not alter or require active PDO transactions.
 
 ## 🏛️ Architecture Guarantees
 

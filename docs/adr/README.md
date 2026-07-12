@@ -35,5 +35,5 @@ The following status values are used:
 
 | ADR | Title | Status | Decision Date | Runtime Status | Related Contract |
 |---|---|---|---|---|---|
-| [0001](0001-pdo-pagination-architecture.md) | PDO Pagination Architecture | Accepted | 2026-07-11 | Planned for `v1.1.0`; not implemented | [PDO Pagination Contract](../architecture/PDO_PAGINATION_CONTRACT.md) |
+| [0001](0001-pdo-pagination-architecture.md) | PDO Pagination Architecture | Accepted | 2026-07-11 | Completed and merged; target release `v1.1.0` | [PDO Pagination Contract](../architecture/PDO_PAGINATION_CONTRACT.md) |
 | [0002](0002-ordering-hard-delete-compaction.md) | Ordering Hard-Delete Compaction | Accepted — Deferred | 2026-07-11 | Not implemented; no stable public API | None |
