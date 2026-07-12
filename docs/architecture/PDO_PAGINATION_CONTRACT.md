@@ -2,11 +2,11 @@
 
 ## 1. Status and Authority
 
-**Status:** Owner-approved implementation contract; Runtime implementation is pending.
+**Status:** Owner-approved implementation contract; Runtime implementation is completed and merged.
 
 **Architecture decision:** [ADR 0001 — PDO Pagination Architecture](../adr/0001-pdo-pagination-architecture.md).
 
-**Implementation authorization:** Not granted by this document alone. Runtime work may begin only after a separate explicit owner instruction.
+**Implementation authorization:** Implementation has been completed and merged.
 
 **Target release:** `v1.1.0`, only after Runtime implementation, complete verification, public documentation alignment, and final owner approval.
 

@@ -84,6 +84,112 @@
     * Rethrows the same original throwable.
     * Does not universally wrap PDO failures as package exceptions.
 
+### `Maatify\Persistence\Pdo\Pagination\PageRequest`
+* **Status**: `final readonly class`
+* **Constructor**:
+  ```php
+  public function __construct(
+      public int|string|null $page = null,
+      public int|string|null $perPage = null,
+      public ?string $sortBy = null,
+      public ?string $sortDirection = null
+  )
+  ```
+
+### `Maatify\Persistence\Pdo\Pagination\SortDirectionEnum`
+* **Status**: `enum`
+* **Cases**: `ASC`, `DESC`
+
+### `Maatify\Persistence\Pdo\Pagination\SortWhitelist`
+* **Status**: `final readonly class`
+* **Constructor**:
+  ```php
+  public function __construct(array $sorts)
+  ```
+
+### `Maatify\Persistence\Pdo\Pagination\PaginationConfig`
+* **Status**: `final readonly class`
+* **Constructor**:
+  ```php
+  public function __construct(
+      public SortWhitelist $sortWhitelist,
+      public string $defaultSortBy,
+      public SortDirectionEnum $defaultSortDirection,
+      public string $tieBreakerSortBy,
+      public SortDirectionEnum $tieBreakerDirection,
+      public int $defaultPerPage = 20,
+      public int $minPerPage = 1,
+      public int $maxPerPage = 200
+  )
+  ```
+
+### `Maatify\Persistence\Pdo\Pagination\PdoPaginationQueryDescriptor`
+* **Status**: `final readonly class`
+* **Constructor**:
+  ```php
+  public function __construct(
+      public string $totalSql,
+      public array $totalParams,
+      public string $filteredCountSql,
+      public array $filteredCountParams,
+      public string $dataSql,
+      public array $dataParams
+  )
+  ```
+
+### `Maatify\Persistence\Pdo\Pagination\PageResult`
+* **Status**: `final readonly class`
+* **Constructor**:
+  ```php
+  public function __construct(
+      public array $data,
+      public int $page,
+      public int $perPage,
+      public int $total,
+      public int $filtered,
+      public int $totalPages,
+      public bool $hasNext,
+      public bool $hasPrevious,
+      public string $sortBy,
+      public SortDirectionEnum $sortDirection
+  )
+  ```
+* **Methods**:
+  * `public function toArray(): array`
+  * `public function jsonSerialize(): array`
+
+### `Maatify\Persistence\Pdo\Pagination\PdoPaginator`
+* **Status**: `final readonly class`
+* **Method**:
+  ```php
+  public function paginate(
+      \PDO $pdo,
+      PdoPaginationQueryDescriptor $query,
+      PageRequest $request,
+      PaginationConfig $config,
+      callable $mapper
+  ): PageResult
+  ```
+* **Transaction Boundary**: The paginator does not own a transaction. It works without one or within a caller-owned one without modifying its state.
+
+### `Maatify\Persistence\Exception\InvalidPaginationConfigurationException`
+* **Status**: `final class`
+* **Extends**: `Maatify\Exceptions\Exception\System\SystemMaatifyException`
+* **Implements**: `Maatify\Persistence\Exception\PersistenceException`
+* **Trigger**: Invalid per-page bounds, whitelist errors.
+
+### `Maatify\Persistence\Exception\InvalidPaginationQueryException`
+* **Status**: `final class`
+* **Extends**: `Maatify\Exceptions\Exception\System\SystemMaatifyException`
+* **Implements**: `Maatify\Persistence\Exception\PersistenceException`
+* **Trigger**: Missing/empty SQL, semicolons, reserved parameters.
+
+### `Maatify\Persistence\Exception\PaginationExecutionException`
+* **Status**: `final class`
+* **Extends**: `Maatify\Exceptions\Exception\System\SystemMaatifyException`
+* **Implements**: `Maatify\Persistence\Exception\PersistenceException`
+* **Trigger**: PDO prepare/bind/execute failures during pagination.
+
 ## SQL and Trust Boundaries
 
 * **Identifiers**: SQL identifiers (table, columns) are validated configuration, not user input. They cannot be PDO-bound. Supported formats are standard identifier naming rules and `schema.table`.
