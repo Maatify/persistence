@@ -1,6 +1,6 @@
 {
   "name": "maatify/persistence",
-  "description": "Standalone, framework-agnostic PDO scoped and global ordering utilities for Maatify projects.",
+  "description": "Standalone, framework-agnostic PDO ordering and pagination utilities for Maatify projects.",
   "keywords": [
     "persistence",
     "pdo",
@@ -10,6 +10,9 @@
     "global-ordering",
     "display-order",
     "sort-order",
+    "pagination",
+    "pdo-pagination",
+    "offset-pagination",
     "transaction",
     "php",
     "maatify"
