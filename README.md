@@ -24,6 +24,8 @@
 
 *Standalone, framework-agnostic PDO utilities for Maatify projects, providing robust scoped and global ordering, and pagination tools. Designed and verified for MySQL environments.*
 
+> **Note:** PDO Pagination is implemented and verified on `main` and is targeted for `v1.1.0`. It is not included in the currently released `v1.0.0`.
+
 </div>
 
 ---
@@ -35,7 +37,7 @@
 * **SQL Identifier Validation**: Ensures table and column configurations are safe and properly quoted.
 * **Soft-Delete Filtering**: Optional support for ignoring soft-deleted rows in ordering calculations.
 * **Scope Isolation**: Ensures only the affected range within the configured scope is updated.
-* **PDO Pagination**: Fast, deterministic offset-pagination with strict normalization, bounds checking, and safe whitelist-based sorting.
+* **PDO Pagination**: Deterministic offset pagination with strict normalization, bounds checking, and safe whitelist-based sorting.
 
 ## ⚙️ Requirements
 
@@ -101,7 +103,11 @@ $config = new PaginationConfig(
     defaultPerPage: 10,
     maxPerPage: 100,
     minPerPage: 1,
-    sortWhitelist: new SortWhitelist(['created' => 'created_at', 'name' => 'user_name']),
+    sortWhitelist: new SortWhitelist([
+        'id' => 'id',
+        'created' => 'created_at',
+        'name' => 'user_name',
+    ]),
     defaultSortBy: 'created',
     defaultSortDirection: SortDirectionEnum::DESC,
     tieBreakerSortBy: 'id',
@@ -134,7 +140,7 @@ $result = $paginator->paginate(
 
 ## 🧩 Public Runtime API
 
-The package currently provides the following public classes for PDO ordering:
+The package currently provides the following public classes for PDO ordering and pagination:
 
 ```php
 Maatify\Persistence\Pdo\Ordering\ScopedOrderingConfig;
@@ -153,6 +159,9 @@ Maatify\Persistence\Exception\PersistenceException;
 Maatify\Persistence\Exception\InvalidOrderingConfigurationException;
 Maatify\Persistence\Exception\InvalidOrderingOperationException;
 Maatify\Persistence\Exception\OrderingTransactionException;
+Maatify\Persistence\Exception\InvalidPaginationConfigurationException;
+Maatify\Persistence\Exception\InvalidPaginationQueryException;
+Maatify\Persistence\Exception\PaginationExecutionException;
 ```
 
 ## ⚠️ Critical Runtime Behavior

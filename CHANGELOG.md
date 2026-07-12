@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 * PDO Pagination capability including `PageRequest`, `PageResult`, and `PdoPaginator`.
-* Fast, deterministic offset-pagination with strict normalization and safe whitelist-based sorting.
+* Deterministic offset pagination with strict normalization and safe whitelist-based sorting.
 * `InvalidPaginationConfigurationException`, `InvalidPaginationQueryException`, and `PaginationExecutionException`.
 
 ## [1.0.0] - 2026-07-11

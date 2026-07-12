@@ -11,6 +11,7 @@
 * **Explicit Composer Dependencies**:
   * `maatify/exceptions` (`^1.0`)
 * **Boundaries**: Framework-agnostic and host-agnostic. No HTTP API, no generic application repository, no ORM, no container bindings.
+* **Note**: PDO Pagination is implemented and verified on `main` and is targeted for `v1.1.0`. It is not included in the currently released `v1.0.0`.
 
 ## Public API Inventory
 
@@ -97,8 +98,8 @@
   ```
 
 ### `Maatify\Persistence\Pdo\Pagination\SortDirectionEnum`
-* **Status**: `enum`
-* **Cases**: `ASC`, `DESC`
+* **Status**: `enum SortDirectionEnum: string`
+* **Cases**: `ASC = 'ASC'`, `DESC = 'DESC'`
 
 ### `Maatify\Persistence\Pdo\Pagination\SortWhitelist`
 * **Status**: `final readonly class`
@@ -106,6 +107,9 @@
   ```php
   public function __construct(array $sorts)
   ```
+* **Methods**:
+  * `public function contains(string $key): bool`
+  * `public function quotedIdentifierFor(string $key): string`
 
 ### `Maatify\Persistence\Pdo\Pagination\PaginationConfig`
 * **Status**: `final readonly class`
@@ -138,7 +142,7 @@
   ```
 
 ### `Maatify\Persistence\Pdo\Pagination\PageResult`
-* **Status**: `final readonly class`
+* **Status**: `final readonly class implements JsonSerializable`
 * **Constructor**:
   ```php
   public function __construct(
@@ -157,6 +161,23 @@
 * **Methods**:
   * `public function toArray(): array`
   * `public function jsonSerialize(): array`
+* **Serialized Envelope**:
+  ```php
+  [
+      'data' => [],
+      'pagination' => [
+          'page' => 1,
+          'per_page' => 20,
+          'total' => 0,
+          'filtered' => 0,
+          'total_pages' => 0,
+          'has_next' => false,
+          'has_previous' => false,
+          'sort_by' => 'created_at',
+          'sort_direction' => 'DESC',
+      ],
+  ]
+  ```
 
 ### `Maatify\Persistence\Pdo\Pagination\PdoPaginator`
 * **Status**: `final readonly class`
@@ -188,13 +209,22 @@
 * **Status**: `final class`
 * **Extends**: `Maatify\Exceptions\Exception\System\SystemMaatifyException`
 * **Implements**: `Maatify\Persistence\Exception\PersistenceException`
-* **Trigger**: PDO prepare/bind/execute failures during pagination.
+* **Trigger**: Package-owned execution and result-contract failures, including non-throwing `prepare()`, `bindValue()`, or `execute()` failures, invalid count shape or count value, fetch-state failures, invalid mapper result, and invalid `PageResult` invariants. Thrown `PDOException` and mapper `Throwable` instances propagate without wrapping.
 
 ## SQL and Trust Boundaries
 
 * **Identifiers**: SQL identifiers (table, columns) are validated configuration, not user input. They cannot be PDO-bound. Supported formats are standard identifier naming rules and `schema.table`.
 * **Values**: All runtime values (ids, scope values) use prepared statements and PDO parameter binding.
 * **No Host Assumptions**: No host schema assumptions or ORM dependencies.
+
+## Pagination Boundaries
+* **Normalization**: Strict page and per-page normalization.
+* **Query Ownership**: Package handles total, filtered-count, and data query execution.
+* **Caller Responsibility**: Caller owns SQL semantic alignment between total, filtered, and data queries.
+* **Sorting**: Safe whitelist sorting and deterministic tie-breaker.
+* **Mapper**: Mapper must return an array or object.
+* **Transaction/PDO Attributes**: No transaction ownership, no PDO attribute mutation. Native MySQL prepared statements with emulation disabled are required.
+* **Exclusions**: No SQL parser, query builder, filter builder, authorization, or HTTP behavior.
 
 ## Exception Architecture
 
@@ -224,6 +254,9 @@ Renaming the marker MAY be reconsidered only as part of a separately approved, m
 | `InvalidOrderingConfigurationException` | `SystemMaatifyException` | `ErrorCodeEnum::MAATIFY_ERROR` | default | Invalid/unsafe trusted SQL configuration identifiers. |
 | `InvalidOrderingOperationException` | `ValidationMaatifyException` | `ErrorCodeEnum::INVALID_ARGUMENT` | default | Invalid runtime id, new order, or scope usage. |
 | `OrderingTransactionException` | `UnsupportedMaatifyException` | `ErrorCodeEnum::UNSUPPORTED_OPERATION` | `defaultIsSafe(): false` | `moveWithinScope()` called with active PDO transaction. |
+| `InvalidPaginationConfigurationException` | `SystemMaatifyException` | `ErrorCodeEnum::MAATIFY_ERROR` | default | Invalid per-page bounds, whitelist errors. |
+| `InvalidPaginationQueryException` | `SystemMaatifyException` | `ErrorCodeEnum::MAATIFY_ERROR` | default | Missing/empty SQL, semicolons, reserved parameters. |
+| `PaginationExecutionException` | `SystemMaatifyException` | `ErrorCodeEnum::MAATIFY_ERROR` | default | Package-owned execution and result-contract failures. |
 ### `Maatify\Persistence\Exception\PersistenceException`
 * **Status**: `interface`
 * **Extends**: `\Throwable`
