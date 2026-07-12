@@ -36,8 +36,8 @@ final class PdoPaginatorQuerySemanticsTest extends PaginationIntegrationTestCase
         self::assertSame(4, $firstPage->total);
         self::assertSame(3, $firstPage->filtered);
         self::assertSame(2, $firstPage->totalPages);
-        self::assertSame([$ids[0], $ids[1]], array_map('intval', array_column($firstPage->data, 'id')));
-        self::assertSame([$ids[2]], array_map('intval', array_column($secondPage->data, 'id')));
+        self::assertSame([$ids[0], $ids[1]], self::idsFromRows($firstPage->data));
+        self::assertSame([$ids[2]], self::idsFromRows($secondPage->data));
     }
 
     public function testNoFilterIdenticalCountsNullBindingInvalidSortFallbackAndObjectMapper(): void
@@ -71,7 +71,7 @@ final class PdoPaginatorQuerySemanticsTest extends PaginationIntegrationTestCase
         self::assertSame($result->total, $result->filtered);
         self::assertSame('created_at', $result->sortBy);
         self::assertSame('DESC', $result->sortDirection->value);
-        self::assertSame([$ids[3], $ids[0]], array_map(static fn (object $row): int => (int) $row->id, $result->data));
+        self::assertSame([$ids[3], $ids[0]], self::idsFromObjects($result->data));
         self::assertSame($objects[0], $result->data[0]);
     }
 
@@ -143,5 +143,40 @@ final class PdoPaginatorQuerySemanticsTest extends PaginationIntegrationTestCase
         );
         self::assertSame(1, $filteredGreaterThanTotal->total);
         self::assertSame(3, $filteredGreaterThanTotal->filtered);
+    }
+
+    /**
+     * @param list<array<string, mixed>> $rows
+     *
+     * @return list<int>
+     */
+    private static function idsFromRows(array $rows): array
+    {
+        $ids = [];
+        foreach ($rows as $row) {
+            self::assertArrayHasKey('id', $row);
+            self::assertTrue(is_int($row['id']) || is_string($row['id']));
+            $ids[] = (int) $row['id'];
+        }
+
+        return $ids;
+    }
+
+    /**
+     * @param list<object> $rows
+     *
+     * @return list<int>
+     */
+    private static function idsFromObjects(array $rows): array
+    {
+        $ids = [];
+        foreach ($rows as $row) {
+            self::assertTrue(property_exists($row, 'id'));
+            $id = $row->id;
+            self::assertTrue(is_int($id) || is_string($id));
+            $ids[] = (int) $id;
+        }
+
+        return $ids;
     }
 }

@@ -14,8 +14,11 @@ use Maatify\Persistence\Pdo\Pagination\SortDirectionEnum;
 use Maatify\Persistence\Pdo\Pagination\SortWhitelist;
 use PHPUnit\Framework\TestCase;
 use ReflectionClass;
+use ReflectionIntersectionType;
 use ReflectionNamedType;
+use ReflectionType;
 use ReflectionParameter;
+use ReflectionUnionType;
 
 final class PaginationPublicApiRegressionTest extends TestCase
 {
@@ -123,16 +126,36 @@ final class PaginationPublicApiRegressionTest extends TestCase
         }
     }
 
-    private static function typeName(?\ReflectionType $type): string
+    private static function typeName(?ReflectionType $type): string
     {
+        self::assertNotNull($type);
+
         if ($type instanceof ReflectionNamedType) {
             return $type->getName();
         }
 
-        self::assertNotNull($type);
-        $parts = array_map(static fn (ReflectionNamedType $namedType): string => $namedType->getName(), $type->getTypes());
-        sort($parts);
+        if ($type instanceof ReflectionUnionType) {
+            $parts = [];
+            foreach ($type->getTypes() as $namedType) {
+                if ($namedType->getName() !== 'null') {
+                    $parts[] = $namedType->getName();
+                }
+            }
+            sort($parts);
 
-        return implode('|', $parts);
+            return implode('|', $parts);
+        }
+
+        if ($type instanceof ReflectionIntersectionType) {
+            $parts = [];
+            foreach ($type->getTypes() as $namedType) {
+                $parts[] = $namedType->getName();
+            }
+            sort($parts);
+
+            return implode('&', $parts);
+        }
+
+        self::fail('Unsupported reflection type.');
     }
 }

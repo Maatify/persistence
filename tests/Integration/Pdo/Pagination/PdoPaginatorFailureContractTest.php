@@ -11,6 +11,7 @@ use Maatify\Persistence\Pdo\Pagination\PdoPaginator;
 use Maatify\Persistence\Tests\Support\MySql\PaginationIntegrationTestCase;
 use Maatify\Persistence\Tests\Support\MySql\PaginationSchemaManager;
 use PDOException;
+use ReflectionMethod;
 use RuntimeException;
 
 final class PdoPaginatorFailureContractTest extends PaginationIntegrationTestCase
@@ -30,8 +31,8 @@ final class PdoPaginatorFailureContractTest extends PaginationIntegrationTestCas
             try {
                 (new PdoPaginator())->paginate($this->pdo(), $descriptor, new PageRequest(), $this->config(), static fn (array $row): array => $row);
                 self::fail('Expected count shape failure.');
-            } catch (PaginationExecutionException) {
-                self::assertTrue(true);
+            } catch (PaginationExecutionException $exception) {
+                self::assertInstanceOf(PaginationExecutionException::class, $exception);
             }
         }
     }
@@ -62,7 +63,7 @@ final class PdoPaginatorFailureContractTest extends PaginationIntegrationTestCas
         }
 
         $this->expectException(PaginationExecutionException::class);
-        (new PdoPaginator())->paginate($this->pdo(), $this->descriptor(), new PageRequest(), $this->config(), static fn (array $row): int => 1);
+        $this->invokePaginatorWithMapper(static fn (array $row): int => 1);
     }
 
     public function testResourceMapperFailureClosesResource(): void
@@ -73,9 +74,21 @@ final class PdoPaginatorFailureContractTest extends PaginationIntegrationTestCas
 
         try {
             $this->expectException(PaginationExecutionException::class);
-            (new PdoPaginator())->paginate($this->pdo(), $this->descriptor(), new PageRequest(), $this->config(), static fn (array $row) => $resource);
+            $this->invokePaginatorWithMapper(static fn (array $row) => $resource);
         } finally {
             fclose($resource);
         }
+    }
+
+    private function invokePaginatorWithMapper(callable $mapper): void
+    {
+        $method = new ReflectionMethod(PdoPaginator::class, 'paginate');
+        $method->invokeArgs(new PdoPaginator(), [
+            $this->pdo(),
+            $this->descriptor(),
+            new PageRequest(),
+            $this->config(),
+            $mapper,
+        ]);
     }
 }

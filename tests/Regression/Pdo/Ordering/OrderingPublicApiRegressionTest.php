@@ -9,7 +9,10 @@ use Maatify\Persistence\Pdo\Ordering\ScopedOrderingManager;
 use PDO;
 use PHPUnit\Framework\TestCase;
 use ReflectionClass;
+use ReflectionIntersectionType;
 use ReflectionNamedType;
+use ReflectionType;
+use ReflectionUnionType;
 use ReflectionParameter;
 
 final class OrderingPublicApiRegressionTest extends TestCase
@@ -38,8 +41,8 @@ final class OrderingPublicApiRegressionTest extends TestCase
         self::assertPublicMethod($class, 'quotedTable', [], 'string');
         self::assertPublicMethod($class, 'quotedIdColumn', [], 'string');
         self::assertPublicMethod($class, 'quotedOrderColumn', [], 'string');
-        self::assertPublicMethod($class, 'quotedScopeColumn', [], '?string');
-        self::assertPublicMethod($class, 'quotedDeletedAtColumn', [], '?string');
+        self::assertPublicMethod($class, 'quotedScopeColumn', [], 'string');
+        self::assertPublicMethod($class, 'quotedDeletedAtColumn', [], 'string');
     }
 
     public function testScopedOrderingManagerApiMatchesRepositoryReality(): void
@@ -71,7 +74,10 @@ final class OrderingPublicApiRegressionTest extends TestCase
         ], 'bool');
     }
 
-    /** @param list<array{string, string, bool, bool, mixed}> $expected */
+    /**
+     * @param ReflectionClass<object> $class
+     * @param list<array{string, string, bool, bool, mixed}> $expected
+     */
     private static function assertConstructorParameters(ReflectionClass $class, array $expected): void
     {
         $constructor = $class->getConstructor();
@@ -79,7 +85,10 @@ final class OrderingPublicApiRegressionTest extends TestCase
         self::assertParameters($constructor->getParameters(), $expected);
     }
 
-    /** @param list<array{string, string, bool, bool, mixed}> $expectedParameters */
+    /**
+     * @param ReflectionClass<object> $class
+     * @param list<array{string, string, bool, bool, mixed}> $expectedParameters
+     */
     private static function assertPublicMethod(ReflectionClass $class, string $methodName, array $expectedParameters, string $returnType): void
     {
         $method = $class->getMethod($methodName);
@@ -108,17 +117,36 @@ final class OrderingPublicApiRegressionTest extends TestCase
         }
     }
 
-    private static function typeName(?\ReflectionType $type): string
+    private static function typeName(?ReflectionType $type): string
     {
-        if ($type instanceof ReflectionNamedType) {
-            return ($type->allowsNull() && $type->getName() !== 'mixed' ? '?' : '') . $type->getName();
-        }
-
         self::assertNotNull($type);
 
-        $parts = array_map(static fn (ReflectionNamedType $namedType): string => $namedType->getName(), $type->getTypes());
-        sort($parts);
+        if ($type instanceof ReflectionNamedType) {
+            return $type->getName();
+        }
 
-        return implode('|', $parts);
+        if ($type instanceof ReflectionUnionType) {
+            $parts = [];
+            foreach ($type->getTypes() as $namedType) {
+                if ($namedType->getName() !== 'null') {
+                    $parts[] = $namedType->getName();
+                }
+            }
+            sort($parts);
+
+            return implode('|', $parts);
+        }
+
+        if ($type instanceof ReflectionIntersectionType) {
+            $parts = [];
+            foreach ($type->getTypes() as $namedType) {
+                $parts[] = $namedType->getName();
+            }
+            sort($parts);
+
+            return implode('&', $parts);
+        }
+
+        self::fail('Unsupported reflection type.');
     }
 }

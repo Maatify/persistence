@@ -53,9 +53,7 @@ final class PdoPaginatorTransactionTest extends PaginationIntegrationTestCase
             );
             self::assertTrue($this->pdo()->inTransaction());
         } finally {
-            if ($this->pdo()->inTransaction()) {
-                $this->pdo()->rollBack();
-            }
+            $this->pdo()->rollBack();
         }
     }
 }
