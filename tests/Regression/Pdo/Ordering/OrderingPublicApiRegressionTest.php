@@ -127,9 +127,10 @@ final class OrderingPublicApiRegressionTest extends TestCase
 
         if ($type instanceof ReflectionUnionType) {
             $parts = [];
-            foreach ($type->getTypes() as $namedType) {
-                if ($namedType->getName() !== 'null') {
-                    $parts[] = $namedType->getName();
+            foreach ($type->getTypes() as $innerType) {
+                $name = self::typeName($innerType);
+                if ($name !== 'null') {
+                    $parts[] = $name;
                 }
             }
             sort($parts);
@@ -139,8 +140,8 @@ final class OrderingPublicApiRegressionTest extends TestCase
 
         if ($type instanceof ReflectionIntersectionType) {
             $parts = [];
-            foreach ($type->getTypes() as $namedType) {
-                $parts[] = $namedType->getName();
+            foreach ($type->getTypes() as $innerType) {
+                $parts[] = self::typeName($innerType);
             }
             sort($parts);
 
@@ -149,4 +150,5 @@ final class OrderingPublicApiRegressionTest extends TestCase
 
         self::fail('Unsupported reflection type.');
     }
+
 }

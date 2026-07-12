@@ -17,6 +17,7 @@ use ReflectionClass;
 use ReflectionIntersectionType;
 use ReflectionNamedType;
 use ReflectionType;
+use ReflectionMethod;
 use ReflectionParameter;
 use ReflectionUnionType;
 
@@ -33,7 +34,7 @@ final class PaginationPublicApiRegressionTest extends TestCase
         }
 
         self::assertSame(['ASC' => 'ASC', 'DESC' => 'DESC'], array_column(SortDirectionEnum::cases(), 'value', 'name'));
-        self::assertSame(['cases', 'from', 'tryFrom'], array_values(array_map(static fn ($method): string => $method->getName(), (new ReflectionClass(SortDirectionEnum::class))->getMethods())));
+        self::assertSame(['cases', 'from', 'tryFrom'], array_map(static fn (\ReflectionMethod $method): string => $method->getName(), (new ReflectionClass(SortDirectionEnum::class))->getMethods()));
     }
 
     public function testConstructorContractsAndPromotedProperties(): void
@@ -92,7 +93,10 @@ final class PaginationPublicApiRegressionTest extends TestCase
         self::assertArrayNotHasKey('offset', $result->toArray()['pagination']);
     }
 
-    /** @param list<array{string, string, bool, bool, mixed, bool}> $expected */
+    /**
+     * @param class-string<object> $className
+     * @param list<array{string, string, bool, bool, mixed, bool}> $expected
+     */
     private static function assertConstructor(string $className, array $expected): void
     {
         $class = new ReflectionClass($className);
@@ -101,6 +105,10 @@ final class PaginationPublicApiRegressionTest extends TestCase
         self::assertParameters($constructor->getParameters(), $expected);
     }
 
+    /**
+     * @param class-string<object> $className
+     * @param list<string> $parameterNames
+     */
     private static function assertMethod(string $className, string $methodName, array $parameterNames, string $returnType): void
     {
         $method = (new ReflectionClass($className))->getMethod($methodName);
@@ -109,7 +117,10 @@ final class PaginationPublicApiRegressionTest extends TestCase
         self::assertSame($returnType, self::typeName($method->getReturnType()));
     }
 
-    /** @param list<array{string, string, bool, bool, mixed, bool}> $expected */
+    /**
+     * @param list<ReflectionParameter> $parameters
+     * @param list<array{string, string, bool, bool, mixed, bool}> $expected
+     */
     private static function assertParameters(array $parameters, array $expected): void
     {
         self::assertCount(count($expected), $parameters);
@@ -136,9 +147,10 @@ final class PaginationPublicApiRegressionTest extends TestCase
 
         if ($type instanceof ReflectionUnionType) {
             $parts = [];
-            foreach ($type->getTypes() as $namedType) {
-                if ($namedType->getName() !== 'null') {
-                    $parts[] = $namedType->getName();
+            foreach ($type->getTypes() as $innerType) {
+                $name = self::typeName($innerType);
+                if ($name !== 'null') {
+                    $parts[] = $name;
                 }
             }
             sort($parts);
@@ -148,8 +160,8 @@ final class PaginationPublicApiRegressionTest extends TestCase
 
         if ($type instanceof ReflectionIntersectionType) {
             $parts = [];
-            foreach ($type->getTypes() as $namedType) {
-                $parts[] = $namedType->getName();
+            foreach ($type->getTypes() as $innerType) {
+                $parts[] = self::typeName($innerType);
             }
             sort($parts);
 
@@ -158,4 +170,5 @@ final class PaginationPublicApiRegressionTest extends TestCase
 
         self::fail('Unsupported reflection type.');
     }
+
 }

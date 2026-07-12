@@ -116,14 +116,69 @@ final class PdoPaginatorFailureTest extends TestCase
         (new ReflectionMethod(PdoPaginator::class, 'paginate'))->invokeArgs(new PdoPaginator(), [$this->successfulPdo(), $this->queryWithoutParams(), new PageRequest(), $this->config(), $mapper]);
     }
 
-    private function query(): PdoPaginationQueryDescriptor { return new PdoPaginationQueryDescriptor('T', ['p' => 1], 'F', ['p' => 1], 'D', ['p' => 1]); }
-    private function queryWithoutParams(): PdoPaginationQueryDescriptor { return new PdoPaginationQueryDescriptor('T', [], 'F', [], 'D', []); }
-    private function config(): PaginationConfig { return new PaginationConfig(new SortWhitelist(['id' => 'id']), 'id', SortDirectionEnum::ASC, 'id', SortDirectionEnum::ASC); }
-    private function successfulPdo(): ScriptedPdo { return new ScriptedPdo([ScriptedPdoStatement::count(1), ScriptedPdoStatement::count(1), ScriptedPdoStatement::data([['id' => 1]])]); }
-    private function countStatement(array $fetchQueue = [['total_count' => 1], false], bool|PDOException $executeResult = true, ?string $errorCode = '00000', array $bindResults = []): ScriptedPdoStatement { return new ScriptedPdoStatement(1, $fetchQueue, $executeResult, $errorCode, $bindResults); }
-    private function dataStatement(bool|PDOException $executeResult = true, array $bindResults = []): ScriptedPdoStatement { return new ScriptedPdoStatement(1, [['id' => 1], false], $executeResult, '00000', $bindResults); }
-    private function pdoPrepareThrowable(): array { $e = new PDOException('prepare'); return [new ScriptedPdo([$e]), $e]; }
-    private function pdoBindThrowable(): array { $e = new PDOException('bind'); return [new ScriptedPdo([$this->countStatement(bindResults: [':p' => $e])]), $e]; }
-    private function pdoExecuteThrowable(): array { $e = new PDOException('execute'); return [new ScriptedPdo([$this->countStatement(executeResult: $e)]), $e]; }
-    private function pdoFetchThrowable(): array { $e = new PDOException('fetch'); return [new ScriptedPdo([new ScriptedPdoStatement(1, [$e])]), $e]; }
+    private function query(): PdoPaginationQueryDescriptor
+    {
+        return new PdoPaginationQueryDescriptor('T', ['p' => 1], 'F', ['p' => 1], 'D', ['p' => 1]);
+    }
+    private function queryWithoutParams(): PdoPaginationQueryDescriptor
+    {
+        return new PdoPaginationQueryDescriptor('T', [], 'F', [], 'D', []);
+    }
+    private function config(): PaginationConfig
+    {
+        return new PaginationConfig(new SortWhitelist(['id' => 'id']), 'id', SortDirectionEnum::ASC, 'id', SortDirectionEnum::ASC);
+    }
+    private function successfulPdo(): ScriptedPdo
+    {
+        return new ScriptedPdo([
+            ScriptedPdoStatement::count(1),
+            ScriptedPdoStatement::count(1),
+            ScriptedPdoStatement::data([['id' => 1]]),
+        ]);
+    }
+    /**
+     * @param list<mixed> $fetchQueue
+     * @param array<string, bool|PDOException> $bindResults
+     */
+    private function countStatement(
+        array $fetchQueue = [['total_count' => 1], false],
+        bool|PDOException $executeResult = true,
+        ?string $errorCode = '00000',
+        array $bindResults = [],
+    ): ScriptedPdoStatement {
+        return new ScriptedPdoStatement(1, $fetchQueue, $executeResult, $errorCode, $bindResults);
+    }
+    /** @param array<string, bool|PDOException> $bindResults */
+    private function dataStatement(bool|PDOException $executeResult = true, array $bindResults = []): ScriptedPdoStatement
+    {
+        return new ScriptedPdoStatement(1, [['id' => 1], false], $executeResult, '00000', $bindResults);
+    }
+    /** @return array{ScriptedPdo, PDOException} */
+    private function pdoPrepareThrowable(): array
+    {
+        $exception = new PDOException('prepare');
+
+        return [new ScriptedPdo([$exception]), $exception];
+    }
+    /** @return array{ScriptedPdo, PDOException} */
+    private function pdoBindThrowable(): array
+    {
+        $exception = new PDOException('bind');
+
+        return [new ScriptedPdo([$this->countStatement(bindResults: [':p' => $exception])]), $exception];
+    }
+    /** @return array{ScriptedPdo, PDOException} */
+    private function pdoExecuteThrowable(): array
+    {
+        $exception = new PDOException('execute');
+
+        return [new ScriptedPdo([$this->countStatement(executeResult: $exception)]), $exception];
+    }
+    /** @return array{ScriptedPdo, PDOException} */
+    private function pdoFetchThrowable(): array
+    {
+        $exception = new PDOException('fetch');
+
+        return [new ScriptedPdo([new ScriptedPdoStatement(1, [$exception])]), $exception];
+    }
 }
