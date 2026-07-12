@@ -37,17 +37,95 @@ final class PdoPaginatorFailureContractTest extends PaginationIntegrationTestCas
         }
     }
 
-    public function testPlaceholderViolationsAndInvalidTableColumnPropagatePdoException(): void
+    public function testRepeatedNamedPlaceholder(): void
     {
-        $this->expectException(PDOException::class);
+        // the constructor enforces keys without ':'
+        $descriptor = new PdoPaginationQueryDescriptor('SELECT 1 AS total_count', [], 'SELECT 1 AS filtered_count', [], 'SELECT id FROM `' . PaginationSchemaManager::TABLE . '` WHERE name = :p OR category = :p', ['p' => 'test']);
+        self::assertInstanceOf(PdoPaginationQueryDescriptor::class, $descriptor);
 
-        (new PdoPaginator())->paginate(
-            $this->pdo(),
-            new PdoPaginationQueryDescriptor('SELECT COUNT(*) AS total_count FROM missing_pagination_table', [], 'SELECT 1 AS filtered_count', [], 'SELECT id FROM missing_pagination_table', []),
-            new PageRequest(),
-            $this->config(),
-            static fn (array $row): array => $row,
-        );
+        try {
+            (new PdoPaginator())->paginate($this->pdo(), $descriptor, new PageRequest(), $this->config(), static fn (array $row): array => $row);
+            self::fail('Expected execution to fail.');
+        } catch (\Throwable $exception) {
+            self::assertTrue($exception instanceof PDOException || $exception instanceof PaginationExecutionException);
+        }
+    }
+
+    public function testMissingParameter(): void
+    {
+        $descriptor = new PdoPaginationQueryDescriptor('SELECT 1 AS total_count', [], 'SELECT 1 AS filtered_count', [], 'SELECT id FROM `' . PaginationSchemaManager::TABLE . '` WHERE name = :p', []);
+        self::assertInstanceOf(PdoPaginationQueryDescriptor::class, $descriptor);
+
+        try {
+            (new PdoPaginator())->paginate($this->pdo(), $descriptor, new PageRequest(), $this->config(), static fn (array $row): array => $row);
+            self::fail('Expected execution to fail.');
+        } catch (\Throwable $exception) {
+            self::assertTrue($exception instanceof PDOException || $exception instanceof PaginationExecutionException);
+        }
+    }
+
+    public function testUnusedParameter(): void
+    {
+        $descriptor = new PdoPaginationQueryDescriptor('SELECT 1 AS total_count', [], 'SELECT 1 AS filtered_count', [], 'SELECT id FROM `' . PaginationSchemaManager::TABLE . '`', ['p' => 'unused']);
+        self::assertInstanceOf(PdoPaginationQueryDescriptor::class, $descriptor);
+
+        try {
+            (new PdoPaginator())->paginate($this->pdo(), $descriptor, new PageRequest(), $this->config(), static fn (array $row): array => $row);
+            self::fail('Expected execution to fail.');
+        } catch (\Throwable $exception) {
+            self::assertTrue($exception instanceof PDOException || $exception instanceof PaginationExecutionException);
+        }
+    }
+
+    public function testPositionalPlaceholder(): void
+    {
+        // Positional parameters map via execution failure.
+        $descriptor = new PdoPaginationQueryDescriptor('SELECT 1 AS total_count', [], 'SELECT 1 AS filtered_count', [], 'SELECT id FROM `' . PaginationSchemaManager::TABLE . '` WHERE name = ?', []);
+        self::assertInstanceOf(PdoPaginationQueryDescriptor::class, $descriptor);
+
+        try {
+            (new PdoPaginator())->paginate($this->pdo(), $descriptor, new PageRequest(), $this->config(), static fn (array $row): array => $row);
+            self::fail('Expected execution to fail.');
+        } catch (\Throwable $exception) {
+            self::assertTrue($exception instanceof PDOException || $exception instanceof PaginationExecutionException);
+        }
+    }
+
+    public function testMixedPositionalAndNamedPlaceholders(): void
+    {
+        $descriptor = new PdoPaginationQueryDescriptor('SELECT 1 AS total_count', [], 'SELECT 1 AS filtered_count', [], 'SELECT id FROM `' . PaginationSchemaManager::TABLE . '` WHERE name = ? AND category = :cat', ['cat' => 'test']);
+        self::assertInstanceOf(PdoPaginationQueryDescriptor::class, $descriptor);
+
+        try {
+            (new PdoPaginator())->paginate($this->pdo(), $descriptor, new PageRequest(), $this->config(), static fn (array $row): array => $row);
+            self::fail('Expected execution to fail.');
+        } catch (\Throwable $exception) {
+            self::assertTrue($exception instanceof PDOException || $exception instanceof PaginationExecutionException);
+        }
+    }
+
+    public function testInvalidTable(): void
+    {
+        $descriptor = new PdoPaginationQueryDescriptor('SELECT COUNT(*) AS total_count FROM missing_pagination_table', [], 'SELECT 1 AS filtered_count', [], 'SELECT id FROM missing_pagination_table', []);
+
+        try {
+            (new PdoPaginator())->paginate($this->pdo(), $descriptor, new PageRequest(), $this->config(), static fn (array $row): array => $row);
+            self::fail('Expected PDOException.');
+        } catch (\Throwable $exception) {
+            self::assertInstanceOf(PDOException::class, $exception);
+        }
+    }
+
+    public function testInvalidColumn(): void
+    {
+        $descriptor = new PdoPaginationQueryDescriptor('SELECT COUNT(missing_col) AS total_count FROM `' . PaginationSchemaManager::TABLE . '`', [], 'SELECT 1 AS filtered_count', [], 'SELECT missing_col FROM `' . PaginationSchemaManager::TABLE . '`', []);
+
+        try {
+            (new PdoPaginator())->paginate($this->pdo(), $descriptor, new PageRequest(), $this->config(), static fn (array $row): array => $row);
+            self::fail('Expected PDOException.');
+        } catch (\Throwable $exception) {
+            self::assertInstanceOf(PDOException::class, $exception);
+        }
     }
 
     public function testMapperThrowableIdentityAndInvalidMapperResults(): void
