@@ -15,7 +15,7 @@ final class PageResultTest extends TestCase
 {
     public function testValidConstructionMetadataAndSerialization(): void
     {
-        $object = new class {
+        $object = new class () {
             public bool $toArrayCalled = false;
             public bool $jsonSerializeCalled = false;
 

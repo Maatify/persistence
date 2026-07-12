@@ -1,0 +1,29 @@
+Coverage Mapping for PDO_PAGINATION_CONTRACT.md / Section 21
+
+| Blueprint requirement (Section 21) | Test class | Test method | Test level |
+|---|---|---|---|
+| 21.1 total and filtered | PdoPaginatorQuerySemanticsTest | testBaseTotalFilteredSortingTieBreakerAndConsecutivePages | Real MySQL Integration |
+| 21.2 no-filter | PdoPaginatorQuerySemanticsTest | testNoFilterIdenticalCountsNullBindingInvalidSortFallbackAndObjectMapper | Real MySQL Integration |
+| 21.3 parameter types | PdoPaginatorQuerySemanticsTest | testNoFilterIdenticalCountsNullBindingInvalidSortFallbackAndObjectMapper | Real MySQL Integration |
+| 21.4 native prepares | PdoPaginatorQuerySemanticsTest | testBaseTotalFilteredSortingTieBreakerAndConsecutivePages | Real MySQL Integration |
+| 21.5 sorting | PdoPaginatorQuerySemanticsTest | testBaseTotalFilteredSortingTieBreakerAndConsecutivePages, testNoFilterIdenticalCountsNullBindingInvalidSortFallbackAndObjectMapper | Real MySQL Integration |
+| 21.6 page behavior | PdoPaginatorQuerySemanticsTest | testBaseTotalFilteredSortingTieBreakerAndConsecutivePages, testOverflowZeroFilteredEmptyPositiveFilteredAndFilteredGreaterThanTotal | Real MySQL Integration |
+| 21.7 mapper | PdoPaginatorQuerySemanticsTest | testNoFilterIdenticalCountsNullBindingInvalidSortFallbackAndObjectMapper, testOverflowZeroFilteredEmptyPositiveFilteredAndFilteredGreaterThanTotal | Real MySQL Integration |
+
+| Blueprint requirement (Section 22) | Test class | Test method | Test level |
+|---|---|---|---|
+| 22.1 count cardinality | PdoPaginatorFailureContractTest | testCountShapeFailures | Real MySQL Integration |
+| 22.2 placeholder failures (repeated named) | PdoPaginatorFailureContractTest | testRepeatedNamedPlaceholder | Real MySQL Integration |
+| 22.2 placeholder failures (missing) | PdoPaginatorFailureContractTest | testMissingParameter | Real MySQL Integration |
+| 22.2 placeholder failures (unused) | PdoPaginatorFailureContractTest | testUnusedParameter | Real MySQL Integration |
+| 22.2 placeholder failures (positional) | PdoPaginatorFailureContractTest | testPositionalPlaceholder | Real MySQL Integration |
+| 22.2 placeholder failures (mixed) | PdoPaginatorFailureContractTest | testMixedPositionalAndNamedPlaceholders | Real MySQL Integration |
+| 22.3 mapper failure | PdoPaginatorFailureContractTest | testMapperThrowableIdentityAndInvalidMapperResults, testResourceMapperFailureClosesResource | Real MySQL Integration |
+| 22.4 PDO exception propagation | PdoPaginatorFailureContractTest | testInvalidTable, testInvalidColumn | Real MySQL Integration |
+
+| Blueprint requirement (Section 23) | Test class | Test method | Test level |
+|---|---|---|---|
+| 23.1 outside transaction | PdoPaginatorTransactionTest | testAttributesUnchangedOutsideTransactionAndCallerTransactionPreserved | Real MySQL Integration |
+| 23.2 caller-owned transaction | PdoPaginatorTransactionTest | testAttributesUnchangedOutsideTransactionAndCallerTransactionPreserved | Real MySQL Integration |
+| 23.3 attributes unchanged | PdoPaginatorTransactionTest | testAttributesUnchangedOutsideTransactionAndCallerTransactionPreserved | Real MySQL Integration |
+| 23.4 claim boundary | PdoPaginatorTransactionTest | testAttributesUnchangedOutsideTransactionAndCallerTransactionPreserved | Real MySQL Integration |

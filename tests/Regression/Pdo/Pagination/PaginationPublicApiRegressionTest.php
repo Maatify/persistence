@@ -17,7 +17,6 @@ use ReflectionClass;
 use ReflectionIntersectionType;
 use ReflectionNamedType;
 use ReflectionType;
-use ReflectionMethod;
 use ReflectionParameter;
 use ReflectionUnionType;
 
