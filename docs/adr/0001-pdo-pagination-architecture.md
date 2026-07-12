@@ -2,7 +2,7 @@
 
 - **Status:** Accepted
 - **Decision date:** 2026-07-11
-- **Runtime status:** Completed and merged; target release `v1.1.0`
+- **Runtime status:** Released in v1.1.0
 - **Implementation authorization:** Implemented
 - **Related contract:** [PDO Pagination Contract](../architecture/PDO_PAGINATION_CONTRACT.md)
 
@@ -62,7 +62,7 @@ The package will not become:
 
 The exact public types, signatures, validation rules, SQL boundaries, exception classifications, result invariants, and MySQL verification requirements are owned by the [PDO Pagination Contract](../architecture/PDO_PAGINATION_CONTRACT.md).
 
-The contract has been implemented and merged. Until the `v1.1.0` release is published, neither this ADR nor the contract proves that consumers can use Pagination.
+The contract has been implemented and released in `v1.1.0`.
 
 ## Alternatives Considered
 

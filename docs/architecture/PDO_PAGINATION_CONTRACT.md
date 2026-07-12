@@ -2,13 +2,14 @@
 
 ## 1. Status and Authority
 
-**Status:** Owner-approved implementation contract; Runtime implementation is completed and merged.
+**Architecture status:** owner-approved
+**Runtime status:** implemented and released in v1.1.0
 
 **Architecture decision:** [ADR 0001 — PDO Pagination Architecture](../adr/0001-pdo-pagination-architecture.md).
 
 **Implementation authorization:** Implementation has been completed and merged.
 
-**Target release:** `v1.1.0`, only after Runtime implementation, complete verification, public documentation alignment, and final owner approval.
+**Released in:** v1.1.0
 
 This document is the package-specific source of truth for implementing:
 
@@ -17,8 +18,6 @@ Maatify\Persistence\Pdo\Pagination
 ```
 
 It supersedes earlier host-project pagination proposals when they conflict with this contract.
-
-Until implementation is merged, this document MUST NOT be presented as proof that the Runtime capability already exists.
 
 After implementation, the Runtime source and `PERSISTENCE_PACKAGE_REFERENCE.md` MUST match this document exactly. Any proposed divergence requires a new architectural decision before code changes.
 
