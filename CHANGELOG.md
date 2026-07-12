@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-07-12
+
 ### Added
 * PDO Pagination capability including `PageRequest`, `PageResult`, and `PdoPaginator`.
 * Deterministic offset pagination with strict normalization and safe whitelist-based sorting.
@@ -43,5 +45,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Rolls back owned transactions after operation failures and rethrows the original throwable.
 * Enforced real MySQL testing; SQLite substitution is explicitly disabled.
 
-[Unreleased]: https://github.com/Maatify/persistence/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/Maatify/persistence/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/Maatify/persistence/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/Maatify/persistence/releases/tag/v1.0.0

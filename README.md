@@ -24,7 +24,7 @@
 
 *Standalone, framework-agnostic PDO utilities for Maatify projects, providing robust scoped and global ordering, and pagination tools. Designed and verified for MySQL environments.*
 
-> **Note:** PDO Pagination is implemented and verified on `main` and is targeted for `v1.1.0`. It is not included in the currently released `v1.0.0`.
+> **Note:** PDO Pagination is available starting with v1.1.0.
 
 </div>
 

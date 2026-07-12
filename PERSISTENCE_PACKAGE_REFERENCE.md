@@ -11,7 +11,7 @@
 * **Explicit Composer Dependencies**:
   * `maatify/exceptions` (`^1.0`)
 * **Boundaries**: Framework-agnostic and host-agnostic. No HTTP API, no generic application repository, no ORM, no container bindings.
-* **Note**: PDO Pagination is implemented and verified on `main` and is targeted for `v1.1.0`. It is not included in the currently released `v1.0.0`.
+* **Note**: PDO Pagination was introduced in v1.1.0.
 
 ## Public API Inventory
 
