@@ -11,5 +11,51 @@ use PDO;
 
 final class PdoPaginatorTransactionTest extends PaginationIntegrationTestCase
 {
-    public function testAttributesUnchangedNoTransactionOutsideAndCallerTransactionPreserved(): void { $this->fixture->seedDefault(); $emulateBefore=$this->pdo()->getAttribute(PDO::ATTR_EMULATE_PREPARES); $errBefore=$this->pdo()->getAttribute(PDO::ATTR_ERRMODE); self::assertFalse($this->pdo()->inTransaction()); (new PdoPaginator())->paginate($this->pdo(),$this->descriptor(),new PageRequest(),$this->config(),fn(array $row): array=>$row); self::assertFalse($this->pdo()->inTransaction()); self::assertSame($emulateBefore,$this->pdo()->getAttribute(PDO::ATTR_EMULATE_PREPARES)); self::assertSame((bool)$emulateBefore,(bool)$this->pdo()->getAttribute(PDO::ATTR_EMULATE_PREPARES)); self::assertSame($errBefore,$this->pdo()->getAttribute(PDO::ATTR_ERRMODE)); $this->pdo()->beginTransaction(); try { (new PdoPaginator())->paginate($this->pdo(),$this->descriptor(),new PageRequest(),$this->config(),fn(array $row): array=>$row); self::assertTrue($this->pdo()->inTransaction()); } finally { if($this->pdo()->inTransaction()){ $this->pdo()->rollBack(); } } }
+    public function testAttributesUnchangedOutsideTransactionAndCallerTransactionPreserved(): void
+    {
+        $this->insertMultiTenantDataset();
+        $attributes = [
+            PDO::ATTR_ERRMODE,
+            PDO::ATTR_DEFAULT_FETCH_MODE,
+            PDO::ATTR_EMULATE_PREPARES,
+            PDO::ATTR_STRINGIFY_FETCHES,
+        ];
+        $before = [];
+        foreach ($attributes as $attribute) {
+            $before[$attribute] = $this->pdo()->getAttribute($attribute);
+        }
+
+        self::assertFalse($this->pdo()->inTransaction());
+        (new PdoPaginator())->paginate(
+            $this->pdo(),
+            $this->descriptor(),
+            new PageRequest(),
+            $this->config(),
+            static fn (array $row): array => $row,
+        );
+        self::assertFalse($this->pdo()->inTransaction());
+
+        foreach ($before as $attribute => $value) {
+            self::assertSame($value, $this->pdo()->getAttribute($attribute));
+            if (is_bool($value) || $value === 0 || $value === 1) {
+                self::assertSame((bool) $value, (bool) $this->pdo()->getAttribute($attribute));
+            }
+        }
+
+        $this->pdo()->beginTransaction();
+        try {
+            (new PdoPaginator())->paginate(
+                $this->pdo(),
+                $this->descriptor(),
+                new PageRequest(),
+                $this->config(),
+                static fn (array $row): array => $row,
+            );
+            self::assertTrue($this->pdo()->inTransaction());
+        } finally {
+            if ($this->pdo()->inTransaction()) {
+                $this->pdo()->rollBack();
+            }
+        }
+    }
 }

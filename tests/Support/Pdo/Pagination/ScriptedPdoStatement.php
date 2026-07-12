@@ -20,7 +20,7 @@ final class ScriptedPdoStatement extends PDOStatement
     /** @param list<array<string,mixed>> $rows */ public static function data(array $rows): self { return new self($rows === [] ? 1 : count($rows[0]), [...$rows, false]); }
     public function bindValue(string|int $param, mixed $value, int $type = PDO::PARAM_STR): bool { $key=(string)$param; $this->bindCalls[]=['parameter'=>$key,'value'=>$value,'type'=>$type]; $r=$this->bindResults[$key]??true; if($r instanceof Throwable){throw $r;} return $r; }
     public function execute(?array $params = null): bool { $this->executeCalls++; if($this->executeResult instanceof Throwable){throw $this->executeResult;} return $this->executeResult; }
-    public function fetch(int $mode = PDO::FETCH_DEFAULT, int $cursorOrientation = PDO::FETCH_ORI_NEXT, int $cursorOffset = 0): mixed { $this->fetchCalls++; return array_shift($this->fetchQueue); }
+    public function fetch(int $mode = PDO::FETCH_DEFAULT, int $cursorOrientation = PDO::FETCH_ORI_NEXT, int $cursorOffset = 0): mixed { $this->fetchCalls++; $result = array_shift($this->fetchQueue); if ($result instanceof Throwable) { throw $result; } return $result; }
     public function columnCount(): int { return $this->columns; }
     public function errorCode(): ?string { return $this->errorCode; }
 }

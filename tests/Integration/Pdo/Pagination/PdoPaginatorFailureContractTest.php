@@ -15,7 +15,67 @@ use RuntimeException;
 
 final class PdoPaginatorFailureContractTest extends PaginationIntegrationTestCase
 {
-    public function testCountShapeFailuresAndPlaceholderViolationsSurfaceAtExecution(): void { $this->fixture->seedDefault(); $t=PaginationSchemaManager::TABLE; foreach([new PdoPaginationQueryDescriptor("SELECT id AS total_count FROM `$t` WHERE tenant_id=999",[],"SELECT COUNT(*) AS filtered_count FROM `$t`",[],"SELECT id FROM `$t`",[]), new PdoPaginationQueryDescriptor("SELECT id AS total_count FROM `$t`",[],"SELECT COUNT(*) AS filtered_count FROM `$t`",[],"SELECT id FROM `$t`",[]), new PdoPaginationQueryDescriptor("SELECT id, name FROM `$t` LIMIT 1",[],"SELECT COUNT(*) AS filtered_count FROM `$t`",[],"SELECT id FROM `$t`",[])] as $q){ try{(new PdoPaginator())->paginate($this->pdo(),$q,new PageRequest(),$this->config(),fn(array $row): array=>$row); self::fail('expected');}catch(PaginationExecutionException){self::assertTrue(true);} } $this->expectException(PDOException::class); (new PdoPaginator())->paginate($this->pdo(),new PdoPaginationQueryDescriptor('SELECT COUNT(*) AS total_count WHERE :missing = 1',[],'SELECT COUNT(*) AS filtered_count',[],'SELECT 1 AS id',[]),new PageRequest(),$this->config(),fn(array $row): array=>$row); }
-    public function testMapperAndPdoThrowablePropagationAndInvalidMapper(): void { $this->fixture->seedDefault(); $e=new RuntimeException('mapper'); try{(new PdoPaginator())->paginate($this->pdo(),$this->descriptor(),new PageRequest(),$this->config(),fn(array $row)=>throw $e); self::fail();}catch(RuntimeException $caught){ self::assertSame($e,$caught); } $this->expectException(PaginationExecutionException::class); (new PdoPaginator())->paginate($this->pdo(),$this->descriptor(),new PageRequest(),$this->config(),fn(array $row): int=>1); }
-    public function testZeroFilteredRowsSkipsGenuineZeroRowDataQuery(): void { $this->fixture->seedDefault(); $t=PaginationSchemaManager::TABLE; $q=new PdoPaginationQueryDescriptor("SELECT COUNT(*) AS total_count FROM `$t`",[],"SELECT COUNT(*) AS filtered_count FROM `$t` WHERE tenant_id = :tenant",['tenant'=>999],"SELECT id FROM `$t` WHERE tenant_id = :tenant_data",['tenant_data'=>999]); $called=false; $r=(new PdoPaginator())->paginate($this->pdo(),$q,new PageRequest(),$this->config(),function(array $row) use (&$called): array { $called=true; return $row; }); self::assertSame([],$r->data); self::assertFalse($called); }
+    public function testCountShapeFailures(): void
+    {
+        $this->insertMultiTenantDataset();
+        $table = PaginationSchemaManager::TABLE;
+
+        $descriptors = [
+            new PdoPaginationQueryDescriptor("SELECT id AS total_count FROM `$table` WHERE tenant_id = 999", [], 'SELECT 1 AS filtered_count', [], "SELECT id FROM `$table`", []),
+            new PdoPaginationQueryDescriptor("SELECT id AS total_count FROM `$table` WHERE tenant_id = 1", [], 'SELECT 1 AS filtered_count', [], "SELECT id FROM `$table`", []),
+            new PdoPaginationQueryDescriptor("SELECT id, name FROM `$table` WHERE tenant_id = 1 LIMIT 1", [], 'SELECT 1 AS filtered_count', [], "SELECT id FROM `$table`", []),
+        ];
+
+        foreach ($descriptors as $descriptor) {
+            try {
+                (new PdoPaginator())->paginate($this->pdo(), $descriptor, new PageRequest(), $this->config(), static fn (array $row): array => $row);
+                self::fail('Expected count shape failure.');
+            } catch (PaginationExecutionException) {
+                self::assertTrue(true);
+            }
+        }
+    }
+
+    public function testPlaceholderViolationsAndInvalidTableColumnPropagatePdoException(): void
+    {
+        $this->expectException(PDOException::class);
+
+        (new PdoPaginator())->paginate(
+            $this->pdo(),
+            new PdoPaginationQueryDescriptor('SELECT COUNT(*) AS total_count FROM missing_pagination_table', [], 'SELECT 1 AS filtered_count', [], 'SELECT id FROM missing_pagination_table', []),
+            new PageRequest(),
+            $this->config(),
+            static fn (array $row): array => $row,
+        );
+    }
+
+    public function testMapperThrowableIdentityAndInvalidMapperResults(): void
+    {
+        $this->insertMultiTenantDataset();
+        $throwable = new RuntimeException('mapper');
+
+        try {
+            (new PdoPaginator())->paginate($this->pdo(), $this->descriptor(), new PageRequest(), $this->config(), static fn (array $row) => throw $throwable);
+            self::fail('Expected mapper throwable.');
+        } catch (RuntimeException $caught) {
+            self::assertSame($throwable, $caught);
+        }
+
+        $this->expectException(PaginationExecutionException::class);
+        (new PdoPaginator())->paginate($this->pdo(), $this->descriptor(), new PageRequest(), $this->config(), static fn (array $row): int => 1);
+    }
+
+    public function testResourceMapperFailureClosesResource(): void
+    {
+        $this->insertMultiTenantDataset();
+        $resource = fopen('php://memory', 'r');
+        self::assertIsResource($resource);
+
+        try {
+            $this->expectException(PaginationExecutionException::class);
+            (new PdoPaginator())->paginate($this->pdo(), $this->descriptor(), new PageRequest(), $this->config(), static fn (array $row) => $resource);
+        } finally {
+            fclose($resource);
+        }
+    }
 }

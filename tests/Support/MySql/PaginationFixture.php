@@ -8,8 +8,36 @@ use PDO;
 
 final readonly class PaginationFixture
 {
-    public function __construct(private PDO $pdo) {}
-    /** @param list<array{tenant_id:int,category:string|null,active:bool,name:string,score:int,created_at:string}> $rows */
-    public function insert(array $rows): void { $s=$this->pdo->prepare('INSERT INTO `'.PaginationSchemaManager::TABLE.'` (`tenant_id`,`category`,`active`,`name`,`score`,`created_at`) VALUES (:tenant_id,:category,:active,:name,:score,:created_at)'); foreach($rows as $r){ $s->bindValue(':tenant_id',$r['tenant_id'],PDO::PARAM_INT); $s->bindValue(':category',$r['category'], $r['category']===null?PDO::PARAM_NULL:PDO::PARAM_STR); $s->bindValue(':active',$r['active'],PDO::PARAM_BOOL); $s->bindValue(':name',$r['name'],PDO::PARAM_STR); $s->bindValue(':score',$r['score'],PDO::PARAM_INT); $s->bindValue(':created_at',$r['created_at'],PDO::PARAM_STR); $s->execute(); } }
-    public function seedDefault(): void { $this->insert([['tenant_id'=>1,'category'=>'book','active'=>true,'name'=>'A','score'=>10,'created_at'=>'2026-01-01 00:00:00'],['tenant_id'=>1,'category'=>'book','active'=>true,'name'=>'B','score'=>10,'created_at'=>'2026-01-02 00:00:00'],['tenant_id'=>1,'category'=>'toy','active'=>true,'name'=>'C','score'=>20,'created_at'=>'2026-01-03 00:00:00'],['tenant_id'=>1,'category'=>null,'active'=>false,'name'=>'D','score'=>30,'created_at'=>'2026-01-04 00:00:00'],['tenant_id'=>2,'category'=>'book','active'=>true,'name'=>'E','score'=>40,'created_at'=>'2026-01-05 00:00:00']]); }
+    public function __construct(private PDO $pdo)
+    {
+    }
+
+    public function insertItem(
+        int $tenantId,
+        string $category,
+        string $name,
+        int $score,
+        bool $isActive,
+        ?string $nullableCode,
+        string $createdAt,
+        ?string $deletedAt = null,
+    ): int {
+        $statement = $this->pdo->prepare(
+            'INSERT INTO `' . PaginationSchemaManager::TABLE . '` '
+            . '(`tenant_id`, `category`, `name`, `score`, `is_active`, `nullable_code`, `created_at`, `deleted_at`) '
+            . 'VALUES (:tenant_id, :category, :name, :score, :is_active, :nullable_code, :created_at, :deleted_at)'
+        );
+
+        $statement->bindValue(':tenant_id', $tenantId, PDO::PARAM_INT);
+        $statement->bindValue(':category', $category, PDO::PARAM_STR);
+        $statement->bindValue(':name', $name, PDO::PARAM_STR);
+        $statement->bindValue(':score', $score, PDO::PARAM_INT);
+        $statement->bindValue(':is_active', $isActive, PDO::PARAM_BOOL);
+        $statement->bindValue(':nullable_code', $nullableCode, $nullableCode === null ? PDO::PARAM_NULL : PDO::PARAM_STR);
+        $statement->bindValue(':created_at', $createdAt, PDO::PARAM_STR);
+        $statement->bindValue(':deleted_at', $deletedAt, $deletedAt === null ? PDO::PARAM_NULL : PDO::PARAM_STR);
+        $statement->execute();
+
+        return (int) $this->pdo->lastInsertId();
+    }
 }
