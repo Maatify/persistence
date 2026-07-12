@@ -95,12 +95,16 @@ final class PageResultTest extends TestCase
         yield 'bad has previous' => [[[], 1, 20, 50, 50, 3, true, true, 'id', SortDirectionEnum::ASC]];
     }
 
-    /** @param list<mixed> $arguments */
+    /**
+     * @param list<mixed> $arguments
+     *
+     * @return PageResult<array<array-key, mixed>|object>
+     */
     private function newPageResult(array $arguments): PageResult
     {
         $reflection = new ReflectionClass(PageResult::class);
 
-        /** @var PageResult $result */
+        /** @var PageResult<array<array-key, mixed>|object> $result */
         $result = $reflection->newInstanceArgs($arguments);
 
         return $result;

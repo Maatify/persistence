@@ -50,7 +50,8 @@ final class PaginationExceptionContractTest extends TestCase
     {
         $this->expectException(InvalidPaginationConfigurationException::class);
 
-        new SortWhitelist([]);
+        $reflection = new ReflectionClass(SortWhitelist::class);
+        $reflection->newInstanceArgs([[]]);
     }
 
     public function testRepresentativeQueryTrigger(): void
