@@ -135,9 +135,6 @@ $result = $paginator->paginate(
 );
 ```
 
-### Note on `getNextPosition()` Concurrency
-`getNextPosition()` does not start a transaction and does not lock the scope. When using it for concurrent inserts, the host application must provide an appropriate transaction and locking mechanism at the repository/application level.
-
 ## 🧩 Public Runtime API
 
 The package currently provides the following public classes for PDO ordering and pagination:
@@ -165,6 +162,11 @@ Maatify\Persistence\Exception\PaginationExecutionException;
 ```
 
 ## ⚠️ Critical Runtime Behavior
+
+**`getNextPosition()`:**
+* Does not start a transaction.
+* Does not lock the applicable scope.
+* For concurrent inserts, the host application must provide the transaction and locking mechanism required to serialize position allocation.
 
 **`moveWithinScope()`:**
 * Rejects inconsistent scope usage.
