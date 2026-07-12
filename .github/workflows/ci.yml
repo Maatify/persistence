@@ -286,6 +286,7 @@ jobs:
           $tables = [
               'maa_persistence_test_global_ordering',
               'maa_persistence_test_scoped_ordering',
+              'maa_persistence_test_pagination_items',
           ];
           $triggers = [
               'maa_persistence_test_fail_global_target_update',
@@ -293,7 +294,7 @@ jobs:
           ];
 
           $tableStatement = $pdo->prepare(
-              'SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = ? AND TABLE_NAME IN (?, ?) ORDER BY TABLE_NAME'
+              'SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = ? AND TABLE_NAME IN (?, ?, ?) ORDER BY TABLE_NAME'
           );
           $tableStatement->execute([$schema, ...$tables]);
           $remainingTables = $tableStatement->fetchAll(PDO::FETCH_COLUMN);
@@ -444,6 +445,7 @@ jobs:
           $tables = [
               'maa_persistence_test_global_ordering',
               'maa_persistence_test_scoped_ordering',
+              'maa_persistence_test_pagination_items',
           ];
           $triggers = [
               'maa_persistence_test_fail_global_target_update',
@@ -451,7 +453,7 @@ jobs:
           ];
 
           $tableStatement = $pdo->prepare(
-              'SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = ? AND TABLE_NAME IN (?, ?) ORDER BY TABLE_NAME'
+              'SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = ? AND TABLE_NAME IN (?, ?, ?) ORDER BY TABLE_NAME'
           );
           $tableStatement->execute([$schema, ...$tables]);
           $remainingTables = $tableStatement->fetchAll(PDO::FETCH_COLUMN);
