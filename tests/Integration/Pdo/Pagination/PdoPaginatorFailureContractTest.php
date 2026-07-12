@@ -79,14 +79,7 @@ final class PdoPaginatorFailureContractTest extends PaginationIntegrationTestCas
 
     public function testPositionalPlaceholder(): void
     {
-        // Positional placeholders use ? in sql, but parameter keys in array can be tricky to bypass constructor.
-        // We'll map them via standard execution failure (often ? fails if positional binding is not used, or if keys are numeric and the package rejects it)
-        // Wait, the package constructor rejects numeric keys (`!is_string($key)`).
-        // Let's check `validateParams`:
-        // if (! is_string($key) || str_starts_with($key, ':') || ! preg_match(self::PARAMETER_KEY_PATTERN, $key) || str_starts_with($key, self::RESERVED_PREFIX)) { throw new InvalidPaginationQueryException('Invalid pagination parameter key.'); }
-        // So we cannot even construct it if we use numeric keys.
-        // Therefore, we can't test "positional placeholder array binding" if it throws InvalidPaginationQueryException in the constructor.
-        // Let's pass empty array and have positional ? in SQL to trigger PDOException on execute.
+        // Positional parameters map via execution failure.
         $descriptor = new PdoPaginationQueryDescriptor('SELECT 1 AS total_count', [], 'SELECT 1 AS filtered_count', [], 'SELECT id FROM `' . PaginationSchemaManager::TABLE . '` WHERE name = ?', []);
         self::assertInstanceOf(PdoPaginationQueryDescriptor::class, $descriptor);
 

@@ -44,13 +44,16 @@ final class PdoPaginatorTransactionTest extends PaginationIntegrationTestCase
 
         $this->pdo()->beginTransaction();
         try {
-            (new PdoPaginator())->paginate(
+            $result = (new PdoPaginator())->paginate(
                 $this->pdo(),
                 $this->descriptor(),
                 new PageRequest(),
                 $this->config(),
                 static fn (array $row): array => $row,
             );
+            self::assertSame(4, $result->total);
+            self::assertSame(3, $result->filtered);
+            self::assertCount(2, $result->data);
             self::assertTrue($this->pdo()->inTransaction());
         } finally {
             $this->pdo()->rollBack();
