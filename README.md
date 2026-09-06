@@ -68,6 +68,10 @@ $config = new ScopedOrderingConfig(
     idColumn: 'id',
     orderColumn: 'display_order',
     deletedAtColumn: 'deleted_at', // Use null if soft-deletes are not used
+    // Set nullableScope: true when NULL is a real scope (for example, roots).
+    nullableScope: false,
+    // Optional: update this column atomically with a successful move.
+    updatedAtColumn: null,
 );
 
 $ordering = new ScopedOrderingManager();
@@ -86,6 +90,8 @@ $success = $ordering->moveWithinScope(
     scopeValue: 2, // Use null for global ordering
     id: 15,
     newOrder: 4,
+    // Required when updatedAtColumn is configured.
+    updatedAtValue: null,
 );
 ```
 
@@ -175,12 +181,14 @@ Maatify\Persistence\Exception\PaginationExecutionException;
 * Rejects caller-owned active PDO transactions.
 * Owns its own transaction.
 * Locks the applicable active scope using `SELECT ... FOR UPDATE`.
+* Supports `NULL` as a scope value when `nullableScope` is enabled; this is distinct from global ordering, which has no `scopeColumn`.
 * Reads the current order from the database within the same transaction.
 * Does not trust a current order provided by the caller.
 * Returns `false` if the target row is missing.
 * Clamps values higher than the maximum position to the maximum available position.
 * Returns `true` if the movement is a no-op (already at the requested position).
 * Moves only the affected range.
+* When `updatedAtColumn` is configured, updates that column on the target row in the same SQL statement and transaction as the final order update.
 * Does not globally normalize pre-existing gaps.
 * Rolls back and returns `false` if the final target update fails.
 * Rolls back on any Throwable after starting the transaction.

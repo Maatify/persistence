@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-09-06
+
+### Added
+* Nullable scoped ordering for schemas where `NULL` is a meaningful scope value.
+* Atomic target mutation timestamps for `moveWithinScope()` via `updatedAtColumn` and `updatedAtValue`.
+
+### Changed
+* Ordering transaction cleanup now checks that the PDO transaction is still active before rolling it back.
+
 ## [1.1.0] - 2026-07-12
 
 ### Added
@@ -45,6 +54,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Rolls back owned transactions after operation failures and rethrows the original throwable.
 * Enforced real MySQL testing; SQLite substitution is explicitly disabled.
 
-[Unreleased]: https://github.com/Maatify/persistence/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/Maatify/persistence/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/Maatify/persistence/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/Maatify/persistence/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/Maatify/persistence/releases/tag/v1.0.0

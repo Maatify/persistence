@@ -132,10 +132,58 @@ final class ScopedOrderingManagerScopedMoveTest extends MySqlIntegrationTestCase
         }
     }
 
+    public function testNullableScopedConfigurationMovesRowsInTheNullScope(): void
+    {
+        $root = $this->insertScopedOrders(null, 1, 2, 3);
+        $nested = $this->insertScopedOrders('scope-a', 1, 2);
+
+        $result = $this->manager->moveWithinScope(
+            $this->pdo(),
+            $this->nullableScopedConfig(),
+            null,
+            $root[2],
+            1,
+        );
+
+        self::assertTrue($result);
+        self::assertSame([$root[0] => 2, $root[1] => 3, $root[2] => 1], $this->reader->scopedOrdersById(null));
+        self::assertSame([$nested[0] => 1, $nested[1] => 2], $this->reader->scopedOrdersById('scope-a'));
+        self::assertFalse($this->pdo()->inTransaction());
+    }
+
+    public function testMoveUpdatesConfiguredTimestampInTheSameTargetUpdate(): void
+    {
+        $target = $this->fixture->insertScoped('scope-a', 1, 'target', null, '2026-01-01 00:00:00');
+        $other = $this->fixture->insertScoped('scope-a', 2, 'other', null, '2026-01-01 00:00:00');
+
+        $result = $this->manager->moveWithinScope(
+            $this->pdo(),
+            new ScopedOrderingConfig(
+                table: OrderingSchemaManager::SCOPED_TABLE,
+                scopeColumn: 'scope_key',
+                updatedAtColumn: 'updated_at',
+            ),
+            'scope-a',
+            $other,
+            1,
+            '2026-01-03 12:34:56',
+        );
+
+        self::assertTrue($result);
+        self::assertSame([$target => 2, $other => 1], $this->reader->scopedOrdersById('scope-a'));
+
+        $statement = $this->pdo()->prepare(
+            'SELECT `updated_at` FROM `' . OrderingSchemaManager::SCOPED_TABLE . '` WHERE `id` = :id',
+        );
+        $statement->execute(['id' => $other]);
+        self::assertSame('2026-01-03 12:34:56', $statement->fetchColumn());
+        self::assertFalse($this->pdo()->inTransaction());
+    }
+
     /**
      * @return list<int>
      */
-    private function insertScopedOrders(int|string $scopeValue, int ...$orders): array
+    private function insertScopedOrders(int|string|null $scopeValue, int ...$orders): array
     {
         $ids = [];
         foreach ($orders as $order) {
@@ -148,5 +196,14 @@ final class ScopedOrderingManagerScopedMoveTest extends MySqlIntegrationTestCase
     private function scopedConfig(): ScopedOrderingConfig
     {
         return new ScopedOrderingConfig(table: OrderingSchemaManager::SCOPED_TABLE, scopeColumn: 'scope_key');
+    }
+
+    private function nullableScopedConfig(): ScopedOrderingConfig
+    {
+        return new ScopedOrderingConfig(
+            table: OrderingSchemaManager::SCOPED_TABLE,
+            scopeColumn: 'scope_key',
+            nullableScope: true,
+        );
     }
 }

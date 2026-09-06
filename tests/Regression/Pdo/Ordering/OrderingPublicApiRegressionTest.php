@@ -30,9 +30,11 @@ final class OrderingPublicApiRegressionTest extends TestCase
             ['idColumn', 'string', false, true, 'id'],
             ['orderColumn', 'string', false, true, 'display_order'],
             ['deletedAtColumn', 'string', true, true, 'deleted_at'],
+            ['nullableScope', 'bool', false, true, false],
+            ['updatedAtColumn', 'string', true, true, null],
         ]);
 
-        foreach (['table', 'scopeColumn', 'idColumn', 'orderColumn', 'deletedAtColumn'] as $property) {
+        foreach (['table', 'scopeColumn', 'idColumn', 'orderColumn', 'deletedAtColumn', 'nullableScope', 'updatedAtColumn'] as $property) {
             $reflectionProperty = $class->getProperty($property);
             self::assertTrue($reflectionProperty->isPublic());
             self::assertTrue($reflectionProperty->isPromoted());
@@ -43,6 +45,7 @@ final class OrderingPublicApiRegressionTest extends TestCase
         self::assertPublicMethod($class, 'quotedOrderColumn', [], 'string');
         self::assertPublicMethod($class, 'quotedScopeColumn', [], 'string');
         self::assertPublicMethod($class, 'quotedDeletedAtColumn', [], 'string');
+        self::assertPublicMethod($class, 'quotedUpdatedAtColumn', [], 'string');
     }
 
     public function testScopedOrderingManagerApiMatchesRepositoryReality(): void
@@ -65,6 +68,7 @@ final class OrderingPublicApiRegressionTest extends TestCase
             ['scopeValue', 'int|string', true, false, null],
             ['id', 'int', false, false, null],
             ['newOrder', 'int', false, false, null],
+            ['updatedAtValue', 'string', true, true, null],
         ], 'bool');
         self::assertPublicMethod($class, 'rowExistsInScope', [
             ['pdo', PDO::class, false, false, null],

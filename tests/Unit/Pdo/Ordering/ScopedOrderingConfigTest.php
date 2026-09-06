@@ -20,6 +20,8 @@ final class ScopedOrderingConfigTest extends TestCase
         self::assertSame('id', $config->idColumn);
         self::assertSame('display_order', $config->orderColumn);
         self::assertSame('deleted_at', $config->deletedAtColumn);
+        self::assertFalse($config->nullableScope);
+        self::assertNull($config->updatedAtColumn);
     }
 
     public function testGlobalConfigurationHasNoScopeColumn(): void
@@ -36,6 +38,13 @@ final class ScopedOrderingConfigTest extends TestCase
         self::assertSame('`tenant_id`', $config->quotedScopeColumn());
     }
 
+    public function testScopedConfigurationCanUseNullAsAScopeValue(): void
+    {
+        $config = new ScopedOrderingConfig('items', 'tenant_id', nullableScope: true);
+
+        self::assertTrue($config->nullableScope);
+    }
+
     public function testCustomColumnsAreStoredAndQuoted(): void
     {
         $config = new ScopedOrderingConfig(
@@ -44,12 +53,17 @@ final class ScopedOrderingConfigTest extends TestCase
             idColumn: 'item_id',
             orderColumn: 'sort_index',
             deletedAtColumn: 'removed_at',
+            nullableScope: true,
+            updatedAtColumn: 'changed_at',
         );
 
         self::assertSame('`item_id`', $config->quotedIdColumn());
         self::assertSame('`sort_index`', $config->quotedOrderColumn());
         self::assertSame('`account_id`', $config->quotedScopeColumn());
         self::assertSame('`removed_at`', $config->quotedDeletedAtColumn());
+        self::assertTrue($config->nullableScope);
+        self::assertSame('changed_at', $config->updatedAtColumn);
+        self::assertSame('`changed_at`', $config->quotedUpdatedAtColumn());
     }
 
     public function testDeletedAtColumnCanBeDisabled(): void
@@ -58,6 +72,21 @@ final class ScopedOrderingConfigTest extends TestCase
 
         self::assertNull($config->deletedAtColumn);
         self::assertNull($config->quotedDeletedAtColumn());
+    }
+
+    public function testUpdatedAtColumnCanBeDisabled(): void
+    {
+        $config = new ScopedOrderingConfig('items', updatedAtColumn: null);
+
+        self::assertNull($config->updatedAtColumn);
+        self::assertNull($config->quotedUpdatedAtColumn());
+    }
+
+    public function testRejectsNullableScopeWithoutScopeColumn(): void
+    {
+        $this->expectException(InvalidOrderingConfigurationException::class);
+
+        new ScopedOrderingConfig('items', nullableScope: true);
     }
 
     public function testQuotesNormalTable(): void
@@ -180,6 +209,15 @@ final class ScopedOrderingConfigTest extends TestCase
         $this->expectException(InvalidOrderingConfigurationException::class);
 
         new ScopedOrderingConfig('items', deletedAtColumn: $column);
+    }
+
+    /** @param non-empty-string $column */
+    #[DataProvider('invalidColumnProvider')]
+    public function testRejectsInvalidUpdatedAtColumn(string $column): void
+    {
+        $this->expectException(InvalidOrderingConfigurationException::class);
+
+        new ScopedOrderingConfig('items', updatedAtColumn: $column);
     }
 
     /** @return iterable<string, array{non-empty-string}> */

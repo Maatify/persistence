@@ -29,16 +29,22 @@ final readonly class OrderingFixture
         return $this->lastInsertId();
     }
 
-    public function insertScoped(int|string $scopeValue, int $displayOrder, string $label = 'scoped row', ?string $deletedAt = null): int
-    {
+    public function insertScoped(
+        int|string|null $scopeValue,
+        int $displayOrder,
+        string $label = 'scoped row',
+        ?string $deletedAt = null,
+        ?string $updatedAt = null,
+    ): int {
         $stmt = $this->prepare(
-            'INSERT INTO `' . OrderingSchemaManager::SCOPED_TABLE . '` (`scope_key`, `display_order`, `deleted_at`, `label`)
-             VALUES (:scope_key, :display_order, :deleted_at, :label)'
+            'INSERT INTO `' . OrderingSchemaManager::SCOPED_TABLE . '` (`scope_key`, `display_order`, `deleted_at`, `updated_at`, `label`)
+             VALUES (:scope_key, :display_order, :deleted_at, :updated_at, :label)'
         );
         $stmt->execute([
             'scope_key'     => $scopeValue,
             'display_order' => $displayOrder,
             'deleted_at'    => $deletedAt,
+            'updated_at'    => $updatedAt,
             'label'         => $label,
         ]);
 
