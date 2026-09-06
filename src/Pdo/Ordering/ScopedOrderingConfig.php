@@ -34,6 +34,8 @@ final readonly class ScopedOrderingConfig
      * @param non-empty-string      $idColumn        Primary key column. Defaults to "id".
      * @param non-empty-string      $orderColumn     Ordering column. Defaults to "display_order".
      * @param non-empty-string|null $deletedAtColumn Optional soft-delete column. Pass null for tables without soft delete.
+     * @param bool                  $nullableScope   Whether a configured scope column may use NULL as a scope value.
+     * @param non-empty-string|null $updatedAtColumn Optional mutation timestamp column updated with the target order.
      */
     public function __construct(
         public string $table,
@@ -41,6 +43,8 @@ final readonly class ScopedOrderingConfig
         public string $idColumn = 'id',
         public string $orderColumn = 'display_order',
         public ?string $deletedAtColumn = 'deleted_at',
+        public bool $nullableScope = false,
+        public ?string $updatedAtColumn = null,
     ) {
         self::assertTableIdentifier($this->table);
         self::assertColumnIdentifier($this->idColumn);
@@ -52,6 +56,16 @@ final readonly class ScopedOrderingConfig
 
         if ($this->deletedAtColumn !== null) {
             self::assertColumnIdentifier($this->deletedAtColumn);
+        }
+
+        if ($this->scopeColumn === null && $this->nullableScope) {
+            throw new InvalidOrderingConfigurationException(
+                'A nullable scope requires a configured scope column.'
+            );
+        }
+
+        if ($this->updatedAtColumn !== null) {
+            self::assertColumnIdentifier($this->updatedAtColumn);
         }
     }
 
@@ -102,6 +116,17 @@ final readonly class ScopedOrderingConfig
         return $this->deletedAtColumn === null
             ? null
             : self::quoteColumnIdentifier($this->deletedAtColumn);
+    }
+
+    /**
+     * Returns the safely quoted mutation timestamp column, or null when the
+     * caller does not require the ordering operation to update one.
+     */
+    public function quotedUpdatedAtColumn(): ?string
+    {
+        return $this->updatedAtColumn === null
+            ? null
+            : self::quoteColumnIdentifier($this->updatedAtColumn);
     }
 
     /**

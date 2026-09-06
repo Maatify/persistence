@@ -32,15 +32,25 @@ final readonly class OrderingStateReader
     /**
      * @return array<int, int>
      */
-    public function scopedOrdersById(int|string $scopeValue): array
+    public function scopedOrdersById(int|string|null $scopeValue): array
     {
-        $stmt = $this->prepare(
-            'SELECT `id`, `display_order`
-               FROM `' . OrderingSchemaManager::SCOPED_TABLE . '`
-              WHERE `scope_key` = :scope_key
-              ORDER BY `id` ASC'
-        );
-        $stmt->execute(['scope_key' => $scopeValue]);
+        if ($scopeValue === null) {
+            $stmt = $this->prepare(
+                'SELECT `id`, `display_order`
+                   FROM `' . OrderingSchemaManager::SCOPED_TABLE . '`
+                  WHERE `scope_key` IS NULL
+                  ORDER BY `id` ASC'
+            );
+            $stmt->execute();
+        } else {
+            $stmt = $this->prepare(
+                'SELECT `id`, `display_order`
+                   FROM `' . OrderingSchemaManager::SCOPED_TABLE . '`
+                  WHERE `scope_key` = :scope_key
+                  ORDER BY `id` ASC'
+            );
+            $stmt->execute(['scope_key' => $scopeValue]);
+        }
 
         return $this->ordersByIdFromStatement($stmt);
     }

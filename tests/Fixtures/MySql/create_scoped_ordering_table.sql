@@ -1,8 +1,9 @@
 CREATE TABLE `maa_persistence_test_scoped_ordering` (
   `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `scope_key` VARCHAR(191) NOT NULL,
+  `scope_key` VARCHAR(191) NULL DEFAULT NULL,
   `display_order` INT NOT NULL,
   `deleted_at` DATETIME NULL DEFAULT NULL,
+  `updated_at` DATETIME NULL DEFAULT NULL,
   `label` VARCHAR(191) NOT NULL,
   PRIMARY KEY (`id`),
   KEY `idx_maa_persistence_test_scoped_ordering_scope_order` (`scope_key`, `display_order`),

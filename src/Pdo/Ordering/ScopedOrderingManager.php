@@ -15,6 +15,7 @@ use Throwable;
  * The manager supports:
  * - global ordering: one sequence for the whole table
  * - scoped ordering: one sequence per scope value, e.g. per method_id/product_id
+ * - nullable scoped ordering: one sequence for NULL and one sequence per non-null scope value
  *
  * Transaction model:
  * - moveWithinScope() owns its transaction.
@@ -39,7 +40,7 @@ final readonly class ScopedOrderingManager
      * If used for concurrent inserts, call it from a caller-owned transaction
      * with appropriate locking at the repository/application level.
      *
-     * @param int|string|null $scopeValue Required when config has a scope column; null for global ordering.
+     * @param int|string|null $scopeValue Required when config has a non-null scope column; null means global ordering or the configured nullable scope.
      */
     public function getNextPosition(
         PDO $pdo,
@@ -86,7 +87,8 @@ final readonly class ScopedOrderingManager
      * - true when the target row is already at the requested/clamped position.
      * - false when the target row does not exist in the given scope.
      *
-     * @param int|string|null $scopeValue Required when config has a scope column; null for global ordering.
+     * @param int|string|null $scopeValue Required when config has a non-null scope column; null means global ordering or the configured nullable scope.
+     * @param string|null $updatedAtValue Timestamp value bound to the target update when updatedAtColumn is configured.
      *
      * @throws InvalidOrderingOperationException When id/order/scope arguments are invalid.
      * @throws OrderingTransactionException When called inside an active PDO transaction.
@@ -97,9 +99,11 @@ final readonly class ScopedOrderingManager
         ScopedOrderingConfig $config,
         int|string|null $scopeValue,
         int $id,
-        int $newOrder
+        int $newOrder,
+        ?string $updatedAtValue = null,
     ): bool {
         $this->assertScopeUsage($config, $scopeValue);
+        $this->assertUpdatedAtUsage($config, $updatedAtValue);
 
         if ($id <= 0) {
             throw new InvalidOrderingOperationException('Invalid row id.');
@@ -146,7 +150,14 @@ final readonly class ScopedOrderingManager
                 $this->shiftOrdersDown($pdo, $config, $scopeValue, $newOrder, $currentOrder);
             }
 
-            $updated = $this->updateTargetOrder($pdo, $config, $scopeValue, $id, $newOrder);
+            $updated = $this->updateTargetOrder(
+                $pdo,
+                $config,
+                $scopeValue,
+                $id,
+                $newOrder,
+                $updatedAtValue,
+            );
 
             if (!$updated) {
                 $pdo->rollBack();
@@ -160,7 +171,7 @@ final readonly class ScopedOrderingManager
 
             return true;
         } catch (Throwable $e) {
-            if ($transactionStarted) {
+            if ($transactionStarted && $pdo->inTransaction()) {
                 $pdo->rollBack();
             }
 
@@ -173,7 +184,7 @@ final readonly class ScopedOrderingManager
      *
      * Soft-deleted rows are treated as non-existing when deletedAtColumn is configured.
      *
-     * @param int|string|null $scopeValue Required when config has a scope column; null for global ordering.
+     * @param int|string|null $scopeValue Required when config has a non-null scope column; null means global ordering or the configured nullable scope.
      */
     public function rowExistsInScope(
         PDO $pdo,
@@ -217,7 +228,7 @@ final readonly class ScopedOrderingManager
      *
      * Soft-deleted rows are ignored when deletedAtColumn is configured.
      *
-     * @param int|string|null $scopeValue Required when config has a scope column; null for global ordering.
+     * @param int|string|null $scopeValue Required when config has a non-null scope column; null means global ordering or the configured nullable scope.
      */
     private function lockScopeForUpdate(
         PDO $pdo,
@@ -250,7 +261,7 @@ final readonly class ScopedOrderingManager
      * FOR UPDATE keeps the target-row read explicit and safe if this method is
      * changed or reused later.
      *
-     * @param int|string|null $scopeValue Required when config has a scope column; null for global ordering.
+     * @param int|string|null $scopeValue Required when config has a non-null scope column; null means global ordering or the configured nullable scope.
      */
     private function getCurrentOrderForUpdate(
         PDO $pdo,
@@ -283,7 +294,7 @@ final readonly class ScopedOrderingManager
     /**
      * Returns the current maximum order position inside the scope.
      *
-     * @param int|string|null $scopeValue Required when config has a scope column; null for global ordering.
+     * @param int|string|null $scopeValue Required when config has a non-null scope column; null means global ordering or the configured nullable scope.
      */
     private function getMaxPosition(
         PDO $pdo,
@@ -316,7 +327,7 @@ final readonly class ScopedOrderingManager
      * current = 5, new = 2
      * rows 2..4 become 3..5.
      *
-     * @param int|string|null $scopeValue Required when config has a scope column; null for global ordering.
+     * @param int|string|null $scopeValue Required when config has a non-null scope column; null means global ordering or the configured nullable scope.
      */
     private function shiftOrdersUp(
         PDO $pdo,
@@ -393,7 +404,8 @@ final readonly class ScopedOrderingManager
         ScopedOrderingConfig $config,
         int|string|null $scopeValue,
         int $id,
-        int $newOrder
+        int $newOrder,
+        ?string $updatedAtValue
     ): bool {
         $where = [];
         $params = [
@@ -405,9 +417,16 @@ final readonly class ScopedOrderingManager
         $this->appendScopeCondition($config, $scopeValue, $where, $params);
         $this->appendSoftDeleteCondition($config, $where);
 
+        $set = $config->quotedOrderColumn() . ' = :new_order_case';
+        $updatedAtColumn = $config->quotedUpdatedAtColumn();
+        if ($updatedAtColumn !== null) {
+            $set .= ', ' . $updatedAtColumn . ' = :updated_at_value';
+            $params['updated_at_value'] = $updatedAtValue;
+        }
+
         $stmt = $pdo->prepare(
             'UPDATE ' . $config->quotedTable() . '
-                SET ' . $config->quotedOrderColumn() . ' = :new_order_case
+                SET ' . $set . '
               WHERE ' . implode(' AND ', $where)
         );
 
@@ -421,7 +440,7 @@ final readonly class ScopedOrderingManager
      *
      * If config has no scope column, this method intentionally does nothing.
      *
-     * @param int|string|null                $scopeValue Scope value for scoped ordering.
+     * @param int|string|null                $scopeValue Scope value for scoped ordering; NULL is supported when nullableScope is enabled.
      * @param list<string>                   $where      WHERE clause fragments.
      * @param array<string, int|string|null> $params     Bound parameter map.
      */
@@ -437,8 +456,14 @@ final readonly class ScopedOrderingManager
             return;
         }
 
-        if ($scopeValue === null) {
+        if ($scopeValue === null && !$config->nullableScope) {
             throw new InvalidOrderingOperationException('Scope column requires a scope value.');
+        }
+
+        if ($scopeValue === null) {
+            $where[] = $scopeColumn . ' IS NULL';
+
+            return;
         }
 
         $where[] = $scopeColumn . ' = :scope_value';
@@ -471,10 +496,11 @@ final readonly class ScopedOrderingManager
      * Valid:
      * - scopeColumn = null, scopeValue = null
      * - scopeColumn = "method_id", scopeValue = 10
+     * - scopeColumn = "parent_id", nullableScope = true, scopeValue = null
      *
      * Invalid:
      * - scopeColumn = null, scopeValue = 10
-     * - scopeColumn = "method_id", scopeValue = null
+     * - scopeColumn = "method_id", nullableScope = false, scopeValue = null
      *
      * @param int|string|null $scopeValue Scope value for scoped ordering.
      */
@@ -486,8 +512,31 @@ final readonly class ScopedOrderingManager
             throw new InvalidOrderingOperationException('Scope value was provided without a scope column.');
         }
 
-        if ($config->scopeColumn !== null && $scopeValue === null) {
+        if ($config->scopeColumn !== null && $scopeValue === null && !$config->nullableScope) {
             throw new InvalidOrderingOperationException('Scope column requires a scope value.');
+        }
+    }
+
+    /**
+     * Ensures that timestamp configuration and the operation value are used
+     * consistently.
+     *
+     * @param string|null $updatedAtValue Timestamp value for the target mutation.
+     */
+    private function assertUpdatedAtUsage(
+        ScopedOrderingConfig $config,
+        ?string $updatedAtValue
+    ): void {
+        if ($config->updatedAtColumn === null && $updatedAtValue !== null) {
+            throw new InvalidOrderingOperationException(
+                'An updated-at value was provided without an updated-at column.'
+            );
+        }
+
+        if ($config->updatedAtColumn !== null && $updatedAtValue === null) {
+            throw new InvalidOrderingOperationException(
+                'An updated-at column requires an updated-at value.'
+            );
         }
     }
 }

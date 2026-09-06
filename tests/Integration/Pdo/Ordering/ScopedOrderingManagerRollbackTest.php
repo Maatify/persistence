@@ -112,14 +112,58 @@ final class ScopedOrderingManagerRollbackTest extends MySqlIntegrationTestCase
         }
     }
 
+    public function testConfiguredTimestampUpdateRollsBackWithTheOrderingMutation(): void
+    {
+        $target = $this->fixture->insertScoped('scope-a', 1, 'target', null, '2026-01-01 00:00:00');
+        $other = $this->fixture->insertScoped('scope-a', 2, 'other', null, '2026-01-01 00:00:00');
+        $before = $this->primaryReader->scopedOrdersById('scope-a');
+        $failureInjector = new OrderingFailureInjector($this->controlPdo);
+
+        try {
+            $failureInjector->createScopedTargetUpdateFailure($other);
+
+            $thrown = $this->captureMoveFailure(
+                new ScopedOrderingConfig(
+                    table: OrderingSchemaManager::SCOPED_TABLE,
+                    scopeColumn: 'scope_key',
+                    updatedAtColumn: 'updated_at',
+                ),
+                'scope-a',
+                $other,
+                1,
+                '2026-01-03 12:34:56',
+            );
+
+            self::assertInstanceOf(PDOException::class, $thrown);
+            self::assertFalse($this->pdo()->inTransaction());
+            self::assertSame($before, $this->controlReader->scopedOrdersById('scope-a'));
+
+            $timestamp = $this->controlPdo->query(
+                'SELECT `updated_at` FROM `' . OrderingSchemaManager::SCOPED_TABLE . '` WHERE `id` = ' . $other,
+            );
+            self::assertNotFalse($timestamp);
+            self::assertSame('2026-01-01 00:00:00', $timestamp->fetchColumn());
+        } finally {
+            $failureInjector->dropAll();
+        }
+    }
+
     private function captureMoveFailure(
         ScopedOrderingConfig $config,
         int|string|null $scopeValue,
         int $id,
-        int $newOrder
+        int $newOrder,
+        ?string $updatedAtValue = null,
     ): Throwable {
         try {
-            $this->manager->moveWithinScope($this->pdo(), $config, $scopeValue, $id, $newOrder);
+            $this->manager->moveWithinScope(
+                $this->pdo(),
+                $config,
+                $scopeValue,
+                $id,
+                $newOrder,
+                $updatedAtValue,
+            );
         } catch (Throwable $throwable) {
             return $throwable;
         }
@@ -143,7 +187,7 @@ final class ScopedOrderingManagerRollbackTest extends MySqlIntegrationTestCase
     /**
      * @return list<int>
      */
-    private function insertScopedOrders(int|string $scopeValue, int ...$orders): array
+    private function insertScopedOrders(int|string|null $scopeValue, int ...$orders): array
     {
         $ids = [];
         foreach ($orders as $order) {

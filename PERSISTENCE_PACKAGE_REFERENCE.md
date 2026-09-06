@@ -24,7 +24,9 @@
       public ?string $scopeColumn = null,
       public string $idColumn = 'id',
       public string $orderColumn = 'display_order',
-      public ?string $deletedAtColumn = 'deleted_at'
+      public ?string $deletedAtColumn = 'deleted_at',
+      public bool $nullableScope = false,
+      public ?string $updatedAtColumn = null
   )
   ```
 * **Public Properties**:
@@ -33,17 +35,22 @@
   * `string $idColumn`
   * `string $orderColumn`
   * `?string $deletedAtColumn`
+  * `bool $nullableScope`
+  * `?string $updatedAtColumn`
 * **Public Methods**:
   * `public function quotedTable(): string`
   * `public function quotedScopeColumn(): ?string`
   * `public function quotedIdColumn(): string`
   * `public function quotedOrderColumn(): string`
   * `public function quotedDeletedAtColumn(): ?string`
+  * `public function quotedUpdatedAtColumn(): ?string`
 * **Exceptions**: Throws `InvalidOrderingConfigurationException` on invalid identifiers.
 * **Design rules**:
   * `scopeColumn === null` represents global ordering.
   * `scopeColumn !== null` represents scoped ordering.
+  * `nullableScope === true` permits `scopeValue === null` to mean `scopeColumn IS NULL`; it is valid only with a configured scope column.
   * `deletedAtColumn === null` disables soft-delete filtering.
+  * `updatedAtColumn !== null` enables an atomic target-row timestamp update for successful moves.
   * Nullable quoted methods return `null` when their configured column is disabled.
   * `table`: Supports `table` or `schema.table` formats.
   * Identifiers must be application-trusted constants.
@@ -67,18 +74,20 @@
     * Treats soft-deleted rows as absent when soft-delete filtering is configured.
     * May throw `InvalidOrderingOperationException` for inconsistent scope usage.
     * May propagate external PDO/database throwables unchanged.
-  * `public function moveWithinScope(\PDO $pdo, ScopedOrderingConfig $config, int|string|null $scopeValue, int $id, int $newOrder): bool`
+  * `public function moveWithinScope(\PDO $pdo, ScopedOrderingConfig $config, int|string|null $scopeValue, int $id, int $newOrder, ?string $updatedAtValue = null): bool`
     * Rejects inconsistent scope usage (`InvalidOrderingOperationException`).
     * Throws `InvalidOrderingOperationException` for `id <= 0`.
     * Throws `InvalidOrderingOperationException` for `newOrder <= 0`.
     * Throws `OrderingTransactionException` when PDO already has an active transaction.
     * Owns its transaction.
     * Locks the applicable active scope.
+    * A configured nullable scope uses `scopeColumn IS NULL` when `$scopeValue` is null.
     * Reads the target order inside the transaction.
     * Returns `false` if the target is missing.
     * Clamps above-maximum order to the applicable maximum.
     * Returns `true` for an already satisfied/clamped no-op.
     * Shifts only the affected range.
+    * When `updatedAtColumn` is configured, `$updatedAtValue` is written with the target order in the same update and transaction.
     * Does not globally normalize pre-existing gaps.
     * Returns `false` and rolls back if the final target update reports no affected row.
     * Rolls back an owned transaction when a throwable occurs after transaction startup.
