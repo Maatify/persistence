@@ -1,6 +1,6 @@
 # Ordering Capability Phase — Nullable Scopes and Atomic Mutation Timestamps
 
-**Status:** Release-finalized for `v1.2.0`; publish after the stacked PRs merge.
+**Status:** Release-finalized for `v1.2.0`; ready for publication after CI verification.
 
 **Scope:** `Maatify\Persistence\Pdo\Ordering`
 
@@ -52,6 +52,5 @@ introduce host-specific schema or framework behavior.
 The phase is verified by configuration unit tests, public API regression tests,
 MySQL integration coverage for nullable scopes and atomic timestamp updates,
 failure-injection rollback coverage, PHPStan at level max, and the package code
-style check. The capability is prepared for the `v1.2.0` release; publishing
-the tag remains gated on merging the capability PR and this release-finalization
-PR.
+style check. The capability is prepared for the `v1.2.0` release. Publish the
+`v1.2.0` tag and release notes from the verified release HEAD.
