@@ -80,7 +80,7 @@ When contributing code, you must adhere to the following architectural rules:
 * **No Generic Repository Abstraction**: Keep the logic specific to the current goals (e.g., PDO ordering utilities).
 * **SQL Identifiers**: Table and column names must remain trusted configurations, not raw user input.
 * **Prepared Statements**: All runtime values must be bound using prepared statements.
-* **Transaction Ownership**: `moveWithinScope()` owns its own transaction. It must reject caller-owned active transactions.
+* **Transaction Ownership**: `moveWithinScope()` owns a transaction only when no transaction is active and participates in an active caller-owned transaction without committing or rolling it back. Composed operations must use the same PDO connection.
 * **Scope Isolation**: Do not break scope isolation; rows outside the affected range must not be moved.
 * **No Global Normalization**: Do not perform global normalization of gaps as a side effect of a scoped operation.
 * **Rollback Behavior**: Rollbacks must preserve the original error/exception.

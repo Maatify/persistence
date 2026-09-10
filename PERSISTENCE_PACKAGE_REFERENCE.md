@@ -78,8 +78,8 @@
     * Rejects inconsistent scope usage (`InvalidOrderingOperationException`).
     * Throws `InvalidOrderingOperationException` for `id <= 0`.
     * Throws `InvalidOrderingOperationException` for `newOrder <= 0`.
-    * Throws `OrderingTransactionException` when PDO already has an active transaction.
-    * Owns its transaction.
+    * Owns a transaction when PDO has no active transaction.
+    * Participates in an active caller-owned PDO transaction without beginning, committing, or rolling it back.
     * Locks the applicable active scope.
     * A configured nullable scope uses `scopeColumn IS NULL` when `$scopeValue` is null.
     * Reads the target order inside the transaction.
@@ -93,6 +93,35 @@
     * Rolls back an owned transaction when a throwable occurs after transaction startup.
     * Rethrows the same original throwable.
     * Does not universally wrap PDO failures as package exceptions.
+
+### `Maatify\Persistence\Pdo\Transaction\TransactionRunnerInterface`
+* **Status**: `interface`
+* **Public Method**:
+  ```php
+  public function run(callable $callback): mixed
+  ```
+* **Contract**:
+  * The callback receives no arguments and its return value is returned unchanged.
+  * When no transaction is active, the implementation starts a transaction,
+    commits after successful callback completion, and rolls back on failure if
+    the transaction is still active.
+  * When a transaction is already active, the implementation participates in it
+    and does not begin, commit, or roll it back.
+  * The original callback `Throwable` is propagated.
+
+### `Maatify\Persistence\Pdo\Transaction\PdoTransactionRunner`
+* **Status**: `final readonly class`
+* **Implements**: `TransactionRunnerInterface`
+* **Constructor**:
+  ```php
+  public function __construct(\PDO $pdo)
+  ```
+  * The PDO connection is an implementation dependency and is not exposed by
+    the shared transaction contract.
+* **Transaction Boundary**: It owns only transactions that it starts. The
+  caller owns an already-active transaction.
+* **Composition Requirement**: Atomic composition requires every participant to
+  use the same PDO connection.
 
 ### `Maatify\Persistence\Pdo\Pagination\PageRequest`
 * **Status**: `final readonly class`
@@ -226,6 +255,21 @@
 * **Values**: All runtime values (ids, scope values) use prepared statements and PDO parameter binding.
 * **No Host Assumptions**: No host schema assumptions or ORM dependencies.
 
+## Transaction Composition
+
+* `PdoTransactionRunner` owns `beginTransaction()`, `commit()`, and
+  `rollBack()` only when it starts the transaction.
+* When the supplied PDO already has an active transaction, the runner and
+  `moveWithinScope()` participate in it without committing or rolling it back.
+* The caller owns the final commit or rollback for an active outer transaction.
+* Atomic composition is supported only when ordinary PDO mutations and all
+  package participants use the same PDO connection.
+* `getNextPosition()` does not start a transaction or lock its scope. The
+  caller owns the transaction and locking needed to serialize concurrent
+  position allocation.
+* `moveWithinScope()` locks the applicable active ordering scope with
+  `SELECT ... FOR UPDATE` inside the transaction it owns or joins.
+
 ## Pagination Boundaries
 * **Normalization**: Strict page and per-page normalization.
 * **Query Ownership**: Package handles total, filtered-count, and data query execution.
@@ -262,7 +306,7 @@ Renaming the marker MAY be reconsidered only as part of a separately approved, m
 | `PersistenceException` | `\Throwable` | N/A | N/A | Interface implemented by all package exceptions. |
 | `InvalidOrderingConfigurationException` | `SystemMaatifyException` | `ErrorCodeEnum::MAATIFY_ERROR` | default | Invalid/unsafe trusted SQL configuration identifiers. |
 | `InvalidOrderingOperationException` | `ValidationMaatifyException` | `ErrorCodeEnum::INVALID_ARGUMENT` | default | Invalid runtime id, new order, or scope usage. |
-| `OrderingTransactionException` | `UnsupportedMaatifyException` | `ErrorCodeEnum::UNSUPPORTED_OPERATION` | `defaultIsSafe(): false` | `moveWithinScope()` called with active PDO transaction. |
+| `OrderingTransactionException` | `UnsupportedMaatifyException` | `ErrorCodeEnum::UNSUPPORTED_OPERATION` | `defaultIsSafe(): false` | Deprecated compatibility exception; no longer thrown by `moveWithinScope()` for active caller-owned transactions. |
 | `InvalidPaginationConfigurationException` | `SystemMaatifyException` | `ErrorCodeEnum::MAATIFY_ERROR` | default | Invalid per-page bounds, whitelist errors. |
 | `InvalidPaginationQueryException` | `SystemMaatifyException` | `ErrorCodeEnum::MAATIFY_ERROR` | default | Missing/empty SQL, semicolons, reserved parameters. |
 | `PaginationExecutionException` | `SystemMaatifyException` | `ErrorCodeEnum::MAATIFY_ERROR` | default | Package-owned execution and result-contract failures. |
@@ -301,7 +345,7 @@ Renaming the marker MAY be reconsidered only as part of a separately approved, m
   * Inconsistent scope usage
 
 ### `Maatify\Persistence\Exception\OrderingTransactionException`
-* **Status**: `final class`
+* **Status**: `final class`, `@deprecated`
 * **Extends**: `Maatify\Exceptions\Exception\Unsupported\UnsupportedMaatifyException`
 * **Implements**: `Maatify\Persistence\Exception\PersistenceException`
 * **Package-Declared Protected Methods**:
@@ -315,7 +359,8 @@ Renaming the marker MAY be reconsidered only as part of a separately approved, m
   ```
   * Returns: `false`
 * **Public Methods**: No package-declared public methods beyond the inherited shared exception API.
-* **Triggering Conditions**: Thrown when `moveWithinScope()` is called while PDO already has an active transaction.
+* **Compatibility**: The class remains public and autoloadable for `1.x` consumers.
+* **Transaction Flow**: `moveWithinScope()` now participates in an active caller-owned PDO transaction and no longer throws this exception for that condition.
 
 ## Integration Requirements
 
@@ -345,4 +390,4 @@ The test categories are:
 * No Host tables
 * No HTTP layer
 * No generic application repository abstraction
-* No implicit transaction participation for `moveWithinScope()`
+* No transaction participation across different PDO connections

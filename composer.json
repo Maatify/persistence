@@ -1,6 +1,6 @@
 {
   "name": "maatify/persistence",
-  "description": "Standalone, framework-agnostic PDO ordering and pagination utilities for Maatify projects.",
+  "description": "Standalone, framework-agnostic PDO ordering, transaction, and pagination utilities for Maatify projects.",
   "keywords": [
     "persistence",
     "pdo",
