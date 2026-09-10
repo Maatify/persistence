@@ -13,8 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 * `moveWithinScope()` now participates in an active caller-owned PDO transaction while preserving standalone transaction ownership and scope locking.
 
-### Removed
-* The obsolete ordering transaction-rejection contract, now that active caller-owned PDO transactions are supported.
+### Deprecated
+* `OrderingTransactionException` remains public and autoloadable for backward compatibility with `1.x` consumers, but `moveWithinScope()` no longer throws it for an active caller-owned PDO transaction.
 
 ## [1.2.0] - 2026-09-06
 
@@ -59,7 +59,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Affected-range-only movement without globally normalizing pre-existing gaps.
 
 ### Changed
-* Refined exception architecture to distinguish between runtime validation (`InvalidOrderingOperationException`), configuration errors (`InvalidOrderingConfigurationException`), and operational ordering constraints.
+* Refined exception architecture to distinguish between runtime validation (`InvalidOrderingOperationException`), configuration errors (`InvalidOrderingConfigurationException`), and operational constraints (`OrderingTransactionException`).
 * Rolls back owned transactions after operation failures and rethrows the original throwable.
 * Enforced real MySQL testing; SQLite substitution is explicitly disabled.
 

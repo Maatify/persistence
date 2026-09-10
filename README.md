@@ -190,10 +190,16 @@ Maatify\Persistence\Pdo\Pagination\PdoPaginator;
 Maatify\Persistence\Exception\PersistenceException;
 Maatify\Persistence\Exception\InvalidOrderingConfigurationException;
 Maatify\Persistence\Exception\InvalidOrderingOperationException;
+Maatify\Persistence\Exception\OrderingTransactionException;
 Maatify\Persistence\Exception\InvalidPaginationConfigurationException;
 Maatify\Persistence\Exception\InvalidPaginationQueryException;
 Maatify\Persistence\Exception\PaginationExecutionException;
 ```
+
+`OrderingTransactionException` remains public and autoloadable for backward
+compatibility with `1.x` consumers, but is deprecated. `moveWithinScope()` now
+participates in an active caller-owned PDO transaction and no longer throws it
+for that condition.
 
 ## ⚠️ Critical Runtime Behavior
 

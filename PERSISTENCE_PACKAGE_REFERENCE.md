@@ -306,6 +306,7 @@ Renaming the marker MAY be reconsidered only as part of a separately approved, m
 | `PersistenceException` | `\Throwable` | N/A | N/A | Interface implemented by all package exceptions. |
 | `InvalidOrderingConfigurationException` | `SystemMaatifyException` | `ErrorCodeEnum::MAATIFY_ERROR` | default | Invalid/unsafe trusted SQL configuration identifiers. |
 | `InvalidOrderingOperationException` | `ValidationMaatifyException` | `ErrorCodeEnum::INVALID_ARGUMENT` | default | Invalid runtime id, new order, or scope usage. |
+| `OrderingTransactionException` | `UnsupportedMaatifyException` | `ErrorCodeEnum::UNSUPPORTED_OPERATION` | `defaultIsSafe(): false` | Deprecated compatibility exception; no longer thrown by `moveWithinScope()` for active caller-owned transactions. |
 | `InvalidPaginationConfigurationException` | `SystemMaatifyException` | `ErrorCodeEnum::MAATIFY_ERROR` | default | Invalid per-page bounds, whitelist errors. |
 | `InvalidPaginationQueryException` | `SystemMaatifyException` | `ErrorCodeEnum::MAATIFY_ERROR` | default | Missing/empty SQL, semicolons, reserved parameters. |
 | `PaginationExecutionException` | `SystemMaatifyException` | `ErrorCodeEnum::MAATIFY_ERROR` | default | Package-owned execution and result-contract failures. |
@@ -342,6 +343,24 @@ Renaming the marker MAY be reconsidered only as part of a separately approved, m
   * Invalid movement id
   * Invalid new ordering value
   * Inconsistent scope usage
+
+### `Maatify\Persistence\Exception\OrderingTransactionException`
+* **Status**: `final class`, `@deprecated`
+* **Extends**: `Maatify\Exceptions\Exception\Unsupported\UnsupportedMaatifyException`
+* **Implements**: `Maatify\Persistence\Exception\PersistenceException`
+* **Package-Declared Protected Methods**:
+  ```php
+  protected function defaultErrorCode(): ErrorCodeInterface
+  ```
+  * Returns: `ErrorCodeEnum::UNSUPPORTED_OPERATION`
+
+  ```php
+  protected function defaultIsSafe(): bool
+  ```
+  * Returns: `false`
+* **Public Methods**: No package-declared public methods beyond the inherited shared exception API.
+* **Compatibility**: The class remains public and autoloadable for `1.x` consumers.
+* **Transaction Flow**: `moveWithinScope()` now participates in an active caller-owned PDO transaction and no longer throws this exception for that condition.
 
 ## Integration Requirements
 
