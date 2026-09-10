@@ -22,7 +22,7 @@
 [![Maatify Ecosystem](https://img.shields.io/badge/Maatify-Ecosystem-blueviolet)](https://github.com/Maatify)
 [![Install](https://img.shields.io/badge/Install-composer%20require%20maatify%2Fpersistence-blue)](https://packagist.org/packages/maatify/persistence)
 
-*Standalone, framework-agnostic PDO utilities for Maatify projects, providing robust scoped and global ordering, and pagination tools. Designed and verified for MySQL environments.*
+*Standalone, framework-agnostic PDO utilities for Maatify projects, providing robust scoped and global ordering, composable transaction support, and pagination tools. Designed and verified for MySQL environments.*
 
 > **Note:** PDO Pagination is available starting with v1.1.0.
 
