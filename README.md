@@ -103,9 +103,9 @@ together. Every participant must use the same PDO connection:
 ```php
 use Maatify\Persistence\Pdo\Transaction\PdoTransactionRunner;
 
-$transactions = new PdoTransactionRunner();
+$transactions = new PdoTransactionRunner($pdo);
 
-$transactions->run($pdo, function () use ($pdo, $ordering, $config): void {
+$transactions->run(function () use ($pdo, $ordering, $config): void {
     $pdo->prepare('UPDATE `consumer_table` SET `status` = :status WHERE `id` = :id')
         ->execute(['status' => 'ready', 'id' => 10]);
 
@@ -113,11 +113,14 @@ $transactions->run($pdo, function () use ($pdo, $ordering, $config): void {
 });
 ```
 
-When no transaction is active, `PdoTransactionRunner` starts one, commits on
-successful callback completion, and rolls back on failure before rethrowing the
-original `Throwable`. When a transaction is already active, it participates in
-that transaction and does not begin, commit, or roll it back. The caller owns
-the outer transaction in that case.
+`TransactionRunnerInterface` exposes only `run(callable $callback)`, so a
+consumer service can depend on the shared transaction abstraction without
+knowing about PDO. `PdoTransactionRunner` is the PDO implementation and
+receives the PDO connection through its constructor. When no transaction is
+active, it starts one, commits on successful callback completion, and rolls
+back on failure before rethrowing the original `Throwable`. When a transaction
+is already active, it participates in that transaction and does not begin,
+commit, or roll it back. The caller owns the outer transaction in that case.
 
 ### PDO Pagination
 

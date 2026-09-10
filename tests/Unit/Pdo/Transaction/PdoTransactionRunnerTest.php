@@ -17,8 +17,7 @@ final class PdoTransactionRunnerTest extends TestCase
         $pdo = new TransactionPdo();
         $callbackCalls = 0;
 
-        $result = (new PdoTransactionRunner())->run(
-            $pdo,
+        $result = (new PdoTransactionRunner($pdo))->run(
             static function () use (&$callbackCalls): array {
                 $callbackCalls++;
 
@@ -41,8 +40,7 @@ final class PdoTransactionRunnerTest extends TestCase
 
         $thrown = null;
         try {
-            (new PdoTransactionRunner())->run(
-                $pdo,
+            (new PdoTransactionRunner($pdo))->run(
                 static function () use ($failure): never {
                     throw $failure;
                 },
@@ -66,8 +64,7 @@ final class PdoTransactionRunnerTest extends TestCase
 
         $thrown = null;
         try {
-            (new PdoTransactionRunner())->run(
-                $pdo,
+            (new PdoTransactionRunner($pdo))->run(
                 static function () use ($failure): never {
                     throw $failure;
                 },
@@ -86,8 +83,7 @@ final class PdoTransactionRunnerTest extends TestCase
         $pdo = new TransactionPdo(transactionActive: true);
         $callbackCalls = 0;
 
-        $result = (new PdoTransactionRunner())->run(
-            $pdo,
+        $result = (new PdoTransactionRunner($pdo))->run(
             static function () use (&$callbackCalls): string {
                 $callbackCalls++;
 
@@ -110,8 +106,7 @@ final class PdoTransactionRunnerTest extends TestCase
 
         $thrown = null;
         try {
-            (new PdoTransactionRunner())->run(
-                $pdo,
+            (new PdoTransactionRunner($pdo))->run(
                 static function () use ($failure): never {
                     throw $failure;
                 },

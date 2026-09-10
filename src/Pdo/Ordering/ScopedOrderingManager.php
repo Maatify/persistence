@@ -118,8 +118,7 @@ final readonly class ScopedOrderingManager
         };
 
         try {
-            return (new PdoTransactionRunner())->run(
-                $pdo,
+            return (new PdoTransactionRunner($pdo))->run(
                 function () use ($pdo, $config, $scopeValue, $id, $newOrder, $updatedAtValue, $rollbackResult): bool {
                     $this->lockScopeForUpdate($pdo, $config, $scopeValue);
 

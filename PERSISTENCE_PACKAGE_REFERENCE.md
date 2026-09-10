@@ -98,7 +98,7 @@
 * **Status**: `interface`
 * **Public Method**:
   ```php
-  public function run(\PDO $pdo, callable $callback): mixed
+  public function run(callable $callback): mixed
   ```
 * **Contract**:
   * The callback receives no arguments and its return value is returned unchanged.
@@ -112,7 +112,12 @@
 ### `Maatify\Persistence\Pdo\Transaction\PdoTransactionRunner`
 * **Status**: `final readonly class`
 * **Implements**: `TransactionRunnerInterface`
-* **Constructor**: Stateless class with no explicitly declared constructor.
+* **Constructor**:
+  ```php
+  public function __construct(\PDO $pdo)
+  ```
+  * The PDO connection is an implementation dependency and is not exposed by
+    the shared transaction contract.
 * **Transaction Boundary**: It owns only transactions that it starts. The
   caller owns an already-active transaction.
 * **Composition Requirement**: Atomic composition requires every participant to

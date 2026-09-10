@@ -87,18 +87,18 @@ final class OrderingPublicApiRegressionTest extends TestCase
         self::assertSame('Maatify\\Persistence\\Pdo\\Transaction', $class->getNamespaceName());
         self::assertTrue($class->isFinal());
         self::assertTrue($class->isReadOnly());
-        self::assertNull($class->getConstructor());
+        self::assertConstructorParameters($class, [
+            ['pdo', PDO::class, false, false, null],
+        ]);
         self::assertContains(TransactionRunnerInterface::class, class_implements(PdoTransactionRunner::class));
 
         self::assertPublicMethod($class, 'run', [
-            ['pdo', PDO::class, false, false, null],
             ['callback', 'callable', false, false, null],
         ], 'mixed');
 
         $interface = new ReflectionClass(TransactionRunnerInterface::class);
         self::assertTrue($interface->isInterface());
         self::assertPublicMethod($interface, 'run', [
-            ['pdo', PDO::class, false, false, null],
             ['callback', 'callable', false, false, null],
         ], 'mixed');
     }

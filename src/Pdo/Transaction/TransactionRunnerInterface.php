@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace Maatify\Persistence\Pdo\Transaction;
 
-use PDO;
-
 interface TransactionRunnerInterface
 {
     /**
@@ -14,5 +12,5 @@ interface TransactionRunnerInterface
      * @param callable(): TResult $callback
      * @return TResult
      */
-    public function run(PDO $pdo, callable $callback): mixed;
+    public function run(callable $callback): mixed;
 }

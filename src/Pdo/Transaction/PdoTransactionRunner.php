@@ -13,40 +13,44 @@ use Throwable;
  */
 final readonly class PdoTransactionRunner implements TransactionRunnerInterface
 {
+    public function __construct(private PDO $pdo)
+    {
+    }
+
     /**
      * @template TResult
      *
      * @param callable(): TResult $callback
      * @return TResult
      */
-    public function run(PDO $pdo, callable $callback): mixed
+    public function run(callable $callback): mixed
     {
-        if ($pdo->inTransaction()) {
+        if ($this->pdo->inTransaction()) {
             return $callback();
         }
 
-        $pdo->beginTransaction();
+        $this->pdo->beginTransaction();
 
         try {
             $result = $callback();
-            $pdo->commit();
+            $this->pdo->commit();
 
             return $result;
         } catch (Throwable $throwable) {
-            $this->rollBackIfActive($pdo);
+            $this->rollBackIfActive();
 
             throw $throwable;
         }
     }
 
-    private function rollBackIfActive(PDO $pdo): void
+    private function rollBackIfActive(): void
     {
-        if (!$pdo->inTransaction()) {
+        if (!$this->pdo->inTransaction()) {
             return;
         }
 
         try {
-            $pdo->rollBack();
+            $this->pdo->rollBack();
         } catch (Throwable) {
         }
     }
