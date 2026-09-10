@@ -6,6 +6,8 @@ namespace Maatify\Persistence\Tests\Regression\Pdo\Ordering;
 
 use Maatify\Persistence\Pdo\Ordering\ScopedOrderingConfig;
 use Maatify\Persistence\Pdo\Ordering\ScopedOrderingManager;
+use Maatify\Persistence\Pdo\Transaction\PdoTransactionRunner;
+use Maatify\Persistence\Pdo\Transaction\TransactionRunnerInterface;
 use PDO;
 use PHPUnit\Framework\TestCase;
 use ReflectionClass;
@@ -76,6 +78,29 @@ final class OrderingPublicApiRegressionTest extends TestCase
             ['scopeValue', 'int|string', true, false, null],
             ['id', 'int', false, false, null],
         ], 'bool');
+    }
+
+    public function testPdoTransactionRunnerApiMatchesRepositoryReality(): void
+    {
+        $class = new ReflectionClass(PdoTransactionRunner::class);
+
+        self::assertSame('Maatify\\Persistence\\Pdo\\Transaction', $class->getNamespaceName());
+        self::assertTrue($class->isFinal());
+        self::assertTrue($class->isReadOnly());
+        self::assertNull($class->getConstructor());
+        self::assertContains(TransactionRunnerInterface::class, class_implements(PdoTransactionRunner::class));
+
+        self::assertPublicMethod($class, 'run', [
+            ['pdo', PDO::class, false, false, null],
+            ['callback', 'callable', false, false, null],
+        ], 'mixed');
+
+        $interface = new ReflectionClass(TransactionRunnerInterface::class);
+        self::assertTrue($interface->isInterface());
+        self::assertPublicMethod($interface, 'run', [
+            ['pdo', PDO::class, false, false, null],
+            ['callback', 'callable', false, false, null],
+        ], 'mixed');
     }
 
     /**

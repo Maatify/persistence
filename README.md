@@ -33,7 +33,7 @@
 ## 🚀 Key Features
 
 * **Global and Scoped Ordering**: Easily manage display order across an entire table or within a specific scope.
-* **Transaction Ownership**: Handles its own transactions and locks the necessary scope reliably.
+* **Composable PDO Transactions**: Owns a transaction when needed and participates in an existing transaction without changing its ownership.
 * **SQL Identifier Validation**: Ensures table and column configurations are safe and properly quoted.
 * **Soft-Delete Filtering**: Optional support for ignoring soft-deleted rows in ordering calculations.
 * **Scope Isolation**: Ensures only the affected range within the configured scope is updated.
@@ -95,6 +95,30 @@ $success = $ordering->moveWithinScope(
 );
 ```
 
+### Composing PDO Mutations in One Transaction
+
+Use the transaction runner when several mutations must commit or roll back
+together. Every participant must use the same PDO connection:
+
+```php
+use Maatify\Persistence\Pdo\Transaction\PdoTransactionRunner;
+
+$transactions = new PdoTransactionRunner();
+
+$transactions->run($pdo, function () use ($pdo, $ordering, $config): void {
+    $pdo->prepare('UPDATE `consumer_table` SET `status` = :status WHERE `id` = :id')
+        ->execute(['status' => 'ready', 'id' => 10]);
+
+    $ordering->moveWithinScope($pdo, $config, 2, 15, 4);
+});
+```
+
+When no transaction is active, `PdoTransactionRunner` starts one, commits on
+successful callback completion, and rolls back on failure before rethrowing the
+original `Throwable`. When a transaction is already active, it participates in
+that transaction and does not begin, commit, or roll it back. The caller owns
+the outer transaction in that case.
+
 ### PDO Pagination
 
 ```php
@@ -143,11 +167,13 @@ $result = $paginator->paginate(
 
 ## 🧩 Public Runtime API
 
-The package currently provides the following public classes for PDO ordering and pagination:
+The package currently provides the following public classes for PDO ordering, transactions, and pagination:
 
 ```php
 Maatify\Persistence\Pdo\Ordering\ScopedOrderingConfig;
 Maatify\Persistence\Pdo\Ordering\ScopedOrderingManager;
+Maatify\Persistence\Pdo\Transaction\TransactionRunnerInterface;
+Maatify\Persistence\Pdo\Transaction\PdoTransactionRunner;
 
 Maatify\Persistence\Pdo\Pagination\PageRequest;
 Maatify\Persistence\Pdo\Pagination\SortDirectionEnum;
@@ -161,7 +187,6 @@ Maatify\Persistence\Pdo\Pagination\PdoPaginator;
 Maatify\Persistence\Exception\PersistenceException;
 Maatify\Persistence\Exception\InvalidOrderingConfigurationException;
 Maatify\Persistence\Exception\InvalidOrderingOperationException;
-Maatify\Persistence\Exception\OrderingTransactionException;
 Maatify\Persistence\Exception\InvalidPaginationConfigurationException;
 Maatify\Persistence\Exception\InvalidPaginationQueryException;
 Maatify\Persistence\Exception\PaginationExecutionException;
@@ -178,8 +203,8 @@ Maatify\Persistence\Exception\PaginationExecutionException;
 * Rejects inconsistent scope usage.
 * Rejects `id <= 0`.
 * Rejects `newOrder <= 0`.
-* Rejects caller-owned active PDO transactions.
-* Owns its own transaction.
+* Owns a transaction when called without an active PDO transaction.
+* Participates in an active caller-owned PDO transaction without beginning, committing, or rolling it back.
 * Locks the applicable active scope using `SELECT ... FOR UPDATE`.
 * Supports `NULL` as a scope value when `nullableScope` is enabled; this is distinct from global ordering, which has no `scopeColumn`.
 * Reads the current order from the database within the same transaction.
@@ -193,6 +218,13 @@ Maatify\Persistence\Exception\PaginationExecutionException;
 * Rolls back and returns `false` if the final target update fails.
 * Rolls back on any Throwable after starting the transaction.
 * Rethrows the original Throwable without arbitrary wrapping.
+
+**`PdoTransactionRunner`:**
+* Requires all composed participants to use the same PDO connection.
+* Starts, commits, and rolls back the transaction when it owns it.
+* Participates in an existing transaction without changing its ownership.
+* Preserves the callback return value.
+* Rethrows the original callback `Throwable` after attempting to roll back an owned transaction.
 
 **`rowExistsInScope()`:**
 * Returns `false` for `id <= 0`.
@@ -220,6 +252,7 @@ Maatify\Persistence\Exception\PaginationExecutionException;
 * No host table ownership.
 * No generic application repository abstraction.
 * The host provides the PDO connection.
+* The caller owns the outer transaction when composing ordinary PDO mutations with Ordering mutations.
 * Trusted SQL identifiers.
 * Runtime values use prepared statements.
 

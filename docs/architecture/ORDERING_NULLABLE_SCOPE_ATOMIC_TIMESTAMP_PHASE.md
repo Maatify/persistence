@@ -31,8 +31,9 @@ in the same SQL `UPDATE`.
 * Global ordering remains the configuration with no `scopeColumn`.
 * A nullable scoped ordering is distinct from global ordering and uses
   `scopeColumn IS NULL` for a null scope value.
-* The manager owns the movement transaction and rejects caller-owned active
-  transactions.
+* The manager owns the movement transaction when no transaction is active and
+  participates in an active caller-owned transaction without committing or
+  rolling it back.
 * Scope locking, affected-range shifting, target order update, and the optional
   timestamp update commit or roll back together.
 * A no-op does not issue a target mutation and therefore does not change its
