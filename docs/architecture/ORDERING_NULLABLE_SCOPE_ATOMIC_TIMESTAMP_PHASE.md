@@ -1,6 +1,6 @@
 # Ordering Capability Phase — Nullable Scopes and Atomic Mutation Timestamps
 
-**Status:** Release-finalized for `v1.2.0`; ready for publication after CI verification.
+**Status:** Released in `v1.2.0`.
 
 **Scope:** `Maatify\Persistence\Pdo\Ordering`
 
@@ -31,8 +31,9 @@ in the same SQL `UPDATE`.
 * Global ordering remains the configuration with no `scopeColumn`.
 * A nullable scoped ordering is distinct from global ordering and uses
   `scopeColumn IS NULL` for a null scope value.
-* The manager owns the movement transaction and rejects caller-owned active
-  transactions.
+* The manager owns the movement transaction when no transaction is active and
+  participates in an active caller-owned transaction without committing or
+  rolling it back.
 * Scope locking, affected-range shifting, target order update, and the optional
   timestamp update commit or roll back together.
 * A no-op does not issue a target mutation and therefore does not change its
@@ -43,14 +44,14 @@ in the same SQL `UPDATE`.
 ## Compatibility and release
 
 The new constructor and method parameters are appended with defaults, so
-existing calls remain source-compatible. Consumers may adopt this capability
-only after it is published as a stable package version; this phase does not
-introduce host-specific schema or framework behavior.
+existing calls remain source-compatible. Consumers may adopt this capability as
+part of the stable `v1.2.0` package; this phase does not introduce host-specific
+schema or framework behavior.
 
 ## Verification
 
 The phase is verified by configuration unit tests, public API regression tests,
 MySQL integration coverage for nullable scopes and atomic timestamp updates,
 failure-injection rollback coverage, PHPStan at level max, and the package code
-style check. The capability is prepared for the `v1.2.0` release. Publish the
-`v1.2.0` tag and release notes from the verified release HEAD.
+style check. The capability was released in `v1.2.0` and is available to
+consumers.

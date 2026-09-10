@@ -9,11 +9,11 @@ use Maatify\Exceptions\Enum\ErrorCodeEnum;
 use Maatify\Exceptions\Exception\Unsupported\UnsupportedMaatifyException;
 
 /**
- * Thrown when ScopedOrderingManager cannot safely own the transaction.
+ * Legacy exception for transaction ownership constraints.
  *
- * ScopedOrderingManager::moveWithinScope() is intentionally self-transactional.
- * It must be called outside an active PDO transaction to avoid ambiguous
- * transaction ownership and partial ordering updates.
+ * @deprecated Retained for backward compatibility with 1.x consumers. Active
+ * caller-owned PDO transactions are now supported by moveWithinScope(), so
+ * this exception is no longer thrown by that transaction flow.
  */
 final class OrderingTransactionException extends UnsupportedMaatifyException implements PersistenceException
 {

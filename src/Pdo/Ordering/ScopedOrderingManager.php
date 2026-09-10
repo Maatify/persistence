@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Maatify\Persistence\Pdo\Ordering;
 
 use Maatify\Persistence\Exception\InvalidOrderingOperationException;
-use Maatify\Persistence\Exception\OrderingTransactionException;
+use Maatify\Persistence\Pdo\Transaction\PdoTransactionRunner;
 use PDO;
 use Throwable;
 
@@ -18,8 +18,9 @@ use Throwable;
  * - nullable scoped ordering: one sequence for NULL and one sequence per non-null scope value
  *
  * Transaction model:
- * - moveWithinScope() owns its transaction.
- * - Call moveWithinScope() outside active PDO transactions.
+ * - moveWithinScope() uses the shared PDO transaction runner.
+ * - It owns the transaction when called outside an active PDO transaction.
+ * - It participates in an active caller-owned PDO transaction.
  *
  * Ordering model:
  * - getNextPosition() returns max(order) + 1.
@@ -91,7 +92,6 @@ final readonly class ScopedOrderingManager
      * @param string|null $updatedAtValue Timestamp value bound to the target update when updatedAtColumn is configured.
      *
      * @throws InvalidOrderingOperationException When id/order/scope arguments are invalid.
-     * @throws OrderingTransactionException When called inside an active PDO transaction.
      * @throws Throwable When a PDO/database operation fails.
      */
     public function moveWithinScope(
@@ -113,69 +113,56 @@ final readonly class ScopedOrderingManager
             throw new InvalidOrderingOperationException('New ordering position must be a positive integer.');
         }
 
-        if ($pdo->inTransaction()) {
-            throw new OrderingTransactionException('ScopedOrderingManager must own the transaction.');
-        }
-
-        $transactionStarted = false;
+        // Preserve the existing false-and-rollback contract through the shared runner.
+        $rollbackResult = new class () extends \RuntimeException {
+        };
 
         try {
-            $pdo->beginTransaction();
-            $transactionStarted = true;
+            return (new PdoTransactionRunner($pdo))->run(
+                function () use ($pdo, $config, $scopeValue, $id, $newOrder, $updatedAtValue, $rollbackResult): bool {
+                    $this->lockScopeForUpdate($pdo, $config, $scopeValue);
 
-            $this->lockScopeForUpdate($pdo, $config, $scopeValue);
+                    $currentOrder = $this->getCurrentOrderForUpdate($pdo, $config, $scopeValue, $id);
 
-            $currentOrder = $this->getCurrentOrderForUpdate($pdo, $config, $scopeValue, $id);
+                    if ($currentOrder === null) {
+                        throw $rollbackResult;
+                    }
 
-            if ($currentOrder === null) {
-                $pdo->rollBack();
-                $transactionStarted = false;
+                    $maxOrder = $this->getMaxPosition($pdo, $config, $scopeValue);
+                    $newOrder = min($newOrder, max(1, $maxOrder));
 
-                return false;
-            }
+                    if ($currentOrder === $newOrder) {
+                        return true;
+                    }
 
-            $maxOrder = $this->getMaxPosition($pdo, $config, $scopeValue);
-            $newOrder = min($newOrder, max(1, $maxOrder));
+                    if ($newOrder < $currentOrder) {
+                        $this->shiftOrdersUp($pdo, $config, $scopeValue, $newOrder, $currentOrder);
+                    } else {
+                        $this->shiftOrdersDown($pdo, $config, $scopeValue, $newOrder, $currentOrder);
+                    }
 
-            if ($currentOrder === $newOrder) {
-                $pdo->commit();
-                $transactionStarted = false;
+                    $updated = $this->updateTargetOrder(
+                        $pdo,
+                        $config,
+                        $scopeValue,
+                        $id,
+                        $newOrder,
+                        $updatedAtValue,
+                    );
 
-                return true;
-            }
+                    if (!$updated) {
+                        throw $rollbackResult;
+                    }
 
-            if ($newOrder < $currentOrder) {
-                $this->shiftOrdersUp($pdo, $config, $scopeValue, $newOrder, $currentOrder);
-            } else {
-                $this->shiftOrdersDown($pdo, $config, $scopeValue, $newOrder, $currentOrder);
-            }
-
-            $updated = $this->updateTargetOrder(
-                $pdo,
-                $config,
-                $scopeValue,
-                $id,
-                $newOrder,
-                $updatedAtValue,
+                    return true;
+                },
             );
-
-            if (!$updated) {
-                $pdo->rollBack();
-                $transactionStarted = false;
-
+        } catch (Throwable $throwable) {
+            if ($throwable === $rollbackResult) {
                 return false;
             }
 
-            $pdo->commit();
-            $transactionStarted = false;
-
-            return true;
-        } catch (Throwable $e) {
-            if ($transactionStarted && $pdo->inTransaction()) {
-                $pdo->rollBack();
-            }
-
-            throw $e;
+            throw $throwable;
         }
     }
 

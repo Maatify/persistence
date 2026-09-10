@@ -80,7 +80,7 @@ Rejected because Ordering and Pagination are separate persistence domains with d
 
 ## Consequences
 
-- Pagination is an additive Minor-version capability targeted at `v1.1.0`.
+- Pagination is an additive Minor-version capability released in `v1.1.0`.
 - Host repositories remain responsible for domain SQL and mapping.
 - The package centralizes only reusable pagination mechanics.
 - Existing Ordering Runtime behavior remains unchanged.

@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-09-10
+
+### Added
+* Reusable PDO transaction runner with callback result preservation and explicit ownership/participation semantics.
+
+### Changed
+* `moveWithinScope()` now participates in an active caller-owned PDO transaction while preserving standalone transaction ownership and scope locking.
+
+### Deprecated
+* `OrderingTransactionException` remains public and autoloadable for backward compatibility with `1.x` consumers, but `moveWithinScope()` no longer throws it for an active caller-owned PDO transaction.
+
 ## [1.2.0] - 2026-09-06
 
 ### Added
@@ -54,7 +65,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Rolls back owned transactions after operation failures and rethrows the original throwable.
 * Enforced real MySQL testing; SQLite substitution is explicitly disabled.
 
-[Unreleased]: https://github.com/Maatify/persistence/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/Maatify/persistence/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/Maatify/persistence/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/Maatify/persistence/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/Maatify/persistence/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/Maatify/persistence/releases/tag/v1.0.0
