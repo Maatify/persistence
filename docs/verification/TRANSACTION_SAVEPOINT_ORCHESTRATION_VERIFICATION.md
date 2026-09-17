@@ -14,8 +14,9 @@ This document records the verification of the Transaction Savepoint Orchestratio
 - [x] Lowest-supported dependencies verification
 - [x] Code style formatting (`php-cs-fixer fix --dry-run --diff`)
 - [x] Repository integrity checks
+- [x] MySQL residue verification
 
 ## 3. Real MySQL Integration Findings
-- Savepoint orchestrations verified successfully using `mysql:host=127.0.0.1;dbname=test`.
-- MariaDB 10.11 / MySQL 8.4 syntax checked successfully. Tests successfully executed after resolving integration environment issues.
-- All transactional test assertions passed, verifying savepoint boundaries and transaction execution limits.
+- Savepoint orchestrations verified successfully.
+- Verified strictly against MySQL 8.4 syntax and boundaries. Tests successfully executed after resolving integration environment issues.
+- All transactional test assertions passed, verifying savepoint boundaries, nested operations, exact Throwable and callback return value preservation, and transaction execution limits.
