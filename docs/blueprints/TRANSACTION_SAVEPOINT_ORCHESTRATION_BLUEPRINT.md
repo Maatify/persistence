@@ -44,12 +44,15 @@ The exact current gap is:
 Required behavior for the missing capability:
 
 ```text
-No active transaction:
-    existing owned-transaction behavior
+if no PDO transaction is active:
+    immediately use the existing owned-transaction path
+    do not generate a savepoint identifier
+    do not execute any savepoint control statement
 
-Active outer transaction:
-    create operation-local savepoint
-    execute callback
+if a PDO transaction is already active:
+    generate the operation savepoint identifier
+    create the savepoint
+    execute the operation
 
     success:
         release operation savepoint
@@ -96,12 +99,20 @@ PdoSavepointTransactionRunner implements SavepointTransactionRunnerInterface
 
 ## 5. Runtime Semantics
 
+### Connection Contract
+Transaction/savepoint composition is rigorously connection-local:
+- `PdoSavepointTransactionRunner` operates exclusively on its injected PDO connection.
+- The caller-owned outer transaction and all mutations intended to participate in that savepoint boundary must execute through the **same PDO instance / underlying database connection**.
+- A savepoint cannot isolate mutations performed on another PDO connection.
+
 ### No active transaction
-The savepoint-capable runner must preserve the existing transaction-runner behavior. It should prefer reuse/delegation (e.g., composing `PdoTransactionRunner` internally) over duplicating the owned-transaction engine where practical.
+The savepoint-capable runner must exactly preserve the existing transaction-runner behavior. It must not generate a savepoint identifier, and it must not execute any savepoint control statements. It should prefer reuse/delegation (e.g., composing `PdoTransactionRunner` internally) over duplicating the owned-transaction engine where practical.
 
 ### Active caller-owned transaction
 The runner must execute:
 ```text
+generate the operation savepoint identifier
+
 SAVEPOINT <package-generated unique name>
 
 execute callback
@@ -131,7 +142,7 @@ maatify_persistence_sp_<32 lowercase hexadecimal characters>
 The suffix represents 16 cryptographically random bytes encoded using lowercase hexadecimal.
 
 Contract requirements:
-- generated for every savepoint-aware invocation
+- **Generation timing:** Only generated if a PDO transaction is already active.
 - no caller input
 - no business/domain-derived input
 - ASCII only
@@ -238,14 +249,15 @@ Expected SemVer impact: Minor version bump (e.g., `1.4.0`).
 - Testability
 - MySQL verification design
 - Compatibility
+- Same-connection enforcement semantics
 
 **Out of scope:**
+- Cross-connection atomicity (explicitly out of scope)
 - Eligibility implementation
 - Host framework integration
 - DI/container bindings
 - ORM support
 - Distributed transactions
-- Cross-connection atomicity
 - Automatic transaction retries
 - Domain-specific transaction policies
 - Changing existing Ordering/Pagination contracts
@@ -262,6 +274,7 @@ Each WU must be independently reviewable and later squash-merged into the Draft 
 The test matrix must cover:
 - No outer transaction / success
 - No outer transaction / failure
+- **Explicit coverage proving the no-active-transaction path does not use savepoint orchestration (no name generated, no SQL issued).**
 - Successful outer transaction participation
 - Operation failure inside outer transaction
 - Rollback-to-savepoint data restoration
@@ -283,14 +296,15 @@ The test matrix must cover:
 - Host commit after isolated failed operation
 - Regression coverage proving `PdoTransactionRunner` semantics did not change
 - Actual MySQL integration behavior, not mocks only
-- **successful callback + normal RELEASE failure**
-- **best-effort rollback after that RELEASE failure**
-- **original RELEASE Throwable preservation when cleanup also fails**
-- **exact savepoint-name format validation**
-- **repeated/generated-name collision-safety coverage**
-- **non-throwing PDO control-statement failure classification**
-- **callback improperly commits or fully rolls back the caller-owned transaction**
-- **exact precedence when the callback throws after altering transaction state**
+- successful callback + normal RELEASE failure
+- best-effort rollback after that RELEASE failure
+- original RELEASE Throwable preservation when cleanup also fails
+- exact savepoint-name format validation
+- repeated/generated-name collision-safety coverage
+- non-throwing PDO control-statement failure classification
+- callback improperly commits or fully rolls back the caller-owned transaction
+- exact precedence when the callback throws after altering transaction state
+- **Same connection requirement validation.**
 
 ## 15. Verification Plan
 
@@ -313,9 +327,9 @@ Real MySQL verification is mandatory. SQLite is not an acceptable substitute.
 ## 16. Documentation Impact
 
 Documentation Sweep targets explicitly include:
-- `docs/adr/0003-transaction-savepoint-orchestration.md`
+- `docs/adr/0003-transaction-savepoint-orchestration.md` (must record connection-local boundary rules)
 - `docs/adr/README.md`
-- `PERSISTENCE_PACKAGE_REFERENCE.md` (to document the new savepoint capabilities and `TransactionExecutionException`)
+- `PERSISTENCE_PACKAGE_REFERENCE.md` (to document the new savepoint capabilities, `TransactionExecutionException`, and connection boundaries)
 - `README.md` (to mention savepoint capability)
 - `CHANGELOG.md`
 - `CONTRIBUTING.md` (if transaction rules are mentioned)
@@ -328,7 +342,7 @@ Ecosystem standards-governance follow-up will be required to make `maatify/persi
 - No semantic drift in existing `PdoTransactionRunner`.
 - Generic savepoint capability implemented.
 - Outer transaction ownership rigorously preserved.
-- **Operation-local rollback behavior verified by unit/regression coverage and real MySQL integration tests.**
+- Operation-local rollback behavior verified by unit/regression coverage and real MySQL integration tests.
 - Exact original `Throwable` preservation proven.
 - Exact callback result preservation proven.
 - Repeated/nested behavior proven.
