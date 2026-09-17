@@ -184,7 +184,7 @@ final class PdoSavepointTransactionRunnerTest extends TestCase
         $failure = new RuntimeException('callback failure.');
         $pdo = new SavepointTransactionPdo(
             transactionActive: true,
-            execResults: [0, false, 0],
+            execResults: [0, false],
         );
 
         $thrown = $this->catchThrowable(
@@ -196,7 +196,8 @@ final class PdoSavepointTransactionRunnerTest extends TestCase
         );
 
         self::assertSame($failure, $thrown);
-        self::assertCount(3, $pdo->executedStatements);
+        self::assertCount(2, $pdo->executedStatements);
+        self::assertStringStartsWith('ROLLBACK TO SAVEPOINT ', $pdo->executedStatements[1]);
         self::assertTrue($pdo->inTransaction());
     }
 
@@ -281,7 +282,33 @@ final class PdoSavepointTransactionRunnerTest extends TestCase
         self::assertTrue($pdo->inTransaction());
     }
 
-    public function testCallbackEndingOuterTransactionDoesNotCauseRunnerToCommitOrRollBackIt(): void
+    public function testCallbackCommittingOuterTransactionDoesNotCauseAdditionalFullCommitOrRollback(): void
+    {
+        $releaseFailure = new PDOException('outer transaction ended after commit.');
+        $pdo = new SavepointTransactionPdo(
+            transactionActive: true,
+            execResults: [0, $releaseFailure],
+        );
+
+        $thrown = $this->catchThrowable(
+            fn () => (new PdoSavepointTransactionRunner($pdo))->run(
+                static function () use ($pdo): string {
+                    $pdo->commit();
+
+                    return 'callback result';
+                },
+            ),
+        );
+
+        self::assertSame($releaseFailure, $thrown);
+        self::assertSame(1, $pdo->commitCalls);
+        self::assertSame(0, $pdo->rollBackCalls);
+        self::assertFalse($pdo->inTransaction());
+        self::assertCount(2, $pdo->executedStatements);
+        self::assertStringStartsWith('RELEASE SAVEPOINT ', $pdo->executedStatements[1]);
+    }
+
+    public function testCallbackFullyRollingBackOuterTransactionDoesNotCauseAdditionalFullCommitOrRollback(): void
     {
         $releaseFailure = new PDOException('outer transaction ended.');
         $pdo = new SavepointTransactionPdo(
@@ -304,6 +331,33 @@ final class PdoSavepointTransactionRunnerTest extends TestCase
         self::assertSame(1, $pdo->rollBackCalls);
         self::assertFalse($pdo->inTransaction());
         self::assertCount(2, $pdo->executedStatements);
+        self::assertStringStartsWith('RELEASE SAVEPOINT ', $pdo->executedStatements[1]);
+    }
+
+    public function testCallbackEndingOuterTransactionThenThrowingPreservesExactThrowableWithoutCleanup(): void
+    {
+        $failure = new RuntimeException('callback failure after ending transaction.');
+        $cleanupFailure = new PDOException('cleanup must not run.');
+        $pdo = new SavepointTransactionPdo(
+            transactionActive: true,
+            execResults: [0, $cleanupFailure],
+        );
+
+        $thrown = $this->catchThrowable(
+            fn () => (new PdoSavepointTransactionRunner($pdo))->run(
+                static function () use ($pdo, $failure): never {
+                    $pdo->rollBack();
+
+                    throw $failure;
+                },
+            ),
+        );
+
+        self::assertSame($failure, $thrown);
+        self::assertSame(0, $pdo->commitCalls);
+        self::assertSame(1, $pdo->rollBackCalls);
+        self::assertFalse($pdo->inTransaction());
+        self::assertCount(1, $pdo->executedStatements);
     }
 
     public function testRepeatedAndNestedSuccessfulInvocationsUseDistinctSavepoints(): void

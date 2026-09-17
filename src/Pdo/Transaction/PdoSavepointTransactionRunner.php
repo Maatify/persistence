@@ -76,7 +76,10 @@ final readonly class PdoSavepointTransactionRunner implements SavepointTransacti
             return;
         }
 
-        $this->tryControlStatement('ROLLBACK TO SAVEPOINT ' . $savepointName);
+        if (!$this->tryControlStatement('ROLLBACK TO SAVEPOINT ' . $savepointName)) {
+            return;
+        }
+
         $this->tryControlStatement('RELEASE SAVEPOINT ' . $savepointName);
     }
 
