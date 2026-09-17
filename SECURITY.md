@@ -16,7 +16,7 @@ Security fixes are provided in the latest stable release within the supported `1
 
 ## Reporting a Vulnerability
 
-Please report vulnerabilities privately by emailing [support@maatify.com](mailto:support@maatify.com).
+Please report vulnerabilities privately by emailing [support@maatify.dev](mailto:support@maatify.dev).
 
 Do **not** publish exploitable details in a public issue or pull request.
 
@@ -56,7 +56,7 @@ The following areas are explicitly out of scope for this package's security poli
 
 ## Disclosure Policy
 
-Once a security vulnerability is reported via `support@maatify.com`, the Maatify team will:
+Once a security vulnerability is reported via `support@maatify.dev`, the Maatify team will:
 1. Acknowledge receipt of the vulnerability report.
 2. Review and investigate the report to determine impact and scope.
 3. Keep the reporter updated on the status of the investigation.

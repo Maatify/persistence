@@ -34,6 +34,7 @@
 
 * **Global and Scoped Ordering**: Easily manage display order across an entire table or within a specific scope.
 * **Composable PDO Transactions**: Owns a transaction when needed and participates in an existing transaction without changing its ownership.
+* **Operation-Local Savepoint Orchestration**: Creates operation-local rollback boundaries within caller-owned transactions, allowing individual operations to roll back without fully terminating the outer transaction.
 * **SQL Identifier Validation**: Ensures table and column configurations are safe and properly quoted.
 * **Soft-Delete Filtering**: Optional support for ignoring soft-deleted rows in ordering calculations.
 * **Scope Isolation**: Ensures only the affected range within the configured scope is updated.
@@ -118,15 +119,21 @@ consumer service can depend on the shared transaction abstraction without
 knowing about PDO. The package provides two intentional, public, and supported
 PDO implementations. Neither is deprecated, and neither replaces the other:
 
-**`PdoTransactionRunner`**
-Provides transaction ownership or participation without operation-local savepoint isolation.
-* When no transaction is active, it owns `begin`, `commit`, and full `rollback`.
-* When a caller-owned transaction already exists, it participates without `begin`, `commit`, or full `rollback`.
+### `PdoTransactionRunner`
+* owns begin/commit/rollback when no transaction is active
+* participates in an existing caller-owned transaction without begin/commit/full rollback
+* intended when operation-local savepoint isolation is not required
 
-**`PdoSavepointTransactionRunner`**
-Provides operation-local savepoint boundaries.
-* When no transaction is active, it preserves the exact owned-transaction behavior described above.
-* When a caller-owned transaction exists, it creates operation-local savepoint isolation. If an error occurs, rolling back to the savepoint never means a full rollback of the caller-owned transaction. The runner does not commit or fully roll back the caller-owned transaction, and the outer transaction remains active.
+### `PdoSavepointTransactionRunner`
+* preserves normal owned-transaction behavior when no transaction is active
+* when an outer transaction is active, creates an operation-local savepoint
+* on callback failure, attempts best-effort rollback to the operation savepoint without fully rolling back the caller-owned outer transaction
+* never commits or fully rolls back the caller-owned outer transaction
+* outer transaction remains caller-owned
+* same PDO connection is required
+* intended when operation-local rollback isolation is required
+
+For the detailed behavioral contract and runner selection guidance, see the [PDO Transaction Architecture](docs/architecture/PDO_TRANSACTION_ARCHITECTURE.md).
 
 ### PDO Pagination
 
@@ -243,6 +250,15 @@ for that condition.
 * Participates in an existing transaction without changing its ownership.
 * Preserves the callback return value.
 * Rethrows the original callback `Throwable` after attempting to roll back an owned transaction.
+
+**`PdoSavepointTransactionRunner`:**
+* no-active-transaction path uses normal owned transaction behavior
+* active outer transaction uses an operation-local savepoint
+* after a successful callback, the runner releases the operation savepoint; the callback result is returned only when completion succeeds
+* after a callback failure, the runner attempts best-effort rollback to the operation savepoint while preserving caller ownership of the outer transaction
+* cleanup failures never replace the original callback `Throwable`
+* the runner never commits or fully rolls back the caller-owned outer transaction
+* same PDO connection requirement
 
 **`rowExistsInScope()`:**
 * Returns `false` for `id <= 0`.

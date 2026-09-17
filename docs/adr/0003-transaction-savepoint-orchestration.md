@@ -2,9 +2,9 @@
 
 - **Status:** Accepted
 - **Decision date:** 2026-09-17
-- **Runtime status:** Implemented, pending release
+- **Runtime status:** Implemented for v1.4.0
 - **Implementation authorization:** Implemented
-- **Related contract:** [Transaction Savepoint Orchestration Blueprint](../blueprints/TRANSACTION_SAVEPOINT_ORCHESTRATION_BLUEPRINT.md)
+- **Related contract:** [PDO Transaction Architecture](../architecture/PDO_TRANSACTION_ARCHITECTURE.md)
 
 ## Context
 The existing `PdoTransactionRunner` works well for single, global transactions. However, complex orchestration requires operation-local transactional boundaries (savepoints) that do not terminate the outer transaction.
