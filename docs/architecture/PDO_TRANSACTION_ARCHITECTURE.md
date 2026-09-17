@@ -73,9 +73,25 @@ If an outer transaction is active, the runner establishes an operation-local bou
 
 - **Naming contract:** `maatify_persistence_sp_<32 lowercase hexadecimal characters>`.
 - **Nesting:** Nested and repeated savepoints are fully supported and safely scoped.
-- **Callback return-value preservation:** The callback's result is always preserved and returned.
-- **Exact Throwable precedence:** If a cleanup failure (like `RELEASE SAVEPOINT`) occurs after a callback throws, the callback's original `Throwable` takes precedence and is propagated.
-- **Cleanup failure behavior:** Package-detected non-throwing PDO control failures (e.g., PDO returning `false` instead of throwing an exception during savepoint control) will throw a `TransactionExecutionException`.
+- **Callback return-value preservation:** The callback's result is returned unchanged only when the transaction/savepoint completion path succeeds. If the callback succeeds but `RELEASE SAVEPOINT` fails, the callback result is not returned; the original release failure is propagated.
+- **Failure Precedence:** The exact behavior is dependent on where the failure occurs:
+  - **Savepoint creation / generation:**
+    - Savepoint-name generation failure occurs before callback execution and propagates.
+    - `SAVEPOINT` creation failure prevents callback execution and propagates.
+    - PDO `false` for a primary transaction-control statement is represented by `TransactionExecutionException`.
+  - **Callback failure:**
+    - The exact callback `Throwable` always wins.
+    - If the outer transaction remains active, perform best-effort `ROLLBACK TO SAVEPOINT`.
+    - Only after successful rollback-to, perform best-effort `RELEASE SAVEPOINT`.
+    - Cleanup failures must never replace the callback `Throwable`.
+  - **Successful callback + RELEASE failure:**
+    - Success must not be reported.
+    - The original RELEASE failure remains visible.
+    - If the outer transaction is still active, perform best-effort rollback to the same savepoint.
+    - If rollback-to succeeds, perform best-effort release.
+    - Cleanup failures must never replace the original RELEASE failure.
+    - Never commit or fully roll back the caller-owned outer transaction.
+- **TransactionExecutionException:** Surfaced for package-detected non-throwing primary control-statement failures, but cleanup attempts may intentionally suppress their own failures to preserve the higher-priority callback/release `Throwable`.
 - **Same-PDO requirement:** Savepoint orchestration is strictly connection-local.
 - **MySQL 8.4 verified boundary:** The savepoint behavior is verified strictly against MySQL 8.4 boundaries.
 - **Cross-connection out of scope:** Cross-connection and distributed transactions are explicitly out of scope.

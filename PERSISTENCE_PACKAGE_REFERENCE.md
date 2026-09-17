@@ -123,6 +123,26 @@
 * **Composition Requirement**: Atomic composition requires every participant to
   use the same PDO connection.
 
+### `Maatify\Persistence\Pdo\Transaction\SavepointTransactionRunnerInterface`
+* **Status**: `interface`
+* **Extends**: `TransactionRunnerInterface`
+* **Public Methods**:
+  * Inherits `run(callable $callback): mixed`
+* **Contract**: Provides stronger operation-local savepoint semantics when an outer transaction exists, without altering the inherited signature.
+
+### `Maatify\Persistence\Pdo\Transaction\PdoSavepointTransactionRunner`
+* **Status**: `final readonly class`
+* **Implements**: `SavepointTransactionRunnerInterface`
+* **Constructor**:
+  ```php
+  public function __construct(\PDO $pdo)
+  ```
+* **Transaction Boundary**:
+  * **No active transaction**: Preserves normal owned-transaction behavior.
+  * **Active outer transaction**: Uses an operation-local savepoint. The caller-owned outer transaction is never committed or fully rolled back by the runner.
+* **Composition Requirement**: Same PDO connection is required. Nested and repeated usage is completely supported.
+* **Deprecation status**: Neither this runner nor `PdoTransactionRunner` is deprecated. Neither replaces the other.
+
 ### `Maatify\Persistence\Pdo\Pagination\PageRequest`
 * **Status**: `final readonly class`
 * **Constructor**:
