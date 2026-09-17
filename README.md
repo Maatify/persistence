@@ -127,7 +127,7 @@ PDO implementations. Neither is deprecated, and neither replaces the other:
 ### `PdoSavepointTransactionRunner`
 * preserves normal owned-transaction behavior when no transaction is active
 * when an outer transaction is active, creates an operation-local savepoint
-* rolls back only to that savepoint on callback failure
+* on callback failure, attempts best-effort rollback to the operation savepoint without fully rolling back the caller-owned outer transaction
 * never commits or fully rolls back the caller-owned outer transaction
 * outer transaction remains caller-owned
 * same PDO connection is required
