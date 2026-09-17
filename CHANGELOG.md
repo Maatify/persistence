@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+* Transaction savepoint orchestration capability (`SavepointTransactionRunnerInterface`, `PdoSavepointTransactionRunner`) for safe, operation-local rollback boundaries within caller-owned PDO transactions.
+* `TransactionExecutionException` for package-detected non-throwing failures of transaction control statements.
+
 ## [1.3.0] - 2026-09-10
 
 ### Added

@@ -249,6 +249,12 @@
 * **Implements**: `Maatify\Persistence\Exception\PersistenceException`
 * **Trigger**: Package-owned execution and result-contract failures, including non-throwing `prepare()`, `bindValue()`, or `execute()` failures, invalid count shape or count value, fetch-state failures, invalid mapper result, and invalid `PageResult` invariants. Thrown `PDOException` and mapper `Throwable` instances propagate without wrapping.
 
+### `Maatify\Persistence\Exception\TransactionExecutionException`
+* **Status**: `final class`
+* **Extends**: `Maatify\Exceptions\Exception\System\SystemMaatifyException`
+* **Implements**: `Maatify\Persistence\Exception\PersistenceException`
+* **Trigger**: Package-owned non-throwing execution failures for transaction control statements (e.g., when PDO `exec()` returns `false` instead of throwing an exception during savepoint orchestration).
+
 ## SQL and Trust Boundaries
 
 * **Identifiers**: SQL identifiers (table, columns) are validated configuration, not user input. They cannot be PDO-bound. Supported formats are standard identifier naming rules and `schema.table`.
@@ -269,6 +275,17 @@
   position allocation.
 * `moveWithinScope()` locks the applicable active ordering scope with
   `SELECT ... FOR UPDATE` inside the transaction it owns or joins.
+
+## Transaction Savepoint Orchestration Boundaries
+* **SavepointTransactionRunnerInterface**: Provides operation-local transactional boundaries (savepoints).
+* **PdoSavepointTransactionRunner**: Implements `SavepointTransactionRunnerInterface`.
+* **Outer Transaction Ownership**: If no transaction is active, it falls back to normal transaction behavior (no savepoints). If an outer transaction is active, it creates a savepoint and releases/rolls back to it, leaving the outer transaction active.
+* **Same-connection**: The caller-owned outer transaction and all savepoint mutations must execute on the same PDO connection instance.
+* **Savepoint naming**: The runner generates opaque savepoint names adhering to `maatify_persistence_sp_<32 lowercase hex>`, safe for repeated and nested operations.
+* **Callback preservation**: Callback return values are preserved exactly. The original `Throwable` is always preserved, even if rollback or release cleanup statements fail.
+* **TransactionExecutionException**: Thrown for package-detected non-throwing failures of transaction control statements (e.g. PDO `false` return).
+* **MySQL Verification**: Savepoint operations are verified against MySQL 8.4 boundaries.
+* **Distinction**: `PdoTransactionRunner` (which handles basic transactions and has unchanged semantics) vs `PdoSavepointTransactionRunner` (which handles savepoints).
 
 ## Pagination Boundaries
 * **Normalization**: Strict page and per-page normalization.
@@ -310,6 +327,7 @@ Renaming the marker MAY be reconsidered only as part of a separately approved, m
 | `InvalidPaginationConfigurationException` | `SystemMaatifyException` | `ErrorCodeEnum::MAATIFY_ERROR` | default | Invalid per-page bounds, whitelist errors. |
 | `InvalidPaginationQueryException` | `SystemMaatifyException` | `ErrorCodeEnum::MAATIFY_ERROR` | default | Missing/empty SQL, semicolons, reserved parameters. |
 | `PaginationExecutionException` | `SystemMaatifyException` | `ErrorCodeEnum::MAATIFY_ERROR` | default | Package-owned execution and result-contract failures. |
+| `TransactionExecutionException` | `SystemMaatifyException` | `ErrorCodeEnum::MAATIFY_ERROR` | default | Package-owned non-throwing execution failures for transaction control statements (e.g. savepoint execution). |
 ### `Maatify\Persistence\Exception\PersistenceException`
 * **Status**: `interface`
 * **Extends**: `\Throwable`

@@ -122,6 +122,11 @@ back on failure before rethrowing the original `Throwable`. When a transaction
 is already active, it participates in that transaction and does not begin,
 commit, or roll it back. The caller owns the outer transaction in that case.
 
+If you need operation-local savepoint boundaries within an active caller-owned
+transaction, use the `SavepointTransactionRunnerInterface` and
+`PdoSavepointTransactionRunner`. It creates, releases, or rolls back to a
+uniquely named savepoint without affecting the caller-owned transaction state.
+
 ### PDO Pagination
 
 ```php
@@ -177,6 +182,8 @@ Maatify\Persistence\Pdo\Ordering\ScopedOrderingConfig;
 Maatify\Persistence\Pdo\Ordering\ScopedOrderingManager;
 Maatify\Persistence\Pdo\Transaction\TransactionRunnerInterface;
 Maatify\Persistence\Pdo\Transaction\PdoTransactionRunner;
+Maatify\Persistence\Pdo\Transaction\SavepointTransactionRunnerInterface;
+Maatify\Persistence\Pdo\Transaction\PdoSavepointTransactionRunner;
 
 Maatify\Persistence\Pdo\Pagination\PageRequest;
 Maatify\Persistence\Pdo\Pagination\SortDirectionEnum;
@@ -194,6 +201,7 @@ Maatify\Persistence\Exception\OrderingTransactionException;
 Maatify\Persistence\Exception\InvalidPaginationConfigurationException;
 Maatify\Persistence\Exception\InvalidPaginationQueryException;
 Maatify\Persistence\Exception\PaginationExecutionException;
+Maatify\Persistence\Exception\TransactionExecutionException;
 ```
 
 `OrderingTransactionException` remains public and autoloadable for backward
