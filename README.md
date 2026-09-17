@@ -115,12 +115,18 @@ $transactions->run(function () use ($pdo, $ordering, $config): void {
 
 `TransactionRunnerInterface` exposes only `run(callable $callback)`, so a
 consumer service can depend on the shared transaction abstraction without
-knowing about PDO. `PdoTransactionRunner` is the PDO implementation and
-receives the PDO connection through its constructor. When no transaction is
-active, it starts one, commits on successful callback completion, and rolls
-back on failure before rethrowing the original `Throwable`. When a transaction
-is already active, it participates in that transaction and does not begin,
-commit, or roll it back. The caller owns the outer transaction in that case.
+knowing about PDO. The package provides two intentional, public, and supported
+PDO implementations. Neither is deprecated, and neither replaces the other:
+
+**`PdoTransactionRunner`**
+Provides transaction ownership or participation without operation-local savepoint isolation.
+* When no transaction is active, it owns `begin`, `commit`, and full `rollback`.
+* When a caller-owned transaction already exists, it participates without `begin`, `commit`, or full `rollback`.
+
+**`PdoSavepointTransactionRunner`**
+Provides operation-local savepoint boundaries.
+* When no transaction is active, it preserves the exact owned-transaction behavior described above.
+* When a caller-owned transaction exists, it creates operation-local savepoint isolation. If an error occurs, rolling back to the savepoint never means a full rollback of the caller-owned transaction. The runner does not commit or fully roll back the caller-owned transaction, and the outer transaction remains active.
 
 ### PDO Pagination
 
@@ -177,6 +183,8 @@ Maatify\Persistence\Pdo\Ordering\ScopedOrderingConfig;
 Maatify\Persistence\Pdo\Ordering\ScopedOrderingManager;
 Maatify\Persistence\Pdo\Transaction\TransactionRunnerInterface;
 Maatify\Persistence\Pdo\Transaction\PdoTransactionRunner;
+Maatify\Persistence\Pdo\Transaction\SavepointTransactionRunnerInterface;
+Maatify\Persistence\Pdo\Transaction\PdoSavepointTransactionRunner;
 
 Maatify\Persistence\Pdo\Pagination\PageRequest;
 Maatify\Persistence\Pdo\Pagination\SortDirectionEnum;
@@ -194,6 +202,7 @@ Maatify\Persistence\Exception\OrderingTransactionException;
 Maatify\Persistence\Exception\InvalidPaginationConfigurationException;
 Maatify\Persistence\Exception\InvalidPaginationQueryException;
 Maatify\Persistence\Exception\PaginationExecutionException;
+Maatify\Persistence\Exception\TransactionExecutionException;
 ```
 
 `OrderingTransactionException` remains public and autoloadable for backward
