@@ -120,13 +120,11 @@ PDO implementations. Neither is deprecated, and neither replaces the other:
 
 **`PdoTransactionRunner`**
 Provides transaction ownership or participation without operation-local savepoint isolation.
-* When no transaction is active, it owns `begin`, `commit`, and full `rollback`.
-* When a caller-owned transaction already exists, it participates without `begin`, `commit`, or full `rollback`.
 
 **`PdoSavepointTransactionRunner`**
-Provides operation-local savepoint boundaries.
-* When no transaction is active, it preserves the exact owned-transaction behavior described above.
-* When a caller-owned transaction exists, it creates operation-local savepoint isolation. If an error occurs, rolling back to the savepoint never means a full rollback of the caller-owned transaction. The runner does not commit or fully roll back the caller-owned transaction, and the outer transaction remains active.
+Provides operation-local savepoint boundaries within an existing caller-owned transaction.
+
+For the detailed behavioral contract and runner selection guidance, see the [PDO Transaction Architecture](docs/architecture/PDO_TRANSACTION_ARCHITECTURE.md).
 
 ### PDO Pagination
 

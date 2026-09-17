@@ -277,15 +277,8 @@
   `SELECT ... FOR UPDATE` inside the transaction it owns or joins.
 
 ## Transaction Savepoint Orchestration Boundaries
-* **SavepointTransactionRunnerInterface**: Provides operation-local transactional boundaries (savepoints).
-* **PdoSavepointTransactionRunner**: Implements `SavepointTransactionRunnerInterface`. Both `PdoTransactionRunner` and `PdoSavepointTransactionRunner` are intentional, public, supported choices. Neither is deprecated, and neither replaces the other.
-* **Distinction**: `PdoTransactionRunner` provides transaction ownership/participation without operation-local savepoint isolation (when no transaction exists, it owns begin/commit/full rollback; when a caller-owned transaction exists, it participates without begin/commit/full rollback). `PdoSavepointTransactionRunner` provides operation-local savepoint boundaries.
-* **Outer Transaction Ownership**: If no transaction is active, `PdoSavepointTransactionRunner` preserves the owned-transaction behavior. If an outer transaction is active, it creates operation-local savepoint isolation. Rollback-to-savepoint never means full rollback of the caller-owned transaction. The runner does not commit or fully roll back the caller-owned transaction, and the outer transaction remains active.
-* **Same-connection**: The caller-owned outer transaction and all savepoint mutations must execute on the same PDO connection instance.
-* **Savepoint naming**: The runner generates opaque savepoint names adhering to `maatify_persistence_sp_<32 lowercase hex>`, safe for repeated and nested operations.
-* **Callback preservation**: Callback return values are preserved exactly. The original `Throwable` is always preserved, even if rollback or release cleanup statements fail.
-* **TransactionExecutionException**: Thrown for package-detected non-throwing failures of transaction control statements (e.g. PDO `false` return).
-* **MySQL Verification**: Savepoint operations are verified against MySQL 8.4 boundaries.
+
+For the detailed behavioral contract and runner selection guidance across both composed transactions and savepoint orchestration, see the [PDO Transaction Architecture](docs/architecture/PDO_TRANSACTION_ARCHITECTURE.md).
 
 ## Pagination Boundaries
 * **Normalization**: Strict page and per-page normalization.

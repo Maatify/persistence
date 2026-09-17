@@ -362,7 +362,7 @@ The canonical organization author entry is:
 "authors": [
   {
     "name": "Maatify",
-    "email": "support@maatify.com",
+    "email": "support@maatify.dev",
     "homepage": "https://maatify.dev"
   }
 ]
@@ -1002,7 +1002,7 @@ This template contains no empty fields:
   "authors": [
     {
       "name": "Maatify",
-      "email": "support@maatify.com",
+      "email": "support@maatify.dev",
       "homepage": "https://maatify.dev"
     }
   ],
