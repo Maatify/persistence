@@ -254,12 +254,11 @@ for that condition.
 **`PdoSavepointTransactionRunner`:**
 * no-active-transaction path uses normal owned transaction behavior
 * active outer transaction uses an operation-local savepoint
-* successful operation releases its savepoint
-* failed callback rolls back to its savepoint while preserving the caller-owned outer transaction
-* callback result is returned when completion succeeds
-* original callback Throwable takes precedence over cleanup failures
+* after a successful callback, the runner releases the operation savepoint; the callback result is returned only when completion succeeds
+* after a callback failure, the runner attempts best-effort rollback to the operation savepoint while preserving caller ownership of the outer transaction
+* cleanup failures never replace the original callback `Throwable`
+* the runner never commits or fully rolls back the caller-owned outer transaction
 * same PDO connection requirement
-* no commit/full rollback of caller-owned transaction
 
 **`rowExistsInScope()`:**
 * Returns `false` for `id <= 0`.
