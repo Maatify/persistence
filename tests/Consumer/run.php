@@ -28,7 +28,7 @@ for ($run = 1; $run <= 2; $run++) {
 echo "Consumer Verification Harness passed: two clean Composer consumer and MySQL runs completed.\n";
 
 /**
- * @param non-empty-string $repositoryRoot
+ * @param string $repositoryRoot
  * @param string $runLabel
  */
 function runSingleConsumerVerification(string $repositoryRoot, string $runLabel): void
@@ -332,10 +332,11 @@ function runCommand(array $command, string $workingDirectory): void
         throw new RuntimeException('Unable to start command: ' . implode(' ', $command));
     }
 
-    $stdout = stream_get_contents($pipes[1]);
-    $stderr = stream_get_contents($pipes[2]);
-    fclose($pipes[1]);
-    fclose($pipes[2]);
+    $processPipes = requireProcessPipes($pipes, $process, $command);
+    $stdout = stream_get_contents($processPipes[1]);
+    $stderr = stream_get_contents($processPipes[2]);
+    fclose($processPipes[1]);
+    fclose($processPipes[2]);
     $exitCode = proc_close($process);
 
     if (is_string($stdout) && $stdout !== '') {
@@ -348,6 +349,32 @@ function runCommand(array $command, string $workingDirectory): void
             . (is_string($stderr) && $stderr !== '' ? PHP_EOL . $stderr : ''),
         );
     }
+}
+
+/**
+ * @param mixed $pipes
+ * @param list<string> $command
+ * @return array{1: resource, 2: resource}
+ */
+function requireProcessPipes(mixed $pipes, mixed $process, array $command): array
+{
+    if (! is_array($pipes) || ! isset($pipes[1], $pipes[2])) {
+        if (is_resource($process)) {
+            proc_close($process);
+        }
+        throw new RuntimeException('Command pipes were not opened: ' . implode(' ', $command));
+    }
+
+    $stdoutPipe = $pipes[1];
+    $stderrPipe = $pipes[2];
+    if (! is_resource($stdoutPipe) || ! is_resource($stderrPipe)) {
+        if (is_resource($process)) {
+            proc_close($process);
+        }
+        throw new RuntimeException('Command pipes were not opened: ' . implode(' ', $command));
+    }
+
+    return [1 => $stdoutPipe, 2 => $stderrPipe];
 }
 
 function requireStatement(PDOStatement|false $statement, string $operation): PDOStatement
