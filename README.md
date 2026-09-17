@@ -309,9 +309,10 @@ Other important documentation:
 * [Contributing Guide](CONTRIBUTING.md)
 * [Code of Conduct](CODE_OF_CONDUCT.md)
 * [Architecture Decision Records](docs/adr/README.md)
-* [Package Building Standard](docs/standards/PACKAGE_BUILDING_STANDARD.md)
-* [CI Workflow Standard](docs/standards/CI_WORKFLOW_STANDARD.md)
-* [Library Presentation Standard](docs/standards/LIBRARY_PRESENTATION_STANDARD.md)
+* [Standards Manifest](docs/php-engineering-standards/STANDARDS_MANIFEST.md)
+* [Package Building Standard](docs/php-engineering-standards/standards/packages/PACKAGE_BUILDING_STANDARD.md)
+* [CI Workflow Standard](docs/php-engineering-standards/standards/packages/CI_WORKFLOW_STANDARD.md)
+* [Library Presentation Standard](docs/php-engineering-standards/standards/packages/LIBRARY_PRESENTATION_STANDARD.md)
 
 ## ✅ Quality Status
 
@@ -330,18 +331,32 @@ Other important documentation:
 
 ```bash
 composer validate --strict
+composer dump-autoload --optimize --strict-psr
+composer check-platform-reqs
+composer audit --no-interaction --abandoned=fail
 composer analyse
 composer test:unit
 composer test:regression
+composer test:integration
+composer test:consumer
 vendor/bin/php-cs-fixer fix --dry-run --diff
+git diff --check
 ```
 
-`composer test:integration` and `composer test` require a real MySQL database. SQLite is explicitly **not** an integration substitute.
+`composer test:integration`, `composer test:consumer`, and `composer test` require a real MySQL database. SQLite is explicitly **not** an integration substitute. The Consumer Verification Harness creates a separate Composer root, installs this package as a non-symlinked dependency, and performs two clean runs.
 
 Set the following environment variables for Integration tests:
 * `PERSISTENCE_TEST_MYSQL_DSN`
 * `PERSISTENCE_TEST_MYSQL_USER`
 * `PERSISTENCE_TEST_MYSQL_PASSWORD`
+
+For workflow syntax validation, install actionlint `v1.7.12` with the checksum pinned in `.github/workflows/ci.yml`, then run:
+
+```bash
+actionlint -color
+```
+
+The CI `workflow-lint` job and this local command cover every workflow under `.github/workflows/`.
 
 ## 📄 License
 
