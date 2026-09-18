@@ -19,9 +19,11 @@ The package owns the reusable PDO ordering, transaction, savepoint, and
 pagination behavior, but it does not own a persistent business entity or a
 production table. Consumers provide their own trusted table and column
 identifiers, SQL, scopes, and mapping. The package does not create migrations,
-foreign keys, or joins to Host tables. MySQL/MariaDB-compatible SQL through
-direct PDO is the supported persistence boundary; the package-level schema
-notes are in [schema/README.md](schema/README.md).
+foreign keys, or joins to Host tables. The persistence profile is
+MySQL/MariaDB-compatible SQL through direct PDO. Repository integration and
+Consumer verification run against real MySQL, with MySQL 8.4.10 as the current
+CI baseline; MariaDB is not independently verified by the current CI matrix.
+The package-level schema notes are in [schema/README.md](schema/README.md).
 
 ## Public API Inventory
 
@@ -411,7 +413,7 @@ Renaming the marker MAY be reconsidered only as part of a separately approved, m
   * `PERSISTENCE_TEST_MYSQL_USER`
   * `PERSISTENCE_TEST_MYSQL_PASSWORD`
 * **Test Database Isolation**: Assumes isolated test tables and requires local package privileges (trigger/table cleanup). Tests include trigger failure injection.
-* **Current CI MySQL Baseline**: 8.4.10.
+* **Current CI MySQL Baseline**: MySQL 8.4.10. MariaDB is not independently verified by the current CI matrix.
 * **Consumer Verification Harness**: `composer test:consumer` installs the
   package into a separate non-symlinked Composer root and verifies a public
   ordering, savepoint, and pagination workflow against real MySQL twice from

@@ -1,5 +1,7 @@
--- Consumer-owned fixture table for scoped ordering.
--- NULL scope is an exact scope; it is not a wildcard or fallback.
+-- Test-only, consumer-owned fixture; the integration suite creates and drops it.
+-- Scoped ordering uses display_order within the exact scope_key; no additional
+-- UNIQUE constraint is declared, and NULL scope is exact rather than a wildcard.
+-- No Host foreign keys or joins; soft-deleted rows are excluded by the package.
 CREATE TABLE `maa_persistence_test_scoped_ordering` (
   `id` INT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'Fixture row identity.',
   `scope_key` VARCHAR(191) NULL DEFAULT NULL COMMENT 'Exact consumer-owned scope key.',

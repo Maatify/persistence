@@ -8,7 +8,7 @@
 
 ## قواعد خاصة بالمشروع
 
-- هذه الحزمة مكتبة Composer مستقلة، framework-agnostic وhost-agnostic، وتستخدم PDO المباشر مع MySQL/MariaDB-compatible SQL.
+- هذه الحزمة مكتبة Composer مستقلة، framework-agnostic وhost-agnostic، وتستخدم PDO المباشر مع SQL متوافق مع ملف MySQL/MariaDB. التحقق التشغيلي في هذا المستودع يتم على MySQL الحقيقي فقط، وMariaDB ليست مدخلة تحقق مستقلة في مصفوفة CI الحالية.
 - يجب الحفاظ على عقد v1.4.0 العام، بما في ذلك ملكية المعاملات، ودعم المعاملة الخارجية، ودلالات savepoint المعتمدة؛ لا يُجرى تغيير breaking public API.
 - اختبارات قاعدة البيانات تتطلب MySQL حقيقيًا؛ لا يجوز استخدام SQLite أو mocks لإثبات سلوك persistence الحقيقي.
 - لا يُتتبّع composer.lock، ولا يُضاف حقل Composer باسم version، ولا تُنشأ Tag أو GitHub Release ضمن أعمال هذا المستودع ما لم يصدر تصريح صريح بذلك.

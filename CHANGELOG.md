@@ -7,9 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.4.0] - Stable Release Preparation (planned 2026-09-17)
-
-> **Release state:** Stable Release Preparation. The `v1.4.0` tag and release are not published; publication awaits owner approval.
+## [1.4.0] - 2026-09-18
 
 ### Added
 * Transaction savepoint orchestration capability (`SavepointTransactionRunnerInterface`, `PdoSavepointTransactionRunner`) for safe, operation-local rollback boundaries within caller-owned PDO transactions.
