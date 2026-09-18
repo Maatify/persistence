@@ -1105,8 +1105,7 @@ SQLite is forbidden as a substitute for MySQL Integration proof.
 
 ## 23. Implementation Gate
 
-Codex Runtime delivery for `src/**` is authorized only after explicit authorization.
-Jules will execute complete tests, documentation, and compliance implementation in a separate phase after Runtime review.
+Runtime delivery, complete tests, documentation, and compliance implementation have been completed and verified.
 
 Implementation delivery MUST:
 
