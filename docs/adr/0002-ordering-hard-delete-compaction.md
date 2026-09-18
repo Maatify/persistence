@@ -72,7 +72,7 @@ Rejected because deletion, authorization, relationships, and cascade behavior ar
 
 ### Assigning the capability automatically to `v1.1.0`
 
-Rejected because `v1.1.0` is currently reserved for the approved Pagination scope. This deferred decision does not expand that release.
+Rejected because at the time of this decision, `v1.1.0` was reserved for the approved Pagination scope. This deferred decision does not expand that release.
 
 ### Keeping an implementation contract before the API decision is reviewed
 
