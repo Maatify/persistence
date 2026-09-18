@@ -13,7 +13,9 @@
     "pagination",
     "pdo-pagination",
     "offset-pagination",
+    "pdo-transaction",
     "transaction",
+    "savepoint",
     "php",
     "maatify"
   ],
