@@ -1,5 +1,11 @@
 # Maatify PHP Library Repository Presentation Standard
 
+## Standard Metadata
+
+- **Standard ID:** `std-library-presentation`
+- **Standard Version:** `1.0.1`
+- **Standard Version Format:** `MAJOR.MINOR.PATCH`
+
 ## 1. Normative Language
 
 The key words "MUST", "MUST NOT", "REQUIRED", "SHOULD", "SHOULD NOT", "MAY", and "OPTIONAL" in this document are to be interpreted as described in RFC 2119.
@@ -18,7 +24,7 @@ This Standard is responsible for governing:
 * Release-facing documentation state.
 * Author and ecosystem identity.
 * GitHub description, topics and PR metadata.
-* Final Release Candidate presentation review.
+* SemVer Release Candidate presentation and first Stable release readiness.
 
 It explicitly does **not** govern:
 * Runtime architecture.
@@ -31,8 +37,10 @@ It explicitly does **not** govern:
 
 ### Relationship to other standards:
 * `PACKAGE_BUILDING_STANDARD.md`: Governs library building, code architecture, and the package contract.
-* `COMPOSER_PACKAGE_STANDARD.md`: Governs Composer metadata, dependencies, autoloading, scripts, configuration, stability, and lock-file policy.
+* `COMPOSER_PACKAGE_STANDARD.md`: Governs Composer metadata, dependencies and Composer stability constraints, autoloading, scripts, configuration, and lock-file policy.
 * `CI_WORKFLOW_STANDARD.md`: Governs CI, quality gates, and automated testing.
+
+This Standard owns the release-facing lifecycle and first Stable readiness. Composer stability constraints govern dependency resolution; they do not define release eligibility or publication state.
 
 Each Standard has clear boundaries and must not duplicate the content of another.
 
@@ -78,7 +86,7 @@ The examples in this Standard use canonical placeholders. When applying these te
    * How to install or access it.
 3. The presentation MUST NOT claim features, support, or a quality status that is not proven.
 4. The shared identity MUST NOT erase the functional differences between libraries.
-5. A Release Candidate MUST be visually and documentarily ready before creating a Tag.
+5. A SemVer Release Candidate MUST be presented against its actual pre-release version before its tag and distribution are published.
 6. Copying the README or governance files from another library without replacing all names and links is strictly forbidden.
 7. The GitHub-rendered appearance is the ultimate reference, not just the raw Markdown source.
 8. Presentation changes MUST NOT alter runtime contracts.
@@ -134,11 +142,13 @@ By default, the README header MUST contain:
 Badges MUST be divided into logical groups.
 
 ### 8.1 Package Status
-For a Final Release Candidate of a Composer library published or intended to be published on Packagist, the following MUST be prepared:
+For a Composer library published or intended for Packagist that is preparing publication of a SemVer pre-release, preparing its first Stable release, or has at least one published Stable version, the following badge markup MUST be prepared:
 * Latest Version.
 * PHP Version.
 * License.
 * PHPStan Level Max (as long as it is actually proven in the project).
+
+During first Stable Release Preparation, badge markup is prepared internally. A live `Latest Version` badge MUST NOT be displayed until a Stable version has actually been published. A published pre-release MAY be shown only as an explicitly labeled pre-release according to Section 8.4.
 
 ### 8.2 Documentation
 Clear badges or links MUST be prepared for:
@@ -154,18 +164,13 @@ Where applicable, the following MUST be prepared:
 * Maatify Ecosystem.
 * Install.
 
-### 8.4 Release Candidate Rule
-> Final Release Candidate MUST include the complete release-facing badge set before Tag creation when the package is intended to be published immediately after owner approval.
+### 8.4 SemVer Pre-release Badge Rule
+When Packagist is the selected package registry, badge markup for an intended SemVer pre-release or Stable release MAY be prepared before its tag is created when publication is planned immediately after owner approval. Preparing markup does not create a release or establish that a Release Candidate exists. Live Packagist badges MUST NOT be exposed before the package is actually published and the version name is valid.
 
 This rule applies only when Packagist is the library's selected package registry or when immediate Packagist publication is part of the approved release plan.
 
-It is forbidden to remove:
-* Latest Version.
-* Monthly Downloads.
-* Total Downloads.
-
-simply because the first Tag has not been created yet, provided the task is preparing the Final Release Candidate for direct publication after approval.
-However, it is forbidden to write an incorrect text claim that a version is already published before it happens.
+However, before the package actually exists on Packagist, Packagist Version, PHP, License, and Downloads badges MUST NOT be displayed live, because Shields will render them as `not found` (even though the endpoint returns HTTP 200).
+Before the first Stable Tag, a version badge MUST NOT be labeled `Latest Version` if no Stable release exists. The default Packagist version badge cannot be relied upon to display pre-releases without configuration. Using the `include_prereleases` parameter is optional and only permitted when there is an explicit decision to display a pre-release clearly labeled as such, not as Stable.
 
 ### 8.5 Badge Style
 This standard does not force `style=for-the-badge` on the README.
@@ -187,6 +192,8 @@ Every Badge MUST:
 * Not claim a License different from the actual one.
 
 ## 9. Canonical Composer / Packagist Badge Templates
+
+*Note: The following live templates MUST ONLY be exposed when the conditions described in Section 8.4 are met.*
 
 ### Package Status
 ```markdown
@@ -328,15 +335,43 @@ They are NOT automatically added to:
 * `LICENSE`
 Unless a subsequent decision alters this Standard.
 
-## 14. SECURITY Presentation States
+## 14. First Stable Release Lifecycle and SECURITY Presentation States
 
-There are three defined states for the Security Policy:
+**Publication State Definition:** For this Standard and cross-Standard use, a package/version is Published only when that exact package identity and exact version are externally resolvable and installable by an external consumer through an actual recognized Composer distribution source. Packagist MAY be such a source, but it is not the only possible source. A branch, commit, tag, GitHub Release, Draft PR, successful CI run, local path repository, documentation claim, or Git tag without evidence of external Composer resolution and installation does not by itself establish Published state. This definition clarifies publication state and does not replace or weaken the release lifecycle, exact tagged RC installation, Consumer Verification Harness, two independent Real Host validations, release evidence, or owner release authorization below.
 
-### 14.1 Development State
-When no approved version and no Final Release Candidate exist, the file MAY state that there is currently no supported release line.
+### 14.1 First Stable Release Gate
 
-### 14.2 Final Release Candidate State
-When the library is prepared for direct release upon owner approval, the Security Policy MUST be prepared for the target release format:
+This gate applies only to a package that has never published a Stable release. Its required sequence is:
+
+```text
+Development
+→ SemVer RC
+→ Consumer Verification Harness
+→ Real Host Validation in 2+ independent projects/Hosts
+→ Stable
+```
+
+A SemVer Release Candidate (RC) MUST be an actual SemVer pre-release of the intended Stable version, such as the tag `v1.0.0-rc.1`. It MUST be published and resolvable by an external consumer through the package's approved distribution channel. For a Composer library, consumers MUST be able to resolve and install that exact tagged version through its actual Composer distribution source. A branch, Draft PR, successful CI run, documentation state, local path repository, or unpublished tag MUST NOT be treated as a SemVer RC.
+
+For this first-Stable sequence, the Consumer Verification Harness MUST verify the exact published RC after it becomes externally consumable. The Harness's test semantics remain owned by the [Testing Standard](../testing/TESTING_STANDARD.md). Real Host Validation MUST then use that same RC in at least two independent real projects/Hosts. Reusing one Harness twice or testing multiple environments of one Host does not satisfy the two-Host requirement. Release readiness MUST retain verifiable evidence that identifies the RC version and each Host validation.
+
+CI success and Consumer Verification Harness success alone MUST NOT authorize the first Stable release. Until the published RC, Harness, and both independent Host validations have passed, the package MUST remain Pre-Stable. The two-Host requirement applies only before the first Stable release; it is not retroactive for packages that already have a published Stable release and MUST NOT be repeated as a condition for later patch, minor, or Stable releases.
+
+Tagging, releasing, publishing, and owner approval remain governed by the applicable release controls. This Standard does not authorize those actions.
+
+### 14.2 Development State
+When neither a SemVer RC nor a Stable release has been published, `SECURITY.md` MAY state that there is currently no supported Stable release line. When a SemVer RC has been published, Section 14.3 applies; an RC does not become a Stable release or a supported Stable line.
+
+### 14.3 Published SemVer RC State
+A SemVer RC exists only after its actual pre-release version and tag are published and available to external consumers through the approved distribution channel. `SECURITY.md` MUST describe that version as a pre-release and MUST NOT present the target Stable version as already published. A SemVer RC does not establish a new supported Stable line; existing published Stable support lines remain governed by the actual support policy.
+
+### 14.4 Stable Release Preparation State
+After the SemVer RC, Consumer Verification Harness, and Real Host Validation steps in Section 14.1 have passed, release-facing files MAY be prepared internally for the target Stable version and date while awaiting owner approval and publication. This state MUST be called Stable Release Preparation or release preparation; it MUST NOT be called a Release Candidate. Until the Stable tag is published and the version is available through the approved distribution channel, the files and their PR metadata MUST NOT claim that the Stable version exists, is published, or is already supported. The target Stable support wording MUST be synchronized with the actual policy before publication.
+
+### 14.5 Published Stable State
+After the Stable tag is published and the version is available to consumers through the approved distribution channel, the Security Policy enters the Published Stable State. It MUST be prepared for the actual supported release lines.
+
+For one supported major line, a `SECURITY.md` section MAY use:
 
 ```markdown
 ## Supported Versions
@@ -346,7 +381,8 @@ The actively supported release line is `{SUPPORTED_MAJOR_LINE}`.
 Security fixes are provided in the latest stable release within the supported `{SUPPORTED_MAJOR_LINE}` line. Users should upgrade to the latest available `{SUPPORTED_MAJOR_LINE}` version before reporting a vulnerability.
 ```
 
-A table MAY be used:
+A table MAY be used when it accurately represents the published support policy:
+
 ```markdown
 | Version | Supported |
 |---------|-----------|
@@ -354,16 +390,7 @@ A table MAY be used:
 | Older lines | No |
 ```
 
-The Final Release Candidate presentation sets up the final state before the Tag, provided that:
-* There is a clear release intent.
-* Approval of the polish immediately precedes the release.
-* If the version or date changes before publication, the files MUST be updated before the Tag.
-
-### 14.3 Published Stable State
-
-After the first stable Tag is published, the Security Policy enters the Published Stable State.
-
-In this state, `SECURITY.md` MUST:
+In the Published Stable State, `SECURITY.md` MUST:
 
 - describe only release lines that are currently supported by published stable releases
 - identify every supported major line when more than one major line is actively supported
@@ -371,13 +398,21 @@ In this state, `SECURITY.md` MUST:
 - remove any wording that describes the package as unreleased, pre-release, or awaiting publication
 - remain synchronized with the actual support policy whenever a supported line is added, replaced, or retired
 
-The Supported Versions wording from Section 14.2 MAY remain unchanged after publication when it accurately describes the published stable state.
-
-A future release line MUST NOT be presented as actively supported before its first stable Tag exists, except during the explicitly approved Final Release Candidate transition defined in Section 14.2.
+A future release line MUST NOT be presented as actively supported before its first Stable Tag exists. SemVer RC and Stable Release Preparation states do not establish Stable support.
 
 Publishing a patch or minor release within an already supported major line does not require a Security Policy change unless the file names an exact version, changes the support scope, or otherwise becomes inaccurate.
 
 If support for a release line is withdrawn, `SECURITY.md` MUST be updated as part of the same owner-approved release or governance change that withdraws support.
+
+### 14.6 Major Version Preservation
+
+This rule applies to packages that have published a Stable release; it does not extend the first-Stable release gate in Section 14.1. A Stable package MUST preserve its current Major version whenever the intended change can reasonably be delivered compatibly.
+
+A Major release MUST be used only for a genuine breaking public-contract change that cannot reasonably be contained through an additive API, a deprecation cycle, a compatibility adapter or shim, a migration path, or a staged replacement.
+
+Internal refactors, implementation cleanup, documentation or presentation changes, naming normalization by itself, and compatible additive capabilities MUST NOT justify a Major version bump.
+
+When a breaking public-contract change makes a Major release unavoidable, its compatibility impact and migration path MUST be explicit, reviewed decisions. The Major bump MUST NOT follow automatically from a modernization, refactor, cleanup, or naming change.
 
 ## 15. CHANGELOG Presentation Standard
 
@@ -385,11 +420,12 @@ The CHANGELOG MUST follow these rules:
 * Keep a Changelog format.
 * Semantic Versioning.
 * `[Unreleased]` MUST always be present at the top.
-* The final version and its date MUST be present.
+* Every published release MUST have its exact version and release date.
 * Release links MUST be at the bottom of the file.
 * Do not list features that do not exist.
 * Do not describe future changes as already implemented.
-* A Final Release Candidate MAY carry the final version number and date before the Tag, provided publication will occur immediately after approval.
+* A SemVer RC entry MUST use its exact pre-release version and matching release date/tag, such as `1.0.0-rc.1`.
+* Stable Release Preparation MAY stage the target Stable version and planned date in an internal release PR after the first-Stable gates pass. Before its Stable tag is published, the entry MUST remain clearly a preparation and MUST NOT imply that the Stable release already exists.
 
 ### Template:
 ```markdown
@@ -493,19 +529,15 @@ Topics or descriptions MUST NOT claim features that do not exist.
 
 ## 20. Pull Request Presentation Metadata
 
-Any PR for a Final Release Candidate MUST contain:
-* A Title reflecting the target release.
+Any PR preparing publication of a SemVer RC or Stable Release Preparation MUST contain:
+* A Title identifying the exact RC target or target Stable version and the actual release-preparation state.
 * A Body describing the actual changes.
 * A Scope confirmation.
-* A Release-control statement.
-* Confirmation that no Merge, Tag, or automatic Release is performed.
-* No outdated wording that contradicts the branch state.
+* For a first-Stable Release Preparation PR, verifiable references to the published RC, Consumer Verification Harness, and both independent Host validations.
+* A release-control statement confirming that no Merge, Tag, Release, or distribution publication occurs without owner approval.
+* Accurate wording that distinguishes an unpublished target version, a published SemVer RC, and a published Stable release.
 
-The PR body MUST NOT state:
-`no release exists`
-`date omitted`
-`pre-release state retained`
-if the files inside are formatted as a final release.
+PR metadata MUST NOT describe a prepared target version as already published. If a Stable Release Preparation is pending its Stable tag, the body MUST say that the Stable release is not yet published, identify the actual published RC, and state that Stable publication awaits owner approval. Version and date wording MUST match what is known; an unknown date MUST NOT be represented as a committed release date.
 
 If the PR scope changes, the Title and Body MUST be updated to remain an accurate historical record.
 
@@ -542,8 +574,16 @@ When using another library as a visual reference, the implementer MUST NOT copy:
 
 An explicit search for reference repository names MUST be conducted before submission.
 
-## 23. Final Release Candidate Checklist
+## 23. Release Presentation and First Stable Readiness Checklist
 
+* [ ] The first-Stable gate is applied only when the package has no previously published Stable release.
+* [ ] The SemVer RC is an actual tagged pre-release of the target Stable version and is resolvable by an external consumer through the approved distribution channel.
+* [ ] The Consumer Verification Harness passed against that exact published RC.
+* [ ] Real Host Validation passed against that same RC in at least two independent projects/Hosts, and verifiable evidence for both is retained.
+* [ ] The same Harness was not counted twice, and two environments of one Host were not counted as two projects/Hosts.
+* [ ] Stable Release Preparation is identified as preparation, not as another Release Candidate.
+* [ ] Before the Stable tag and release exist, README, CHANGELOG, SECURITY, badges, and PR metadata do not claim a published or supported Stable version.
+* [ ] The two-Host gate is not imposed on already-Stable packages or later patch, minor, or Stable releases.
 * [ ] README header and Maatify identity are present.
 * [ ] Required badges exist and point to the current package.
 * [ ] Packagist badges are complete when the library uses or is being prepared for immediate publication on Packagist.
@@ -559,7 +599,7 @@ An explicit search for reference repository names MUST be conducted before submi
 * [ ] Author block uses visible `<br>` line breaks.
 * [ ] The canonical PHP-library footer is the final README element.
 * [ ] Composer and GitHub metadata are accurate.
-* [ ] PR title and body match the actual release-candidate state.
+* [ ] PR title and body match the actual published RC or Stable Release Preparation state.
 * [ ] No foreign package names or URLs remain.
 * [ ] No `composer.lock` was introduced when the library does not track it.
 * [ ] CI Gate is successful.

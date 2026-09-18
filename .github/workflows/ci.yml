@@ -2,8 +2,6 @@ name: CI
 
 on:
   pull_request:
-    branches:
-      - main
   push:
     branches:
       - main
@@ -69,6 +67,7 @@ jobs:
             --prefer-dist \
             --no-progress
           composer check-platform-reqs
+          composer dump-autoload --optimize --strict-psr
           composer audit \
             --no-interaction \
             --abandoned=fail
@@ -102,6 +101,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          git diff --check
           git diff --exit-code
 
   unit-regression:
@@ -153,13 +153,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          vendor/bin/phpunit --testsuite unit
-          vendor/bin/phpunit --testsuite regression
+          composer test:unit
+          composer test:regression
 
       - name: Repository integrity
         shell: bash
         run: |
           set -euo pipefail
+          git diff --check
           git diff --exit-code
 
   lowest-dependencies:
@@ -256,11 +257,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          vendor/bin/phpunit --testsuite unit
-          vendor/bin/phpunit --testsuite regression
-          vendor/bin/phpunit --testsuite integration
-          vendor/bin/phpunit --testsuite integration
-          vendor/bin/phpunit
+          composer test:unit
+          composer test:regression
+          composer test:integration
+          composer test:integration
 
       - name: Verify MySQL residue
         if: ${{ always() && !cancelled() && steps.setup-php.outcome == 'success' }}
@@ -287,6 +287,7 @@ jobs:
               'maa_persistence_test_global_ordering',
               'maa_persistence_test_scoped_ordering',
               'maa_persistence_test_pagination_items',
+              'maa_persistence_test_transaction_savepoint_items',
           ];
           $triggers = [
               'maa_persistence_test_fail_global_target_update',
@@ -294,7 +295,7 @@ jobs:
           ];
 
           $tableStatement = $pdo->prepare(
-              'SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = ? AND TABLE_NAME IN (?, ?, ?) ORDER BY TABLE_NAME'
+              'SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = ? AND TABLE_NAME IN (?, ?, ?, ?) ORDER BY TABLE_NAME'
           );
           $tableStatement->execute([$schema, ...$tables]);
           $remainingTables = $tableStatement->fetchAll(PDO::FETCH_COLUMN);
@@ -324,6 +325,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          git diff --check
           git diff --exit-code
 
   integration:
@@ -413,13 +415,18 @@ jobs:
             exit 1
           fi
 
-      - name: Run Integration and full suites
+      - name: Run Consumer Verification Harness
         shell: bash
         run: |
           set -euo pipefail
-          vendor/bin/phpunit --testsuite integration
-          vendor/bin/phpunit --testsuite integration
-          vendor/bin/phpunit
+          composer test:consumer
+
+      - name: Run Integration and repeatability suites
+        shell: bash
+        run: |
+          set -euo pipefail
+          composer test:integration
+          composer test:integration
 
       - name: Verify MySQL residue
         if: ${{ always() && !cancelled() && steps.setup-php.outcome == 'success' }}
@@ -446,6 +453,7 @@ jobs:
               'maa_persistence_test_global_ordering',
               'maa_persistence_test_scoped_ordering',
               'maa_persistence_test_pagination_items',
+              'maa_persistence_test_transaction_savepoint_items',
           ];
           $triggers = [
               'maa_persistence_test_fail_global_target_update',
@@ -453,7 +461,7 @@ jobs:
           ];
 
           $tableStatement = $pdo->prepare(
-              'SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = ? AND TABLE_NAME IN (?, ?, ?) ORDER BY TABLE_NAME'
+              'SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = ? AND TABLE_NAME IN (?, ?, ?, ?) ORDER BY TABLE_NAME'
           );
           $tableStatement->execute([$schema, ...$tables]);
           $remainingTables = $tableStatement->fetchAll(PDO::FETCH_COLUMN);
@@ -483,6 +491,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          git diff --check
           git diff --exit-code
 
   ci-gate:

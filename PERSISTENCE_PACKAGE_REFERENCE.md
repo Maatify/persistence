@@ -13,6 +13,18 @@
 * **Boundaries**: Framework-agnostic and host-agnostic. No HTTP API, no generic application repository, no ORM, no container bindings.
 * **Note**: PDO Pagination was introduced in v1.1.0.
 
+## Persistence and Schema Ownership
+
+The package owns the reusable PDO ordering, transaction, savepoint, and
+pagination behavior, but it does not own a persistent business entity or a
+production table. Consumers provide their own trusted table and column
+identifiers, SQL, scopes, and mapping. The package does not create migrations,
+foreign keys, or joins to Host tables. The persistence profile is
+MySQL/MariaDB-compatible SQL through direct PDO. Repository integration and
+Consumer verification run against real MySQL, with MySQL 8.4.10 as the current
+CI baseline; MariaDB is not independently verified by the current CI matrix.
+The package-level schema notes are in [schema/README.md](schema/README.md).
+
 ## Public API Inventory
 
 ### `Maatify\Persistence\Pdo\Ordering\ScopedOrderingConfig`
@@ -122,6 +134,26 @@
   caller owns an already-active transaction.
 * **Composition Requirement**: Atomic composition requires every participant to
   use the same PDO connection.
+
+### `Maatify\Persistence\Pdo\Transaction\SavepointTransactionRunnerInterface`
+* **Status**: `interface`
+* **Extends**: `TransactionRunnerInterface`
+* **Public Methods**:
+  * Inherits `run(callable $callback): mixed`
+* **Contract**: Provides stronger operation-local savepoint semantics when an outer transaction exists, without altering the inherited signature.
+
+### `Maatify\Persistence\Pdo\Transaction\PdoSavepointTransactionRunner`
+* **Status**: `final readonly class`
+* **Implements**: `SavepointTransactionRunnerInterface`
+* **Constructor**:
+  ```php
+  public function __construct(\PDO $pdo)
+  ```
+* **Transaction Boundary**:
+  * **No active transaction**: Preserves normal owned-transaction behavior.
+  * **Active outer transaction**: Uses an operation-local savepoint. The caller-owned outer transaction is never committed or fully rolled back by the runner.
+* **Composition Requirement**: Same PDO connection is required. Nested and repeated usage is completely supported.
+* **Deprecation status**: Neither this runner nor `PdoTransactionRunner` is deprecated. Neither replaces the other.
 
 ### `Maatify\Persistence\Pdo\Pagination\PageRequest`
 * **Status**: `final readonly class`
@@ -249,6 +281,12 @@
 * **Implements**: `Maatify\Persistence\Exception\PersistenceException`
 * **Trigger**: Package-owned execution and result-contract failures, including non-throwing `prepare()`, `bindValue()`, or `execute()` failures, invalid count shape or count value, fetch-state failures, invalid mapper result, and invalid `PageResult` invariants. Thrown `PDOException` and mapper `Throwable` instances propagate without wrapping.
 
+### `Maatify\Persistence\Exception\TransactionExecutionException`
+* **Status**: `final class`
+* **Extends**: `Maatify\Exceptions\Exception\System\SystemMaatifyException`
+* **Implements**: `Maatify\Persistence\Exception\PersistenceException`
+* **Trigger**: Package-owned non-throwing execution failures for transaction control statements (e.g., when PDO `exec()` returns `false` instead of throwing an exception during savepoint orchestration).
+
 ## SQL and Trust Boundaries
 
 * **Identifiers**: SQL identifiers (table, columns) are validated configuration, not user input. They cannot be PDO-bound. Supported formats are standard identifier naming rules and `schema.table`.
@@ -269,6 +307,10 @@
   position allocation.
 * `moveWithinScope()` locks the applicable active ordering scope with
   `SELECT ... FOR UPDATE` inside the transaction it owns or joins.
+
+## Transaction Savepoint Orchestration Boundaries
+
+For the detailed behavioral contract and runner selection guidance across both composed transactions and savepoint orchestration, see the [PDO Transaction Architecture](docs/architecture/PDO_TRANSACTION_ARCHITECTURE.md).
 
 ## Pagination Boundaries
 * **Normalization**: Strict page and per-page normalization.
@@ -310,6 +352,7 @@ Renaming the marker MAY be reconsidered only as part of a separately approved, m
 | `InvalidPaginationConfigurationException` | `SystemMaatifyException` | `ErrorCodeEnum::MAATIFY_ERROR` | default | Invalid per-page bounds, whitelist errors. |
 | `InvalidPaginationQueryException` | `SystemMaatifyException` | `ErrorCodeEnum::MAATIFY_ERROR` | default | Missing/empty SQL, semicolons, reserved parameters. |
 | `PaginationExecutionException` | `SystemMaatifyException` | `ErrorCodeEnum::MAATIFY_ERROR` | default | Package-owned execution and result-contract failures. |
+| `TransactionExecutionException` | `SystemMaatifyException` | `ErrorCodeEnum::MAATIFY_ERROR` | default | Package-owned non-throwing execution failures for transaction control statements (e.g. savepoint execution). |
 ### `Maatify\Persistence\Exception\PersistenceException`
 * **Status**: `interface`
 * **Extends**: `\Throwable`
@@ -370,7 +413,11 @@ Renaming the marker MAY be reconsidered only as part of a separately approved, m
   * `PERSISTENCE_TEST_MYSQL_USER`
   * `PERSISTENCE_TEST_MYSQL_PASSWORD`
 * **Test Database Isolation**: Assumes isolated test tables and requires local package privileges (trigger/table cleanup). Tests include trigger failure injection.
-* **Current CI MySQL Baseline**: 8.4.10.
+* **Current CI MySQL Baseline**: MySQL 8.4.10. MariaDB is not independently verified by the current CI matrix.
+* **Consumer Verification Harness**: `composer test:consumer` installs the
+  package into a separate non-symlinked Composer root and verifies a public
+  ordering, savepoint, and pagination workflow against real MySQL twice from
+  clean consumer/database state.
 
 ## Verification Model
 

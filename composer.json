@@ -23,7 +23,7 @@
   "authors": [
     {
       "name": "Maatify",
-      "email": "support@maatify.com",
+      "email": "support@maatify.dev",
       "homepage": "https://maatify.dev"
     }
   ],
@@ -57,7 +57,8 @@
     "test": "phpunit",
     "test:unit": "phpunit --testsuite unit",
     "test:regression": "phpunit --testsuite regression",
-    "test:integration": "phpunit --testsuite integration"
+    "test:integration": "phpunit --testsuite integration",
+    "test:consumer": "php tests/Consumer/run.php"
   },
   "config": {
     "optimize-autoloader": true,

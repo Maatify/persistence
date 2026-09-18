@@ -30,7 +30,7 @@ Contributions should respect the current directory structure:
 
 * `src/`: Contains the production source code.
 * `tests/`: Contains the test suites (`unit`, `regression`, and `integration`).
-* `docs/`: Contains internal documentation and standards.
+* `docs/`: Contains internal documentation, architecture decisions, and the pinned engineering standards.
 
 ## Local Verification
 
@@ -39,11 +39,23 @@ Before submitting a Pull Request, please ensure all local verification steps pas
 ```bash
 composer install
 composer validate --strict
+composer dump-autoload --optimize --strict-psr
+composer check-platform-reqs
+composer audit --no-interaction --abandoned=fail
 composer analyse
 composer test:unit
 composer test:regression
+composer test:integration
+composer test:consumer
 vendor/bin/php-cs-fixer fix --dry-run --diff
+git diff --check
 ```
+
+The commands above are the local parity sequence for the CI quality and test
+gates. `composer test:integration` and `composer test:consumer` require the
+real MySQL service configured below. The consumer harness must be run from the
+package root; it creates and removes its own clean consumer root and test
+table twice.
 
 ### Integration Testing
 
@@ -69,6 +81,13 @@ Or to run the full test suite:
 composer test
 ```
 
+Workflow syntax is verified locally with actionlint `v1.7.12`, using the
+checksum pinned in `.github/workflows/ci.yml`:
+
+```bash
+actionlint -color
+```
+
 ## Architectural Contribution Rules
 
 When contributing code, you must adhere to the following architectural rules:
@@ -80,12 +99,12 @@ When contributing code, you must adhere to the following architectural rules:
 * **No Generic Repository Abstraction**: Keep the logic specific to the current goals (e.g., PDO ordering utilities).
 * **SQL Identifiers**: Table and column names must remain trusted configurations, not raw user input.
 * **Prepared Statements**: All runtime values must be bound using prepared statements.
-* **Transaction Ownership**: `moveWithinScope()` owns a transaction only when no transaction is active and participates in an active caller-owned transaction without committing or rolling it back. Composed operations must use the same PDO connection.
+* **Transaction Ownership**: `moveWithinScope()` owns a transaction only when no transaction is active and participates in an active caller-owned transaction without committing or rolling it back. Composed operations and savepoint orchestrations must use the same PDO connection.
 * **Scope Isolation**: Do not break scope isolation; rows outside the affected range must not be moved.
 * **No Global Normalization**: Do not perform global normalization of gaps as a side effect of a scoped operation.
 * **Rollback Behavior**: Rollbacks must preserve the original error/exception.
 * **Exception Handling**: Do not catch every `\PDOException` or external `\Throwable` randomly to wrap it in a package exception. `PersistenceException` is strictly for package-defined exceptions.
-* **Composer Lock**: This reusable library does not track `composer.lock`, in accordance with the [Composer Package Standard](docs/standards/COMPOSER_PACKAGE_STANDARD.md). Remove any locally generated `composer.lock` before submitting changes.
+* **Composer Lock**: This reusable library does not track `composer.lock`, in accordance with the [Composer Package Standard](docs/php-engineering-standards/standards/packages/COMPOSER_PACKAGE_STANDARD.md). Remove any locally generated `composer.lock` before submitting changes.
 
 ## Pull Request Rules
 

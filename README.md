@@ -34,6 +34,7 @@
 
 * **Global and Scoped Ordering**: Easily manage display order across an entire table or within a specific scope.
 * **Composable PDO Transactions**: Owns a transaction when needed and participates in an existing transaction without changing its ownership.
+* **Operation-Local Savepoint Orchestration**: Creates operation-local rollback boundaries within caller-owned transactions, allowing individual operations to roll back without fully terminating the outer transaction.
 * **SQL Identifier Validation**: Ensures table and column configurations are safe and properly quoted.
 * **Soft-Delete Filtering**: Optional support for ignoring soft-deleted rows in ordering calculations.
 * **Scope Isolation**: Ensures only the affected range within the configured scope is updated.
@@ -115,12 +116,24 @@ $transactions->run(function () use ($pdo, $ordering, $config): void {
 
 `TransactionRunnerInterface` exposes only `run(callable $callback)`, so a
 consumer service can depend on the shared transaction abstraction without
-knowing about PDO. `PdoTransactionRunner` is the PDO implementation and
-receives the PDO connection through its constructor. When no transaction is
-active, it starts one, commits on successful callback completion, and rolls
-back on failure before rethrowing the original `Throwable`. When a transaction
-is already active, it participates in that transaction and does not begin,
-commit, or roll it back. The caller owns the outer transaction in that case.
+knowing about PDO. The package provides two intentional, public, and supported
+PDO implementations. Neither is deprecated, and neither replaces the other:
+
+### `PdoTransactionRunner`
+* owns begin/commit/rollback when no transaction is active
+* participates in an existing caller-owned transaction without begin/commit/full rollback
+* intended when operation-local savepoint isolation is not required
+
+### `PdoSavepointTransactionRunner`
+* preserves normal owned-transaction behavior when no transaction is active
+* when an outer transaction is active, creates an operation-local savepoint
+* on callback failure, attempts best-effort rollback to the operation savepoint without fully rolling back the caller-owned outer transaction
+* never commits or fully rolls back the caller-owned outer transaction
+* outer transaction remains caller-owned
+* same PDO connection is required
+* intended when operation-local rollback isolation is required
+
+For the detailed behavioral contract and runner selection guidance, see the [PDO Transaction Architecture](docs/architecture/PDO_TRANSACTION_ARCHITECTURE.md).
 
 ### PDO Pagination
 
@@ -177,6 +190,8 @@ Maatify\Persistence\Pdo\Ordering\ScopedOrderingConfig;
 Maatify\Persistence\Pdo\Ordering\ScopedOrderingManager;
 Maatify\Persistence\Pdo\Transaction\TransactionRunnerInterface;
 Maatify\Persistence\Pdo\Transaction\PdoTransactionRunner;
+Maatify\Persistence\Pdo\Transaction\SavepointTransactionRunnerInterface;
+Maatify\Persistence\Pdo\Transaction\PdoSavepointTransactionRunner;
 
 Maatify\Persistence\Pdo\Pagination\PageRequest;
 Maatify\Persistence\Pdo\Pagination\SortDirectionEnum;
@@ -194,6 +209,7 @@ Maatify\Persistence\Exception\OrderingTransactionException;
 Maatify\Persistence\Exception\InvalidPaginationConfigurationException;
 Maatify\Persistence\Exception\InvalidPaginationQueryException;
 Maatify\Persistence\Exception\PaginationExecutionException;
+Maatify\Persistence\Exception\TransactionExecutionException;
 ```
 
 `OrderingTransactionException` remains public and autoloadable for backward
@@ -234,6 +250,15 @@ for that condition.
 * Participates in an existing transaction without changing its ownership.
 * Preserves the callback return value.
 * Rethrows the original callback `Throwable` after attempting to roll back an owned transaction.
+
+**`PdoSavepointTransactionRunner`:**
+* no-active-transaction path uses normal owned transaction behavior
+* active outer transaction uses an operation-local savepoint
+* after a successful callback, the runner releases the operation savepoint; the callback result is returned only when completion succeeds
+* after a callback failure, the runner attempts best-effort rollback to the operation savepoint while preserving caller ownership of the outer transaction
+* cleanup failures never replace the original callback `Throwable`
+* the runner never commits or fully rolls back the caller-owned outer transaction
+* same PDO connection requirement
 
 **`rowExistsInScope()`:**
 * Returns `false` for `id <= 0`.
@@ -284,9 +309,10 @@ Other important documentation:
 * [Contributing Guide](CONTRIBUTING.md)
 * [Code of Conduct](CODE_OF_CONDUCT.md)
 * [Architecture Decision Records](docs/adr/README.md)
-* [Package Building Standard](docs/standards/PACKAGE_BUILDING_STANDARD.md)
-* [CI Workflow Standard](docs/standards/CI_WORKFLOW_STANDARD.md)
-* [Library Presentation Standard](docs/standards/LIBRARY_PRESENTATION_STANDARD.md)
+* [Standards Manifest](docs/php-engineering-standards/STANDARDS_MANIFEST.md)
+* [Package Building Standard](docs/php-engineering-standards/standards/packages/PACKAGE_BUILDING_STANDARD.md)
+* [CI Workflow Standard](docs/php-engineering-standards/standards/packages/CI_WORKFLOW_STANDARD.md)
+* [Library Presentation Standard](docs/php-engineering-standards/standards/packages/LIBRARY_PRESENTATION_STANDARD.md)
 
 ## ✅ Quality Status
 
@@ -305,18 +331,32 @@ Other important documentation:
 
 ```bash
 composer validate --strict
+composer dump-autoload --optimize --strict-psr
+composer check-platform-reqs
+composer audit --no-interaction --abandoned=fail
 composer analyse
 composer test:unit
 composer test:regression
+composer test:integration
+composer test:consumer
 vendor/bin/php-cs-fixer fix --dry-run --diff
+git diff --check
 ```
 
-`composer test:integration` and `composer test` require a real MySQL database. SQLite is explicitly **not** an integration substitute.
+`composer test:integration`, `composer test:consumer`, and `composer test` require a real MySQL database. SQLite is explicitly **not** an integration substitute. The Consumer Verification Harness creates a separate Composer root, installs this package as a non-symlinked dependency, and performs two clean runs.
 
 Set the following environment variables for Integration tests:
 * `PERSISTENCE_TEST_MYSQL_DSN`
 * `PERSISTENCE_TEST_MYSQL_USER`
 * `PERSISTENCE_TEST_MYSQL_PASSWORD`
+
+For workflow syntax validation, install actionlint `v1.7.12` with the checksum pinned in `.github/workflows/ci.yml`, then run:
+
+```bash
+actionlint -color
+```
+
+The CI `workflow-lint` job and this local command cover every workflow under `.github/workflows/`.
 
 ## 📄 License
 
