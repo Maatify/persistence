@@ -1,4 +1,5 @@
--- Consumer-owned fixture table for global ordering.
+-- Test-only, consumer-owned fixture; the integration suite creates and drops it.
+-- Global ordering uses display_order; no additional UNIQUE constraint is declared.
 -- No Host foreign keys or joins; soft-deleted rows are excluded by the package.
 CREATE TABLE `maa_persistence_test_global_ordering` (
   `id` INT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'Fixture row identity.',

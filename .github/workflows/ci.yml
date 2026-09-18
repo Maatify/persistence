@@ -2,9 +2,6 @@ name: CI
 
 on:
   pull_request:
-    branches:
-      - main
-      - codex/transaction-savepoint-orchestration-draft
   push:
     branches:
       - main

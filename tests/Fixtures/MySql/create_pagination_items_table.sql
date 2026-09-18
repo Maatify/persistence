@@ -1,5 +1,7 @@
--- Consumer-owned fixture table for pagination.
--- Host identity is supplied as tenant_id; this fixture adds no Host FK.
+-- Test-only, consumer-owned fixture; the integration suite creates and drops it.
+-- Pagination filters deleted_at and sorts through whitelisted fields with id as
+-- the deterministic tie-breaker; no additional UNIQUE constraint is declared.
+-- Host identity is supplied as tenant_id; this fixture adds no Host FK or JOIN.
 CREATE TABLE `maa_persistence_test_pagination_items` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'Fixture row identity.',
   `tenant_id` INT UNSIGNED NOT NULL COMMENT 'Host-provided tenant identity; no FK.',

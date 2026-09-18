@@ -4,4 +4,4 @@
 
 توجد مخططات MySQL المعزولة الخاصة باختبارات المستودع تحت [tests/Fixtures/MySql/](../tests/Fixtures/MySql/)، كما ينشئ Consumer Verification Harness جدوله المعزول مؤقتًا داخل قاعدة الاختبار ثم يحذفه. هذه الملفات ليست جداول Host ولا تعتمد على أي schema خارجي.
 
-الحد التعاقدي لقاعدة البيانات هو MySQL/MariaDB-compatible SQL عبر PDO المباشر. لا تستخدم الحزمة ORM أو query builder خارجيًا، ولا تنشئ جداول عامة مثل logs أو event_logs، ولا تضيف مفاتيح خارجية أو JOINs إلى جداول Host.
+الحد التعاقدي لقاعدة البيانات هو SQL متوافق مع ملف MySQL/MariaDB عبر PDO المباشر. التحقق الفعلي لهذه الحزمة واختبارات Consumer يتم على MySQL، وخط CI الحالي يستخدم MySQL 8.4.10؛ لم تُتحقق MariaDB بصورة مستقلة ضمن مصفوفة CI الحالية. لا تستخدم الحزمة ORM أو query builder خارجيًا، ولا تنشئ جداول عامة مثل logs أو event_logs، ولا تضيف مفاتيح خارجية أو JOINs إلى جداول Host.
