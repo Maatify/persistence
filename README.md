@@ -220,9 +220,11 @@ for that condition.
 ## ⚠️ Critical Runtime Behavior
 
 **`getNextPosition()`:**
-* Does not start a transaction.
-* Does not lock the applicable scope.
-* For concurrent inserts, the host application must provide the transaction and locking mechanism required to serialize position allocation.
+* Never starts, commits, or rolls back a transaction.
+* Outside an active PDO transaction, performs a plain read and takes no lock.
+* Inside an active caller-owned PDO transaction, performs a locking read (`SELECT ... FOR UPDATE`) of the last active row in the applicable scope. This returns the latest committed maximum instead of the transaction's `REPEATABLE READ` snapshot, and the lock is held until the caller commits or rolls back.
+* Guarantee: the position reflects the latest committed state, and on a non-empty scope callers that also use locking reads (`getNextPosition()` inside a transaction, `moveWithinScope()`) are serialized on the scope's last active row.
+* Limits: an empty scope has no row to lock, so the host application must still serialize the first insert (for example by locking a parent row or relying on a `UNIQUE` constraint). The lock footprint depends on the access plan: with an index usable for `(scope, order)` the scan stops at the last active row but also locks every soft-deleted row above it; without one, every table row is scanned and locked. Under `REPEATABLE READ` the lock also covers the gap above the last scanned row, which can belong to another scope; under `READ COMMITTED` no gap lock is taken. Writers that do not use locking reads are not serialized.
 
 **`moveWithinScope()`:**
 * Rejects inconsistent scope usage.

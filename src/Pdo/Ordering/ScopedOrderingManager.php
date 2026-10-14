@@ -23,7 +23,8 @@ use Throwable;
  * - It participates in an active caller-owned PDO transaction.
  *
  * Ordering model:
- * - getNextPosition() returns max(order) + 1.
+ * - getNextPosition() returns max(order) + 1. Inside an active PDO transaction
+ *   it reads the latest committed maximum with a locking read.
  * - moveWithinScope() locks the whole ordering scope with SELECT ... FOR UPDATE,
  *   then reads the current row order from the database inside the transaction.
  * - newOrder is clamped to the current max position inside the same scope.
@@ -36,10 +37,34 @@ final readonly class ScopedOrderingManager
      * If the table has no rows in the scope, returns 1.
      * Soft-deleted rows are ignored when deletedAtColumn is configured.
      *
-     * Note:
-     * This method does not start a transaction and does not lock the scope.
-     * If used for concurrent inserts, call it from a caller-owned transaction
-     * with appropriate locking at the repository/application level.
+     * Transaction and locking:
+     * This method never starts, commits, or rolls back a transaction.
+     * - Outside an active PDO transaction it performs a plain read and takes no lock.
+     * - Inside an active (caller-owned) PDO transaction it performs a locking
+     *   read (SELECT ... FOR UPDATE ... ORDER BY order DESC LIMIT 1). A locking
+     *   read returns the latest committed state instead of the transaction's
+     *   REPEATABLE READ snapshot, so a row committed by another transaction
+     *   after the snapshot was established is never missed. Locks are held
+     *   until the caller commits or rolls back.
+     *
+     * Guarantee: the returned position reflects the latest committed state, and
+     * on a non-empty scope concurrent callers that also use locking reads
+     * (this method inside a transaction, moveWithinScope()) are serialized on
+     * the scope's last active row.
+     *
+     * Limits:
+     * - An empty scope has no row to lock, so concurrent first inserts are not
+     *   serialized by this method; the caller must serialize them (e.g. lock a
+     *   parent row or rely on a UNIQUE constraint).
+     * - Lock footprint depends on the access plan. With an index usable for
+     *   (scope, order) the scan stops at the last active row; every
+     *   soft-deleted row above it is scanned and locked as well. Without such
+     *   an index the scan covers, and locks, every row of the table.
+     * - Under REPEATABLE READ the lock also covers the gap above the last
+     *   scanned row up to the next index record, which may belong to another
+     *   scope. Under READ COMMITTED no gap lock is taken.
+     * - Writers that do not use locking reads are not serialized, except by
+     *   the REPEATABLE READ gap lock described above.
      *
      * @param int|string|null $scopeValue Required when config has a non-null scope column; null means global ordering or the configured nullable scope.
      */
@@ -57,6 +82,26 @@ final readonly class ScopedOrderingManager
         $this->appendSoftDeleteCondition($config, $where);
 
         $whereSql = $where !== [] ? ' WHERE ' . implode(' AND ', $where) : '';
+
+        if ($pdo->inTransaction()) {
+            // ORDER BY ... DESC LIMIT 1 lets InnoDB stop at the last active row
+            // when an (scope, order) index exists. MAX(...) FOR UPDATE would
+            // lock every row of the scanned scope range instead.
+            $stmt = $pdo->prepare(
+                'SELECT ' . $config->quotedOrderColumn() . '
+                   FROM ' . $config->quotedTable()
+                . $whereSql .
+                ' ORDER BY ' . $config->quotedOrderColumn() . ' DESC, ' . $config->quotedIdColumn() . ' DESC
+                  LIMIT 1
+                  FOR UPDATE'
+            );
+
+            $stmt->execute($params);
+
+            $value = $stmt->fetchColumn();
+
+            return ($value === false ? 0 : (int) $value) + 1;
+        }
 
         $stmt = $pdo->prepare(
             'SELECT COALESCE(MAX(' . $config->quotedOrderColumn() . '), 0)
