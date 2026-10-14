@@ -16,6 +16,7 @@ use Maatify\Exceptions\Exception\Validation\ValidationMaatifyException;
  * - Invalid target/current ordering position.
  * - Scope value provided without a scope column.
  * - Scope column configured but no scope value provided.
+ * - A locking next-position read requested without an active PDO transaction.
  */
 final class InvalidOrderingOperationException extends ValidationMaatifyException implements PersistenceException
 {

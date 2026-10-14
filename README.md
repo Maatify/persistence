@@ -232,12 +232,19 @@ for that condition.
 * Limits: an empty scope has no row to lock, so the host application must still serialize the first insert (for example by locking a parent row or relying on a `UNIQUE` constraint). The lock footprint depends on the access plan: with an index usable for `(scope, order)` the scan stops at the last active row but also locks every soft-deleted row above it; without one, every table row is scanned and locked. Under `REPEATABLE READ` the lock also covers the gap above the last scanned row, which can belong to another scope; under `READ COMMITTED` no gap lock is taken. Writers that do not use locking reads are not serialized. Lock wait timeouts and deadlocks propagate as the original `PDOException`; retrying is the caller's responsibility.
 
 ```php
+use Maatify\Persistence\Pdo\Ordering\ScopedOrderingConfig;
+use Maatify\Persistence\Pdo\Ordering\ScopedOrderingManager;
+use Maatify\Persistence\Pdo\Transaction\PdoTransactionRunner;
+
+$config = new ScopedOrderingConfig(table: 'maa_shipping_rates', scopeColumn: 'method_id');
+$ordering = new ScopedOrderingManager();
 $transactions = new PdoTransactionRunner($pdo);
 
 $transactions->run(function () use ($pdo, $ordering, $config): void {
     $position = $ordering->getNextPositionForUpdate($pdo, $config, 2);
 
-    // Insert the new row using the same PDO connection and transaction.
+    // Insert the new row at $position using the same PDO connection and
+    // transaction; the lock is held until the transaction ends.
 });
 ```
 
