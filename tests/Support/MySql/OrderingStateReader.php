@@ -76,7 +76,14 @@ final readonly class OrderingStateReader
     {
         $ordersById = [];
 
-        while (($row = $stmt->fetch(PDO::FETCH_ASSOC)) !== false) {
+        while (true) {
+            /** @var mixed $row The PDO stub is narrower than what the driver may return. */
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if ($row === false) {
+                break;
+            }
+
             if (!is_array($row)) {
                 throw new AssertionFailedError('Ordering state row must be an array.');
             }

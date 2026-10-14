@@ -200,6 +200,7 @@ final readonly class PdoPaginator
     /** @return array<string, mixed>|false */
     private function fetchAssociativeOrEof(PDOStatement $statement): array|false
     {
+        /** @var mixed $row The PDO stub is narrower than what a driver or test double may return. */
         $row = $statement->fetch(PDO::FETCH_ASSOC);
         if ($row === false) {
             if ($statement->errorCode() === '00000') {
