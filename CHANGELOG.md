@@ -7,8 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Fixed
-* `ScopedOrderingManager::getNextPosition()` no longer returns a stale maximum inside a caller-owned transaction whose `REPEATABLE READ` snapshot predates another connection's commit, which could assign a position already used by a live row. Inside an active PDO transaction it now reads the last active row of the scope with `SELECT ... FOR UPDATE`; outside a transaction behavior is unchanged. Public signatures and transaction ownership are unchanged.
+### Added
+* `ScopedOrderingManager::getNextPositionForUpdate()`: a locking next-position read for use inside an active caller-owned PDO transaction. It returns the latest committed maximum instead of the transaction's `REPEATABLE READ` snapshot, which avoids duplicate positions when `getNextPosition()` is called with an older snapshot. `getNextPosition()` is unchanged (plain read, no lock).
 
 ## [1.4.0] - 2026-09-18
 

@@ -69,6 +69,11 @@ final class OrderingPublicApiRegressionTest extends TestCase
             ['config', ScopedOrderingConfig::class, false, false, null],
             ['scopeValue', 'int|string', true, true, null],
         ], 'int');
+        self::assertPublicMethod($class, 'getNextPositionForUpdate', [
+            ['pdo', PDO::class, false, false, null],
+            ['config', ScopedOrderingConfig::class, false, false, null],
+            ['scopeValue', 'int|string', true, true, null],
+        ], 'int');
         self::assertPublicMethod($class, 'moveWithinScope', [
             ['pdo', PDO::class, false, false, null],
             ['config', ScopedOrderingConfig::class, false, false, null],
