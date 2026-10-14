@@ -205,6 +205,47 @@ final class ScopedOrderingManagerStaleSnapshotTest extends MySqlIntegrationTestC
         self::assertSame(3, $this->otherReader->scopedOrdersById('scope-a')[$newId]);
     }
 
+    public function testCallerTransactionLockBlocksConcurrentMoveWithinScope(): void
+    {
+        $this->fixture->insertScoped('scope-a', 1);
+        $topId = $this->fixture->insertScoped('scope-a', 2);
+        $this->beginTransactionWithSnapshot();
+        $this->manager->getNextPosition($this->pdo(), $this->scopedConfig(), 'scope-a');
+
+        try {
+            $this->manager->moveWithinScope($this->otherPdo, $this->scopedConfig(), 'scope-a', $topId, 1);
+            self::fail('moveWithinScope() must wait for the allocator transaction holding the scope tail.');
+        } catch (PDOException $exception) {
+            self::assertSame(self::LOCK_WAIT_TIMEOUT_ERROR, $exception->errorInfo[1] ?? null);
+        }
+
+        self::assertFalse($this->otherPdo->inTransaction());
+        self::assertSame(2, $this->otherReader->scopedOrdersById('scope-a')[$topId]);
+    }
+
+    public function testConcurrentMoveWithinScopeBlocksCallerTransactionAllocation(): void
+    {
+        $this->fixture->insertScoped('scope-a', 1);
+        $topId = $this->fixture->insertScoped('scope-a', 2);
+
+        $this->otherPdo->beginTransaction();
+        self::assertTrue($this->manager->moveWithinScope($this->otherPdo, $this->scopedConfig(), 'scope-a', $topId, 1));
+
+        $this->pdo()->exec('SET SESSION innodb_lock_wait_timeout = 1');
+        $this->pdo()->beginTransaction();
+
+        try {
+            $this->manager->getNextPosition($this->pdo(), $this->scopedConfig(), 'scope-a');
+            self::fail('getNextPosition() must wait for a move that holds the scope lock.');
+        } catch (PDOException $exception) {
+            self::assertSame(self::LOCK_WAIT_TIMEOUT_ERROR, $exception->errorInfo[1] ?? null);
+        } finally {
+            $this->pdo()->rollBack();
+            $this->pdo()->exec('SET SESSION innodb_lock_wait_timeout = DEFAULT');
+            $this->otherPdo->rollBack();
+        }
+    }
+
     public function testCallerTransactionLockDoesNotBlockRowsOfOtherScopes(): void
     {
         $this->fixture->insertScoped('scope-a', 1);
