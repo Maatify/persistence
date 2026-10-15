@@ -254,21 +254,39 @@ final class ScopedOrderingManagerStaleSnapshotTest extends MySqlIntegrationTestC
         $this->fixture->insertScoped('scope-a', 1);
         $topId = $this->fixture->insertScoped('scope-a', 2);
 
-        $this->otherPdo->beginTransaction();
-        self::assertTrue($this->manager->moveWithinScope($this->otherPdo, $this->scopedConfig(), 'scope-a', $topId, 1));
-
-        $this->pdo()->exec('SET SESSION innodb_lock_wait_timeout = 1');
-        $this->pdo()->beginTransaction();
+        $statement = $this->pdo()->query('SELECT @@SESSION.innodb_lock_wait_timeout');
+        self::assertNotFalse($statement);
+        $originalLockWaitTimeout = $statement->fetchColumn();
+        self::assertIsNumeric($originalLockWaitTimeout);
 
         try {
-            $this->manager->getNextPositionForUpdate($this->pdo(), $this->scopedConfig(), 'scope-a');
-            self::fail('getNextPositionForUpdate() must wait for a move that holds the scope lock.');
-        } catch (PDOException $exception) {
-            self::assertSame(self::LOCK_WAIT_TIMEOUT_ERROR, $exception->errorInfo[1] ?? null);
+            $this->otherPdo->beginTransaction();
+            self::assertTrue($this->manager->moveWithinScope($this->otherPdo, $this->scopedConfig(), 'scope-a', $topId, 1));
+
+            try {
+                $this->pdo()->exec('SET SESSION innodb_lock_wait_timeout = 1');
+
+                try {
+                    $this->pdo()->beginTransaction();
+
+                    try {
+                        $this->manager->getNextPositionForUpdate($this->pdo(), $this->scopedConfig(), 'scope-a');
+                        self::fail('getNextPositionForUpdate() must wait for a move that holds the scope lock.');
+                    } catch (PDOException $exception) {
+                        self::assertSame(self::LOCK_WAIT_TIMEOUT_ERROR, $exception->errorInfo[1] ?? null);
+                    }
+                } finally {
+                    if ($this->pdo()->inTransaction()) {
+                        $this->pdo()->rollBack();
+                    }
+                }
+            } finally {
+                $this->pdo()->exec('SET SESSION innodb_lock_wait_timeout = ' . (int) $originalLockWaitTimeout);
+            }
         } finally {
-            $this->pdo()->rollBack();
-            $this->pdo()->exec('SET SESSION innodb_lock_wait_timeout = DEFAULT');
-            $this->otherPdo->rollBack();
+            if ($this->otherPdo->inTransaction()) {
+                $this->otherPdo->rollBack();
+            }
         }
     }
 
@@ -316,19 +334,38 @@ final class ScopedOrderingManagerStaleSnapshotTest extends MySqlIntegrationTestC
         $this->fixture->insertScoped('scope-a', 1);
         $this->fixture->insertScoped('scope-a', 2);
 
-        $this->otherPdo->beginTransaction();
-        $this->otherPdo->query(
-            'SELECT `id` FROM `' . OrderingSchemaManager::SCOPED_TABLE . '`
-              WHERE `scope_key` = \'scope-a\' ORDER BY `display_order` DESC FOR UPDATE'
-        );
+        $statement = $this->pdo()->query('SELECT @@SESSION.innodb_lock_wait_timeout');
+        self::assertNotFalse($statement);
+        $originalLockWaitTimeout = $statement->fetchColumn();
+        self::assertIsNumeric($originalLockWaitTimeout);
 
-        // Would hit the lock wait timeout if this call used a locking read.
-        $this->pdo()->exec('SET SESSION innodb_lock_wait_timeout = 1');
-        self::assertSame(3, $this->manager->getNextPosition($this->pdo(), $this->scopedConfig(), 'scope-a'));
-        $this->pdo()->exec('SET SESSION innodb_lock_wait_timeout = DEFAULT');
-        self::assertFalse($this->pdo()->inTransaction());
+        try {
+            $this->otherPdo->beginTransaction();
+            $this->otherPdo->query(
+                'SELECT `id` FROM `' . OrderingSchemaManager::SCOPED_TABLE . '`
+                  WHERE `scope_key` = \'scope-a\' ORDER BY `display_order` DESC FOR UPDATE'
+            );
 
-        $this->otherPdo->rollBack();
+            try {
+                // Would hit the lock wait timeout if this call used a locking read.
+                $this->pdo()->exec('SET SESSION innodb_lock_wait_timeout = 1');
+
+                try {
+                    self::assertSame(3, $this->manager->getNextPosition($this->pdo(), $this->scopedConfig(), 'scope-a'));
+                    self::assertFalse($this->pdo()->inTransaction());
+                } finally {
+                    if ($this->pdo()->inTransaction()) {
+                        $this->pdo()->rollBack();
+                    }
+                }
+            } finally {
+                $this->pdo()->exec('SET SESSION innodb_lock_wait_timeout = ' . (int) $originalLockWaitTimeout);
+            }
+        } finally {
+            if ($this->otherPdo->inTransaction()) {
+                $this->otherPdo->rollBack();
+            }
+        }
     }
 
     private function beginTransactionWithSnapshot(): void
