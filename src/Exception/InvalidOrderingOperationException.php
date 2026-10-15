@@ -10,7 +10,7 @@ use Maatify\Exceptions\Exception\Validation\ValidationMaatifyException;
 
 /**
  * Thrown when an ordering operation is called with invalid runtime arguments
- * or without a precondition of the operation being met.
+ * or when a required operation precondition is not met.
  *
  * Examples:
  * - Invalid row id.
