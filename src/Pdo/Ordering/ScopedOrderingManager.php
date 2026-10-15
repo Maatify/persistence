@@ -77,9 +77,16 @@ final readonly class ScopedOrderingManager
      * Requires an active PDO transaction on the given connection and never
      * begins, commits, or rolls back one; the lock is held until the caller ends
      * the transaction, so perform the insert on the same connection and
-     * transaction. A locking read (SELECT ... FOR UPDATE ... ORDER BY order DESC
-     * LIMIT 1) returns the latest committed state instead of the transaction's
-     * REPEATABLE READ snapshot.
+     * transaction. A locking read (SELECT ... FOR UPDATE ... ORDER BY order DESC,
+     * id DESC LIMIT 1) returns the latest committed state instead of the
+     * transaction's REPEATABLE READ snapshot. The row it selects and locks is the
+     * last active row by the configured order column, with the configured id
+     * column as the tie-breaker.
+     *
+     * The locking read is repeated until two consecutive reads return the same
+     * last active row. A read that waited for the lock on the previous tail may
+     * resume after another transaction committed a higher tail (observable under
+     * READ COMMITTED); the repeat makes the returned position follow that tail.
      *
      * Guarantee: the returned position reflects the latest committed state, and
      * on a non-empty scope concurrent callers that also use locking reads (this
@@ -100,7 +107,9 @@ final readonly class ScopedOrderingManager
      *   REPEATABLE READ gap lock described above.
      * - The call may wait for locks and fail with a lock wait timeout or
      *   deadlock PDOException, which propagates unchanged; retrying is the
-     *   caller's responsibility.
+     *   caller's responsibility. Under REPEATABLE READ, a call queued behind a
+     *   transaction that then inserts above the locked row typically fails with
+     *   a deadlock instead of resuming.
      *
      * @param int|string|null $scopeValue Required when config has a non-null scope column; null means global ordering or the configured nullable scope.
      *
@@ -134,11 +143,26 @@ final readonly class ScopedOrderingManager
               FOR UPDATE'
         );
 
-        $stmt->execute($params);
+        // A read that waited for the lock on the previous tail can resume after
+        // another transaction committed a higher tail (observable under READ
+        // COMMITTED). Repeat the locking read until it returns the same tail
+        // twice, so the position is derived from a tail this transaction holds.
+        $previousTail = null;
 
-        $value = $stmt->fetchColumn();
+        while (true) {
+            $stmt->execute($params);
 
-        return ($value === false ? 0 : (int) $value) + 1;
+            $value = $stmt->fetchColumn();
+            $stmt->closeCursor();
+
+            $tail = $value === false ? 0 : (int) $value;
+
+            if ($tail === $previousTail) {
+                return $tail + 1;
+            }
+
+            $previousTail = $tail;
+        }
     }
 
     /**

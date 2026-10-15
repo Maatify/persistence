@@ -23,6 +23,7 @@ use PDOException;
 final class ScopedOrderingManagerStaleSnapshotTest extends MySqlIntegrationTestCase
 {
     private const LOCK_WAIT_TIMEOUT_ERROR = 1205;
+    private const DEADLOCK_ERROR = 1213;
 
     private ScopedOrderingManager $manager;
     private PDO $otherPdo;
@@ -290,6 +291,21 @@ final class ScopedOrderingManagerStaleSnapshotTest extends MySqlIntegrationTestC
         }
     }
 
+    public function testWaitingAllocatorSeesHigherTailCommittedWhileItWaitedUnderReadCommitted(): void
+    {
+        self::assertSame('POSITION 4', $this->runWaitingAllocatorBehindTailInsert('READ COMMITTED'));
+    }
+
+    public function testWaitingAllocatorNeverReusesInsertedPositionUnderRepeatableRead(): void
+    {
+        // The held gap lock makes the queued allocator a deadlock victim; it must
+        // never resume with the position that was inserted while it waited.
+        self::assertContains(
+            $this->runWaitingAllocatorBehindTailInsert('REPEATABLE READ'),
+            ['POSITION 4', 'FAILURE ' . self::DEADLOCK_ERROR],
+        );
+    }
+
     public function testCallerTransactionLockDoesNotBlockRowsOfOtherScopes(): void
     {
         $this->fixture->insertScoped('scope-a', 1);
@@ -365,6 +381,137 @@ final class ScopedOrderingManagerStaleSnapshotTest extends MySqlIntegrationTestC
             if ($this->otherPdo->inTransaction()) {
                 $this->otherPdo->rollBack();
             }
+        }
+    }
+
+    /**
+     * @return array{0: resource, 1: array<int, resource>}
+     */
+    private function startWaitingAllocator(string $isolationLevel, string $scope): array
+    {
+        $pipes = [];
+        $process = proc_open(
+            [PHP_BINARY, dirname(__DIR__, 3) . '/Support/MySql/NextPositionWaiter.php', $isolationLevel, $scope],
+            [1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
+            $pipes,
+        );
+
+        self::assertIsResource($process, 'Unable to start the waiting allocator process.');
+
+        return [$process, $pipes];
+    }
+
+    /**
+     * Holds the scope tail in the caller transaction, queues a second allocator
+     * behind it on its own connection, inserts a higher tail and commits while
+     * the second allocator waits, then returns the second allocator's report.
+     */
+    private function runWaitingAllocatorBehindTailInsert(string $isolationLevel): string
+    {
+        $this->fixture->insertScoped('scope-a', 1);
+        $this->fixture->insertScoped('scope-a', 2);
+
+        $process = null;
+        $pipes = [];
+
+        try {
+            try {
+                $this->pdo()->exec('SET TRANSACTION ISOLATION LEVEL ' . $isolationLevel);
+                $this->pdo()->beginTransaction();
+
+                // The first allocator locks the current tail (order 2).
+                self::assertSame(3, $this->manager->getNextPositionForUpdate($this->pdo(), $this->scopedConfig(), 'scope-a'));
+
+                [$process, $pipes] = $this->startWaitingAllocator($isolationLevel, 'scope-a');
+
+                $connectionId = $this->readWaiterLine($pipes);
+                self::assertStringStartsWith('CONNECTION_ID ', $connectionId);
+                $this->awaitBlockedLockingRead(substr($connectionId, strlen('CONNECTION_ID ')));
+
+                // The first allocator inserts the new tail and commits while the second waits.
+                $this->fixture->insertScoped('scope-a', 3);
+                $this->pdo()->commit();
+
+                return $this->readWaiterLine($pipes);
+            } finally {
+                if ($this->pdo()->inTransaction()) {
+                    $this->pdo()->rollBack();
+                }
+            }
+        } finally {
+            if ($process !== null) {
+                $this->stopWaitingAllocator($process, $pipes);
+            }
+        }
+    }
+
+    /**
+     * @param array<int, resource> $pipes
+     */
+    private function readWaiterLine(array $pipes): string
+    {
+        stream_set_timeout($pipes[1], 30);
+        $line = fgets($pipes[1]);
+
+        if ($line === false) {
+            self::fail('Waiting allocator produced no output; stderr: ' . stream_get_contents($pipes[2]));
+        }
+
+        return trim($line);
+    }
+
+    /**
+     * Waits until the given connection is stuck inside a locking read, using
+     * the other connection so the observation does not touch the caller's transaction.
+     */
+    private function awaitBlockedLockingRead(string $connectionId): void
+    {
+        $deadline = microtime(true) + 15;
+
+        do {
+            $rows = $this->otherPdo->query('SHOW FULL PROCESSLIST');
+            self::assertNotFalse($rows);
+
+            foreach ($rows->fetchAll() as $row) {
+                if (!is_array($row)) {
+                    continue;
+                }
+
+                $id = $row['Id'] ?? null;
+                $command = $row['Command'] ?? null;
+                $info = $row['Info'] ?? null;
+                $time = $row['Time'] ?? null;
+
+                if (
+                    is_scalar($id) && (string) $id === $connectionId
+                    && in_array($command, ['Query', 'Execute'], true)
+                    && is_string($info) && str_contains($info, 'FOR UPDATE')
+                    && is_numeric($time) && (int) $time >= 1
+                ) {
+                    return;
+                }
+            }
+
+            usleep(100_000);
+        } while (microtime(true) < $deadline);
+
+        self::fail('The second allocator never blocked on the locking read.');
+    }
+
+    /**
+     * @param resource             $process
+     * @param array<int, resource> $pipes
+     */
+    private function stopWaitingAllocator($process, array $pipes): void
+    {
+        try {
+            proc_terminate($process);
+        } finally {
+            foreach ($pipes as $pipe) {
+                fclose($pipe);
+            }
+
+            proc_close($process);
         }
     }
 
