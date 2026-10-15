@@ -9,14 +9,15 @@ use Maatify\Exceptions\Enum\ErrorCodeEnum;
 use Maatify\Exceptions\Exception\Validation\ValidationMaatifyException;
 
 /**
- * Thrown when an ordering operation is called with invalid runtime arguments.
+ * Thrown when an ordering operation is called with invalid runtime arguments
+ * or without a precondition of the operation being met.
  *
  * Examples:
  * - Invalid row id.
  * - Invalid target/current ordering position.
  * - Scope value provided without a scope column.
  * - Scope column configured but no scope value provided.
- * - A locking next-position read requested without an active PDO transaction.
+ * - Unmet precondition: a locking next-position read requested without an active PDO transaction.
  */
 final class InvalidOrderingOperationException extends ValidationMaatifyException implements PersistenceException
 {

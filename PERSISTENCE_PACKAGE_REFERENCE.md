@@ -362,7 +362,7 @@ Renaming the marker MAY be reconsidered only as part of a separately approved, m
 | --------- | ------------------ | ---------- | --------------- | --------------------- |
 | `PersistenceException` | `\Throwable` | N/A | N/A | Interface implemented by all package exceptions. |
 | `InvalidOrderingConfigurationException` | `SystemMaatifyException` | `ErrorCodeEnum::MAATIFY_ERROR` | default | Invalid/unsafe trusted SQL configuration identifiers. |
-| `InvalidOrderingOperationException` | `ValidationMaatifyException` | `ErrorCodeEnum::INVALID_ARGUMENT` | default | Invalid runtime id, new order, or scope usage. |
+| `InvalidOrderingOperationException` | `ValidationMaatifyException` | `ErrorCodeEnum::INVALID_ARGUMENT` | default | Invalid runtime id, new order, or scope usage, or an unmet operation precondition (`getNextPositionForUpdate()` without an active PDO transaction). |
 | `OrderingTransactionException` | `UnsupportedMaatifyException` | `ErrorCodeEnum::UNSUPPORTED_OPERATION` | `defaultIsSafe(): false` | Deprecated compatibility exception; no longer thrown by `moveWithinScope()` for active caller-owned transactions. |
 | `InvalidPaginationConfigurationException` | `SystemMaatifyException` | `ErrorCodeEnum::MAATIFY_ERROR` | default | Invalid per-page bounds, whitelist errors. |
 | `InvalidPaginationQueryException` | `SystemMaatifyException` | `ErrorCodeEnum::MAATIFY_ERROR` | default | Missing/empty SQL, semicolons, reserved parameters. |
@@ -401,6 +401,7 @@ Renaming the marker MAY be reconsidered only as part of a separately approved, m
   * Invalid movement id
   * Invalid new ordering value
   * Inconsistent scope usage
+  * Unmet operation precondition: `getNextPositionForUpdate()` called without an active PDO transaction
 
 ### `Maatify\Persistence\Exception\OrderingTransactionException`
 * **Status**: `final class`, `@deprecated`
