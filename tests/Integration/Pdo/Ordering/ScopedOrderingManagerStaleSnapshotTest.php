@@ -396,9 +396,14 @@ final class ScopedOrderingManagerStaleSnapshotTest extends MySqlIntegrationTestC
             $pipes,
         );
 
-        self::assertIsResource($process, 'Unable to start the waiting allocator process.');
+        $stdout = $pipes[1] ?? null;
+        $stderr = $pipes[2] ?? null;
 
-        return [$process, $pipes];
+        if (!is_resource($process) || !is_resource($stdout) || !is_resource($stderr)) {
+            self::fail('Unable to start the waiting allocator process.');
+        }
+
+        return [$process, [1 => $stdout, 2 => $stderr]];
     }
 
     /**
