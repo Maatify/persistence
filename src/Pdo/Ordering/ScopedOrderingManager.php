@@ -40,19 +40,23 @@ final readonly class ScopedOrderingManager
      *
      * Note:
      * This method does not start a transaction and does not lock the scope.
-     * If used for concurrent inserts, call it from a caller-owned transaction
-     * with appropriate locking at the repository/application level.
+     * Concurrent inserts need caller-side serialization, such as a lock held by
+     * the caller's transaction.
      *
-     * Inside a transaction whose REPEATABLE READ snapshot is older than another
-     * connection's commit, this plain read can return a stale maximum. Use
-     * getNextPositionForUpdate() when the position must reflect the latest
-     * committed state.
+     * Snapshot rule: this plain read uses the transaction's consistent-read
+     * snapshot. Under REPEATABLE READ that snapshot is created by the
+     * transaction's first non-locking read, and locking reads (FOR UPDATE) do
+     * not refresh it. Locking the scope or a parent row afterwards therefore
+     * does not make this read current, and repeating it (for example to retry
+     * after a duplicate-key error) returns the same stale value. The read is
+     * current only when no older snapshot exists: outside a transaction, under
+     * READ COMMITTED, or when the caller's serialization lock is taken before
+     * the transaction's first non-locking read.
      *
      * Both next-position reads are supported. Use getNextPositionForUpdate() to
-     * allocate a position for an insert inside a caller-owned transaction; use
-     * this plain read for previews, outside a transaction or under READ
-     * COMMITTED, or when the caller already serializes allocation another way
-     * (for example a parent-row lock or a UNIQUE constraint with retry).
+     * allocate a position for an insert inside a caller-owned transaction, in
+     * particular under REPEATABLE READ; use this plain read for previews and
+     * for the cases above where no older snapshot exists.
      *
      * @param int|string|null $scopeValue Required when config has a non-null scope column; null means global ordering or the configured nullable scope.
      */

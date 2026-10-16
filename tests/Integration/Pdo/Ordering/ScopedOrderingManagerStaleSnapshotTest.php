@@ -312,6 +312,41 @@ final class ScopedOrderingManagerStaleSnapshotTest extends MySqlIntegrationTestC
         );
     }
 
+    public function testPlainReadStaysStaleWhenTheCallerLocksAfterTheSnapshotWasEstablished(): void
+    {
+        $this->beginTransactionWithSnapshot();
+        $this->otherFixture->insertScoped('scope-a', 1);
+
+        // A locking read sees the committed row but does not refresh the snapshot.
+        $statement = $this->pdo()->query(
+            'SELECT `id` FROM `' . OrderingSchemaManager::SCOPED_TABLE . '` WHERE `scope_key` = \'scope-a\' FOR UPDATE'
+        );
+        self::assertNotFalse($statement);
+        self::assertCount(1, $statement->fetchAll());
+
+        // Repeating the plain read in the same transaction keeps returning the stale value.
+        self::assertSame(1, $this->manager->getNextPosition($this->pdo(), $this->scopedConfig(), 'scope-a'));
+        self::assertSame(1, $this->manager->getNextPosition($this->pdo(), $this->scopedConfig(), 'scope-a'));
+        self::assertSame(2, $this->manager->getNextPositionForUpdate($this->pdo(), $this->scopedConfig(), 'scope-a'));
+    }
+
+    public function testPlainReadSeesLatestCommittedWhenTheSerializationLockPrecedesTheSnapshot(): void
+    {
+        $this->fixture->insertGlobal(1);
+
+        $this->pdo()->beginTransaction();
+
+        // The serialization lock (here on an unrelated row) is the first statement,
+        // so the snapshot is created by the plain read below, after the lock.
+        $statement = $this->pdo()->query('SELECT `id` FROM `' . OrderingSchemaManager::GLOBAL_TABLE . '` FOR UPDATE');
+        self::assertNotFalse($statement);
+        $statement->fetchAll();
+
+        $this->otherFixture->insertScoped('scope-a', 1);
+
+        self::assertSame(2, $this->manager->getNextPosition($this->pdo(), $this->scopedConfig(), 'scope-a'));
+    }
+
     public function testCallerTransactionLockDoesNotBlockRowsOfOtherScopes(): void
     {
         $this->fixture->insertScoped('scope-a', 1);

@@ -72,7 +72,7 @@ The package-level schema notes are in [schema/README.md](schema/README.md).
 * **Constructor**: Stateless class with no explicitly declared constructor.
 * **Public Methods**:
   * `public function getNextPosition(\PDO $pdo, ScopedOrderingConfig $config, int|string|null $scopeValue = null): int`
-    * Supported lock-free read, intended for previews, use outside a transaction or under `READ COMMITTED`, and callers that serialize allocation another way; use `getNextPositionForUpdate()` to allocate a position inside a caller-owned transaction.
+    * Supported lock-free read, intended for previews and for allocation only when no older snapshot exists (outside a transaction, under `READ COMMITTED`, or with the caller's serialization lock taken before the transaction's first non-locking read); use `getNextPositionForUpdate()` to allocate a position inside a caller-owned transaction.
     * Returns `MAX(order) + 1` (calculated via `COALESCE(MAX(...), 0) + 1`).
     * Returns `1` for an empty applicable scope.
     * Ignores soft-deleted rows when soft-delete filtering is configured.
@@ -80,8 +80,8 @@ The package-level schema notes are in [schema/README.md](schema/README.md).
     * Does not lock.
     * May throw `InvalidOrderingOperationException` for inconsistent scope usage.
     * External PDO/database throwables may propagate unchanged.
-    * Concurrency note: Use caller-owned lock for concurrent inserts.
-    * Inside a transaction with an older `REPEATABLE READ` snapshot the plain read can return a stale maximum; use `getNextPositionForUpdate()`.
+    * Concurrency note: concurrent inserts need caller-side serialization, such as a lock held by the caller's transaction.
+    * Snapshot rule: under `REPEATABLE READ` the plain read uses the snapshot created by the transaction's first non-locking read, and locking reads do not refresh it. After a later commit by another connection it can return a stale maximum even if the caller locked the scope or a parent row afterwards, and repeating it in the same transaction returns the same stale value; use `getNextPositionForUpdate()` or retry in a new transaction.
   * `public function getNextPositionForUpdate(\PDO $pdo, ScopedOrderingConfig $config, int|string|null $scopeValue = null): int`
     * Returns `MAX(order) + 1` from the latest committed state (`1` for an empty applicable scope); soft-deleted rows are ignored when soft-delete filtering is configured.
     * Requires an active PDO transaction on the connection; throws `InvalidOrderingOperationException` when none is active. Never begins, commits, or rolls back a transaction.

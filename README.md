@@ -230,13 +230,13 @@ for that condition.
 
 **Choosing between the two next-position reads** (both are supported):
 * `getNextPositionForUpdate()`: allocate a position for an insert inside a caller-owned transaction, in particular under `REPEATABLE READ` (the MySQL default), where a plain read can be stale.
-* `getNextPosition()`: plain, lock-free read for previews, for use outside a transaction or under `READ COMMITTED` (where the read already sees the latest committed state), or when the caller already serializes allocation another way, for example with a parent-row lock or a `UNIQUE` constraint with retry. Concurrent allocation still needs that caller-side serialization.
+* `getNextPosition()`: plain, lock-free read for previews, and for allocation only when no older snapshot exists: outside a transaction, under `READ COMMITTED`, or when the caller's serialization lock (for example on a parent row) is taken before the transaction's first non-locking read. Concurrent allocation still needs that caller-side serialization.
 
 **`getNextPosition()`:**
 * Does not start a transaction.
 * Does not lock the applicable scope.
 * For concurrent inserts, the host application must provide the transaction and locking mechanism required to serialize position allocation.
-* Inside a transaction whose `REPEATABLE READ` snapshot is older than another connection's commit, the plain read can return a stale maximum. Use `getNextPositionForUpdate()` in that case.
+* Snapshot rule: under `REPEATABLE READ` the plain read uses the snapshot created by the transaction's first non-locking read, and locking reads (`FOR UPDATE`) do not refresh it. If another connection committed after that snapshot, the plain read can return a stale maximum even when the caller locked the scope or a parent row afterwards, and repeating it in the same transaction (for example to retry after a duplicate-key error) returns the same stale value. Use `getNextPositionForUpdate()` in that case, or retry in a new transaction.
 
 **`getNextPositionForUpdate()`:**
 * Requires an active PDO transaction on the given connection; throws `InvalidOrderingOperationException` otherwise. It never begins, commits, or rolls back a transaction.
