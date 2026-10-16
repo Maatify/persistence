@@ -118,6 +118,11 @@ final readonly class ScopedOrderingManager
      *   scope. Under READ COMMITTED no gap lock is taken.
      * - Writers that do not use locking reads are not serialized, except by the
      *   REPEATABLE READ gap lock described above.
+     * - Locks taken by earlier reads of a repeated call are kept until the
+     *   transaction ends, so a call that repeats holds locks on every tail it
+     *   read (the earlier tail and the newer one). This slightly widens the
+     *   lock footprint and the contention and deadlock surface compared with a
+     *   single read.
      * - The call may wait for locks and fail with a lock wait timeout or
      *   deadlock PDOException, which propagates unchanged; retrying is the
      *   caller's responsibility. Under REPEATABLE READ, a call queued behind a

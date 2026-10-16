@@ -14,6 +14,7 @@ use Maatify\Persistence\Tests\Support\MySql\OrderingSchemaManager;
 use Maatify\Persistence\Tests\Support\MySql\OrderingStateReader;
 use PDO;
 use PDOException;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
  * Regression protection for getNextPositionForUpdate() inside a caller-owned
@@ -297,19 +298,66 @@ final class ScopedOrderingManagerStaleSnapshotTest extends MySqlIntegrationTestC
 
         self::assertTrue($insertCommitted);
         self::assertSame('POSITION 4', $report);
+        self::assertSame([1, 2, 3], $this->committedScopeAOrders());
     }
 
-    public function testWaitingAllocatorNeverReusesInsertedPositionUnderRepeatableRead(): void
+    /**
+     * @return array<string, array{list<string>}>
+     */
+    public static function waitingAllocatorWeights(): array
     {
-        [$insertCommitted, $report] = $this->runWaitingAllocatorBehindTailInsert('REPEATABLE READ');
+        return [
+            // Usually the queued allocator becomes the deadlock victim.
+            'light waiting allocator' => [[]],
+            // Biased towards the inserting transaction becoming the victim instead.
+            'heavy waiting allocator' => [['heavy']],
+        ];
+    }
 
-        // The gap lock usually makes the queued allocator the deadlock victim, but
-        // InnoDB may pick the inserting transaction instead. Either way the queued
-        // allocator must never reuse the position that was inserted while it waited.
-        self::assertContains(
-            $report,
-            $insertCommitted ? ['POSITION 4', 'FAILURE ' . self::DEADLOCK_ERROR] : ['POSITION 3'],
-        );
+    /**
+     * @param list<string> $waiterFlags
+     */
+    #[DataProvider('waitingAllocatorWeights')]
+    public function testWaitingAllocatorNeverReusesAnOccupiedPositionUnderRepeatableRead(array $waiterFlags): void
+    {
+        [$insertCommitted, $report] = $this->runWaitingAllocatorBehindTailInsert('REPEATABLE READ', $waiterFlags);
+
+        // Whichever transaction InnoDB picks as the deadlock victim, the committed
+        // state must match the outcome: the inserted row exists only if its
+        // transaction committed, and no position is occupied twice.
+        $orders = $this->committedScopeAOrders();
+        self::assertSame($insertCommitted ? [1, 2, 3] : [1, 2], $orders);
+
+        if ($report === 'FAILURE ' . self::DEADLOCK_ERROR) {
+            // Only one transaction can be the deadlock victim.
+            self::assertTrue($insertCommitted);
+
+            return;
+        }
+
+        // Otherwise the queued allocator must report exactly the next free position.
+        self::assertSame('POSITION ' . (max($orders) + 1), $report);
+    }
+
+    public function testRepeatedLockingReadKeepsEveryTailItLockedUntilTheTransactionEnds(): void
+    {
+        $this->runWaitingAllocatorBehindTailInsert('READ COMMITTED', ['hold'], function (string $report): void {
+            self::assertSame('POSITION 4', $report);
+
+            // The waiting allocator locked the old tail (order 2), then the new tail
+            // (order 3); both stay locked while its transaction is open. Earlier
+            // rows are not part of its lock footprint.
+            foreach ([2, 3] as $order) {
+                try {
+                    $this->probeScopeARowLock($order);
+                    self::fail('The row at order ' . $order . ' must stay locked by the waiting allocator.');
+                } catch (PDOException $exception) {
+                    self::assertSame(self::LOCK_WAIT_TIMEOUT_ERROR, $exception->errorInfo[1] ?? null);
+                }
+            }
+
+            self::assertSame(1, $this->probeScopeARowLock(1));
+        });
     }
 
     public function testPlainReadStaysStaleWhenTheCallerLocksAfterTheSnapshotWasEstablished(): void
@@ -432,27 +480,30 @@ final class ScopedOrderingManagerStaleSnapshotTest extends MySqlIntegrationTestC
     }
 
     /**
+     * @param list<string> $flags
+     *
      * @return array{0: resource, 1: array<int, resource>}
      */
-    private function startWaitingAllocator(string $isolationLevel, string $scope): array
+    private function startWaitingAllocator(string $isolationLevel, string $scope, array $flags): array
     {
         $pipes = [];
         $process = proc_open(
-            [PHP_BINARY, dirname(__DIR__, 3) . '/Support/MySql/NextPositionWaiter.php', $isolationLevel, $scope],
-            [1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
+            [PHP_BINARY, dirname(__DIR__, 3) . '/Support/MySql/NextPositionWaiter.php', $isolationLevel, $scope, ...$flags],
+            [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
             $pipes,
         );
 
         /** @var array<int, resource> $openedPipes */
         $openedPipes = $pipes;
+        $stdin = $openedPipes[0] ?? null;
         $stdout = $openedPipes[1] ?? null;
         $stderr = $openedPipes[2] ?? null;
 
-        if (!is_resource($process) || !is_resource($stdout) || !is_resource($stderr)) {
+        if (!is_resource($process) || !is_resource($stdin) || !is_resource($stdout) || !is_resource($stderr)) {
             self::fail('Unable to start the waiting allocator process.');
         }
 
-        return [$process, [1 => $stdout, 2 => $stderr]];
+        return [$process, [0 => $stdin, 1 => $stdout, 2 => $stderr]];
     }
 
     /**
@@ -462,10 +513,20 @@ final class ScopedOrderingManagerStaleSnapshotTest extends MySqlIntegrationTestC
      * the second allocator's report. A deadlock on the inserting transaction is
      * tolerated (REPEATABLE READ only); any other failure propagates.
      *
+     * $whileWaiterOpen runs after the report is read and before the waiting
+     * allocator is stopped, so a test can inspect the locks it still holds when
+     * it was started with the "hold" flag.
+     *
+     * @param list<string>                $waiterFlags
+     * @param (callable(string): void)|null $whileWaiterOpen
+     *
      * @return array{0: bool, 1: string}
      */
-    private function runWaitingAllocatorBehindTailInsert(string $isolationLevel): array
-    {
+    private function runWaitingAllocatorBehindTailInsert(
+        string $isolationLevel,
+        array $waiterFlags = [],
+        ?callable $whileWaiterOpen = null,
+    ): array {
         $this->fixture->insertScoped('scope-a', 1);
         $this->fixture->insertScoped('scope-a', 2);
 
@@ -480,7 +541,7 @@ final class ScopedOrderingManagerStaleSnapshotTest extends MySqlIntegrationTestC
                 // The first allocator locks the current tail (order 2).
                 self::assertSame(3, $this->manager->getNextPositionForUpdate($this->pdo(), $this->scopedConfig(), 'scope-a'));
 
-                [$process, $pipes] = $this->startWaitingAllocator($isolationLevel, 'scope-a');
+                [$process, $pipes] = $this->startWaitingAllocator($isolationLevel, 'scope-a', $waiterFlags);
 
                 $connectionId = $this->readWaiterLine($pipes);
                 self::assertStringStartsWith('CONNECTION_ID ', $connectionId);
@@ -499,7 +560,13 @@ final class ScopedOrderingManagerStaleSnapshotTest extends MySqlIntegrationTestC
                     }
                 }
 
-                return [$insertCommitted, $this->readWaiterLine($pipes)];
+                $report = $this->readWaiterLine($pipes);
+
+                if ($whileWaiterOpen !== null) {
+                    $whileWaiterOpen($report);
+                }
+
+                return [$insertCommitted, $report];
             } finally {
                 if ($this->pdo()->inTransaction()) {
                     $this->pdo()->rollBack();
@@ -510,6 +577,35 @@ final class ScopedOrderingManagerStaleSnapshotTest extends MySqlIntegrationTestC
                 $this->stopWaitingAllocator($process, $pipes);
             }
         }
+    }
+
+    /**
+     * Orders of the committed rows of scope-a, read on the other connection.
+     *
+     * @return list<int>
+     */
+    private function committedScopeAOrders(): array
+    {
+        $orders = array_values($this->otherReader->scopedOrdersById('scope-a'));
+        sort($orders);
+
+        return $orders;
+    }
+
+    /**
+     * Tries to lock the scope-a row at the given order on the other connection
+     * (one-second lock wait timeout) and returns how many rows it locked.
+     */
+    private function probeScopeARowLock(int $order): int
+    {
+        $statement = $this->otherPdo->prepare(
+            'SELECT `id` FROM `' . OrderingSchemaManager::SCOPED_TABLE . '`
+              WHERE `scope_key` = \'scope-a\' AND `display_order` = :display_order FOR UPDATE'
+        );
+        self::assertNotFalse($statement);
+        $statement->execute(['display_order' => $order]);
+
+        return count($statement->fetchAll());
     }
 
     /**

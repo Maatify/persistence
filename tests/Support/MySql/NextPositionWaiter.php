@@ -11,7 +11,13 @@ declare(strict_types=1);
  * before the call and, after it, either the returned position or the driver
  * error code of a PDOException (for example 1213 for a deadlock).
  *
- * Usage: php NextPositionWaiter.php "<READ COMMITTED|REPEATABLE READ>" <scope>
+ * Usage: php NextPositionWaiter.php "<READ COMMITTED|REPEATABLE READ>" <scope> [heavy] [hold]
+ *
+ * Flags:
+ * - heavy: first lock many rows of an unrelated scope, so InnoDB treats this
+ *   transaction as the heavier one when it has to pick a deadlock victim.
+ * - hold: keep the transaction (and its locks) open after reporting, until the
+ *   parent closes this process's stdin.
  */
 
 use Maatify\Persistence\Pdo\Ordering\ScopedOrderingConfig;
@@ -23,9 +29,14 @@ require dirname(__DIR__, 2) . '/bootstrap.php';
 
 $isolationLevel = $argv[1] ?? '';
 $scope = $argv[2] ?? '';
+$flags = array_slice($argv, 3);
 
-if (!in_array($isolationLevel, ['READ COMMITTED', 'REPEATABLE READ'], true) || $scope === '') {
-    fwrite(STDERR, "Usage: NextPositionWaiter.php \"<READ COMMITTED|REPEATABLE READ>\" <scope>\n");
+if (
+    !in_array($isolationLevel, ['READ COMMITTED', 'REPEATABLE READ'], true)
+    || $scope === ''
+    || array_diff($flags, ['heavy', 'hold']) !== []
+) {
+    fwrite(STDERR, "Usage: NextPositionWaiter.php \"<READ COMMITTED|REPEATABLE READ>\" <scope> [heavy] [hold]\n");
     exit(2);
 }
 
@@ -44,6 +55,14 @@ try {
 
     $snapshot->fetchColumn();
 
+    if (in_array('heavy', $flags, true)) {
+        $pdo->exec(
+            'INSERT INTO `' . OrderingSchemaManager::SCOPED_TABLE . '` (`scope_key`, `display_order`, `label`)
+             WITH RECURSIVE `seq` (`n`) AS (SELECT 1 UNION ALL SELECT `n` + 1 FROM `seq` WHERE `n` < 400)
+             SELECT \'heavy-scope\', `n`, \'heavy\' FROM `seq`'
+        );
+    }
+
     fwrite(STDOUT, 'CONNECTION_ID ' . $connectionId->fetchColumn() . "\n");
     fflush(STDOUT);
 
@@ -55,6 +74,11 @@ try {
         );
 
         fwrite(STDOUT, 'POSITION ' . $position . "\n");
+        fflush(STDOUT);
+
+        if (in_array('hold', $flags, true)) {
+            fgets(STDIN);
+        }
     } catch (PDOException $exception) {
         $driverCode = $exception->errorInfo[1] ?? null;
 
