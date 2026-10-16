@@ -72,6 +72,7 @@ The package-level schema notes are in [schema/README.md](schema/README.md).
 * **Constructor**: Stateless class with no explicitly declared constructor.
 * **Public Methods**:
   * `public function getNextPosition(\PDO $pdo, ScopedOrderingConfig $config, int|string|null $scopeValue = null): int`
+    * **Deprecated** (`@deprecated`): use `getNextPositionForUpdate()` inside a caller-owned PDO transaction. Behavior is unchanged and the method remains supported in `1.x`; it is scheduled for cleanup in the next major release.
     * Returns `MAX(order) + 1` (calculated via `COALESCE(MAX(...), 0) + 1`).
     * Returns `1` for an empty applicable scope.
     * Ignores soft-deleted rows when soft-delete filtering is configured.
@@ -311,9 +312,10 @@ The package-level schema notes are in [schema/README.md](schema/README.md).
 * The caller owns the final commit or rollback for an active outer transaction.
 * Atomic composition is supported only when ordinary PDO mutations and all
   package participants use the same PDO connection.
-* `getNextPosition()` does not start a transaction or lock its scope. The
-  caller owns the transaction and locking needed to serialize concurrent
-  position allocation.
+* `getNextPosition()` is deprecated in favor of `getNextPositionForUpdate()`
+  and is scheduled for cleanup in the next major release. It does not start a
+  transaction or lock its scope. The caller owns the transaction and locking
+  needed to serialize concurrent position allocation.
 * `getNextPositionForUpdate()` requires an active PDO transaction, never starts
   one, and reads the scope's last active row with `SELECT ... FOR UPDATE`, so it
   sees the latest committed maximum and serializes lock-using allocation and

@@ -23,7 +23,8 @@ use Throwable;
  * - It participates in an active caller-owned PDO transaction.
  *
  * Ordering model:
- * - getNextPosition() returns max(order) + 1 with a plain read and no lock.
+ * - getNextPosition() (deprecated) returns max(order) + 1 with a plain read and
+ *   no lock.
  * - getNextPositionForUpdate() returns max(order) + 1 from the latest committed
  *   state using a locking read inside an active caller-owned PDO transaction.
  * - moveWithinScope() locks the whole ordering scope with SELECT ... FOR UPDATE,
@@ -49,6 +50,10 @@ final readonly class ScopedOrderingManager
      * committed state.
      *
      * @param int|string|null $scopeValue Required when config has a non-null scope column; null means global ordering or the configured nullable scope.
+     *
+     * @deprecated Use getNextPositionForUpdate() inside a caller-owned PDO
+     * transaction. This lock-free read is unchanged and remains supported in
+     * 1.x; it is scheduled for cleanup in the next major release.
      */
     public function getNextPosition(
         PDO $pdo,

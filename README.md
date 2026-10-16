@@ -61,6 +61,7 @@ composer require maatify/persistence
 ```php
 use Maatify\Persistence\Pdo\Ordering\ScopedOrderingConfig;
 use Maatify\Persistence\Pdo\Ordering\ScopedOrderingManager;
+use Maatify\Persistence\Pdo\Transaction\PdoTransactionRunner;
 
 // 1. Configure the ordering behavior for a table
 $config = new ScopedOrderingConfig(
@@ -77,12 +78,20 @@ $config = new ScopedOrderingConfig(
 
 $ordering = new ScopedOrderingManager();
 
-// 2. Get the next position for a new insert
-$nextPosition = $ordering->getNextPosition(
-    pdo: $pdo,
-    config: $config,
-    scopeValue: 2, // Use null for global ordering
-);
+// 2. Get the next position for a new insert. Call it inside a PDO transaction
+// and insert on the same connection (see "Critical Runtime Behavior").
+// getNextPosition() is deprecated in favor of getNextPositionForUpdate().
+$transactions = new PdoTransactionRunner($pdo);
+
+$transactions->run(function () use ($pdo, $ordering, $config): void {
+    $nextPosition = $ordering->getNextPositionForUpdate(
+        pdo: $pdo,
+        config: $config,
+        scopeValue: 2, // Use null for global ordering
+    );
+
+    // Insert the new row at $nextPosition using the same PDO connection.
+});
 
 // 3. Move an existing row within its scope
 $success = $ordering->moveWithinScope(
@@ -219,7 +228,8 @@ for that condition.
 
 ## ⚠️ Critical Runtime Behavior
 
-**`getNextPosition()`:**
+**`getNextPosition()` (deprecated):**
+* Deprecated in favor of `getNextPositionForUpdate()` inside a caller-owned PDO transaction. Its behavior is unchanged and it remains supported in `1.x`; it is scheduled for cleanup in the next major release.
 * Does not start a transaction.
 * Does not lock the applicable scope.
 * For concurrent inserts, the host application must provide the transaction and locking mechanism required to serialize position allocation.

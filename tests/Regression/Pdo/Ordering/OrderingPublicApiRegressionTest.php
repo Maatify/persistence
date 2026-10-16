@@ -17,6 +17,7 @@ use PDO;
 use PHPUnit\Framework\TestCase;
 use ReflectionClass;
 use ReflectionIntersectionType;
+use ReflectionMethod;
 use ReflectionNamedType;
 use ReflectionParameter;
 use ReflectionType;
@@ -88,6 +89,18 @@ final class OrderingPublicApiRegressionTest extends TestCase
             ['scopeValue', 'int|string', true, false, null],
             ['id', 'int', false, false, null],
         ], 'bool');
+    }
+
+    public function testGetNextPositionIsDeprecatedInFavorOfTheLockingVariant(): void
+    {
+        $method = new ReflectionMethod(ScopedOrderingManager::class, 'getNextPosition');
+        $docComment = (string) $method->getDocComment();
+
+        self::assertStringContainsString('@deprecated', $docComment);
+        self::assertStringContainsString('getNextPositionForUpdate()', $docComment);
+
+        $lockingDocComment = (string) (new ReflectionMethod(ScopedOrderingManager::class, 'getNextPositionForUpdate'))->getDocComment();
+        self::assertStringNotContainsString('@deprecated', $lockingDocComment);
     }
 
     public function testPdoTransactionRunnerApiMatchesRepositoryReality(): void
