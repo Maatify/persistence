@@ -61,6 +61,7 @@ composer require maatify/persistence
 ```php
 use Maatify\Persistence\Pdo\Ordering\ScopedOrderingConfig;
 use Maatify\Persistence\Pdo\Ordering\ScopedOrderingManager;
+use Maatify\Persistence\Pdo\Transaction\PdoTransactionRunner;
 
 // 1. Configure the ordering behavior for a table
 $config = new ScopedOrderingConfig(
@@ -77,12 +78,20 @@ $config = new ScopedOrderingConfig(
 
 $ordering = new ScopedOrderingManager();
 
-// 2. Get the next position for a new insert
-$nextPosition = $ordering->getNextPosition(
-    pdo: $pdo,
-    config: $config,
-    scopeValue: 2, // Use null for global ordering
-);
+// 2. Get the next position for a new insert. Inside a PDO transaction use
+// getNextPositionForUpdate() and insert on the same connection (see
+// "Critical Runtime Behavior" for when the plain getNextPosition() fits instead).
+$transactions = new PdoTransactionRunner($pdo);
+
+$transactions->run(function () use ($pdo, $ordering, $config): void {
+    $nextPosition = $ordering->getNextPositionForUpdate(
+        pdo: $pdo,
+        config: $config,
+        scopeValue: 2, // Use null for global ordering
+    );
+
+    // Insert the new row at $nextPosition using the same PDO connection.
+});
 
 // 3. Move an existing row within its scope
 $success = $ordering->moveWithinScope(
@@ -219,10 +228,38 @@ for that condition.
 
 ## ⚠️ Critical Runtime Behavior
 
+**Choosing between the two next-position reads** (both are supported):
+* `getNextPositionForUpdate()`: allocate a position for an insert inside a caller-owned transaction, in particular under `REPEATABLE READ` (the MySQL default), where a plain read can be stale.
+* `getNextPosition()`: plain, lock-free read for previews, and for allocation only when no older snapshot exists: outside a transaction, under `READ COMMITTED`, or when the caller's serialization lock (for example on a parent row) is taken before the transaction's first non-locking read. Concurrent allocation still needs that caller-side serialization.
+
 **`getNextPosition()`:**
 * Does not start a transaction.
 * Does not lock the applicable scope.
 * For concurrent inserts, the host application must provide the transaction and locking mechanism required to serialize position allocation.
+* Snapshot rule: under `REPEATABLE READ` the plain read uses the snapshot created by the transaction's first non-locking read, and locking reads (`FOR UPDATE`) do not refresh it. If another connection committed after that snapshot, the plain read can return a stale maximum even when the caller locked the scope or a parent row afterwards, and repeating it in the same transaction (for example to retry after a duplicate-key error) returns the same stale value. Use `getNextPositionForUpdate()` in that case, or retry in a new transaction.
+
+**`getNextPositionForUpdate()`:**
+* Requires an active PDO transaction on the given connection; throws `InvalidOrderingOperationException` otherwise. It never begins, commits, or rolls back a transaction.
+* Performs a locking read (`SELECT ... ORDER BY order DESC, id DESC LIMIT 1 FOR UPDATE`, using the configured order and id columns) of the last active row in the applicable scope, so the result reflects the latest committed state instead of the transaction snapshot. The locking read is repeated until two consecutive reads return the same order value, so every call issues at least two locking reads (also for an empty scope), and a call that waited for the lock on the previous tail follows a higher tail committed meanwhile (observable under `READ COMMITTED`). The repeat continues only while the tail keeps changing, and each repeated read can itself wait for a lock or fail with a lock wait timeout or deadlock. The lock is held until the caller ends the transaction; insert on the same connection and transaction.
+* Guarantee: on a non-empty scope, callers that also use locking reads (`getNextPositionForUpdate()`, `moveWithinScope()`) are serialized on the scope's last active row.
+* Limits: an empty scope has no row to lock, so the host application must still serialize the first insert (for example by locking a parent row or relying on a `UNIQUE` constraint). The lock footprint depends on the access plan: with an index usable for `(scope, order)` the scan stops at the last active row but also locks every soft-deleted row above it; without one, every table row is scanned and locked. Under `REPEATABLE READ` the lock also covers the gap above the last scanned row, which can belong to another scope; under `READ COMMITTED` no gap lock is taken. Writers that do not use locking reads are not serialized. Locks taken by earlier reads of a repeated call are kept until the transaction ends, so a call that repeats holds locks on every tail it read (the earlier tail and the newer one), which slightly widens the lock footprint and the contention and deadlock surface compared with a single read. Lock wait timeouts and deadlocks propagate as the original `PDOException`; retrying is the caller's responsibility. Under `REPEATABLE READ`, a call queued behind a transaction that then inserts above the locked row typically fails with a deadlock instead of resuming.
+
+```php
+use Maatify\Persistence\Pdo\Ordering\ScopedOrderingConfig;
+use Maatify\Persistence\Pdo\Ordering\ScopedOrderingManager;
+use Maatify\Persistence\Pdo\Transaction\PdoTransactionRunner;
+
+$config = new ScopedOrderingConfig(table: 'maa_shipping_rates', scopeColumn: 'method_id');
+$ordering = new ScopedOrderingManager();
+$transactions = new PdoTransactionRunner($pdo);
+
+$transactions->run(function () use ($pdo, $ordering, $config): void {
+    $position = $ordering->getNextPositionForUpdate($pdo, $config, 2);
+
+    // Insert the new row at $position using the same PDO connection and
+    // transaction; the lock is held until the transaction ends.
+});
+```
 
 **`moveWithinScope()`:**
 * Rejects inconsistent scope usage.
