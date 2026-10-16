@@ -324,9 +324,15 @@ final class ScopedOrderingManagerStaleSnapshotTest extends MySqlIntegrationTestC
         self::assertNotFalse($statement);
         self::assertCount(1, $statement->fetchAll());
 
-        // Repeating the plain read in the same transaction keeps returning the stale value.
-        self::assertSame(1, $this->manager->getNextPosition($this->pdo(), $this->scopedConfig(), 'scope-a'));
-        self::assertSame(1, $this->manager->getNextPosition($this->pdo(), $this->scopedConfig(), 'scope-a'));
+        // Repeating the plain read in the same transaction (a retry) keeps returning the stale value.
+        for ($attempt = 1; $attempt <= 2; ++$attempt) {
+            self::assertSame(
+                1,
+                $this->manager->getNextPosition($this->pdo(), $this->scopedConfig(), 'scope-a'),
+                'Plain read attempt ' . $attempt,
+            );
+        }
+
         self::assertSame(2, $this->manager->getNextPositionForUpdate($this->pdo(), $this->scopedConfig(), 'scope-a'));
     }
 
