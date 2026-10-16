@@ -91,16 +91,14 @@ final class OrderingPublicApiRegressionTest extends TestCase
         ], 'bool');
     }
 
-    public function testGetNextPositionIsDeprecatedInFavorOfTheLockingVariant(): void
+    public function testBothNextPositionReadsRemainSupportedAndNotDeprecated(): void
     {
-        $method = new ReflectionMethod(ScopedOrderingManager::class, 'getNextPosition');
-        $docComment = (string) $method->getDocComment();
-
-        self::assertStringContainsString('@deprecated', $docComment);
-        self::assertStringContainsString('getNextPositionForUpdate()', $docComment);
-
+        $plainDocComment = (string) (new ReflectionMethod(ScopedOrderingManager::class, 'getNextPosition'))->getDocComment();
         $lockingDocComment = (string) (new ReflectionMethod(ScopedOrderingManager::class, 'getNextPositionForUpdate'))->getDocComment();
+
+        self::assertStringNotContainsString('@deprecated', $plainDocComment);
         self::assertStringNotContainsString('@deprecated', $lockingDocComment);
+        self::assertStringContainsString('getNextPositionForUpdate()', $plainDocComment);
     }
 
     public function testPdoTransactionRunnerApiMatchesRepositoryReality(): void

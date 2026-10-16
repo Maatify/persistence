@@ -78,9 +78,9 @@ $config = new ScopedOrderingConfig(
 
 $ordering = new ScopedOrderingManager();
 
-// 2. Get the next position for a new insert. Call it inside a PDO transaction
-// and insert on the same connection (see "Critical Runtime Behavior").
-// getNextPosition() is deprecated in favor of getNextPositionForUpdate().
+// 2. Get the next position for a new insert. Inside a PDO transaction use
+// getNextPositionForUpdate() and insert on the same connection (see
+// "Critical Runtime Behavior" for when the plain getNextPosition() fits instead).
 $transactions = new PdoTransactionRunner($pdo);
 
 $transactions->run(function () use ($pdo, $ordering, $config): void {
@@ -228,8 +228,11 @@ for that condition.
 
 ## ⚠️ Critical Runtime Behavior
 
-**`getNextPosition()` (deprecated):**
-* Deprecated in favor of `getNextPositionForUpdate()` inside a caller-owned PDO transaction. Its behavior is unchanged and it remains supported in `1.x`; it is scheduled for cleanup in the next major release.
+**Choosing between the two next-position reads** (both are supported):
+* `getNextPositionForUpdate()`: allocate a position for an insert inside a caller-owned transaction, in particular under `REPEATABLE READ` (the MySQL default), where a plain read can be stale.
+* `getNextPosition()`: plain, lock-free read for previews, for use outside a transaction or under `READ COMMITTED` (where the read already sees the latest committed state), or when the caller already serializes allocation another way, for example with a parent-row lock or a `UNIQUE` constraint with retry. Concurrent allocation still needs that caller-side serialization.
+
+**`getNextPosition()`:**
 * Does not start a transaction.
 * Does not lock the applicable scope.
 * For concurrent inserts, the host application must provide the transaction and locking mechanism required to serialize position allocation.
