@@ -293,16 +293,22 @@ final class ScopedOrderingManagerStaleSnapshotTest extends MySqlIntegrationTestC
 
     public function testWaitingAllocatorSeesHigherTailCommittedWhileItWaitedUnderReadCommitted(): void
     {
-        self::assertSame('POSITION 4', $this->runWaitingAllocatorBehindTailInsert('READ COMMITTED'));
+        [$insertCommitted, $report] = $this->runWaitingAllocatorBehindTailInsert('READ COMMITTED');
+
+        self::assertTrue($insertCommitted);
+        self::assertSame('POSITION 4', $report);
     }
 
     public function testWaitingAllocatorNeverReusesInsertedPositionUnderRepeatableRead(): void
     {
-        // The held gap lock makes the queued allocator a deadlock victim; it must
-        // never resume with the position that was inserted while it waited.
+        [$insertCommitted, $report] = $this->runWaitingAllocatorBehindTailInsert('REPEATABLE READ');
+
+        // The gap lock usually makes the queued allocator the deadlock victim, but
+        // InnoDB may pick the inserting transaction instead. Either way the queued
+        // allocator must never reuse the position that was inserted while it waited.
         self::assertContains(
-            $this->runWaitingAllocatorBehindTailInsert('REPEATABLE READ'),
-            ['POSITION 4', 'FAILURE ' . self::DEADLOCK_ERROR],
+            $report,
+            $insertCommitted ? ['POSITION 4', 'FAILURE ' . self::DEADLOCK_ERROR] : ['POSITION 3'],
         );
     }
 
@@ -411,9 +417,13 @@ final class ScopedOrderingManagerStaleSnapshotTest extends MySqlIntegrationTestC
     /**
      * Holds the scope tail in the caller transaction, queues a second allocator
      * behind it on its own connection, inserts a higher tail and commits while
-     * the second allocator waits, then returns the second allocator's report.
+     * the second allocator waits. Returns whether the insert was committed and
+     * the second allocator's report. A deadlock on the inserting transaction is
+     * tolerated (REPEATABLE READ only); any other failure propagates.
+     *
+     * @return array{0: bool, 1: string}
      */
-    private function runWaitingAllocatorBehindTailInsert(string $isolationLevel): string
+    private function runWaitingAllocatorBehindTailInsert(string $isolationLevel): array
     {
         $this->fixture->insertScoped('scope-a', 1);
         $this->fixture->insertScoped('scope-a', 2);
@@ -436,10 +446,19 @@ final class ScopedOrderingManagerStaleSnapshotTest extends MySqlIntegrationTestC
                 $this->awaitBlockedLockingRead(substr($connectionId, strlen('CONNECTION_ID ')));
 
                 // The first allocator inserts the new tail and commits while the second waits.
-                $this->fixture->insertScoped('scope-a', 3);
-                $this->pdo()->commit();
+                $insertCommitted = false;
 
-                return $this->readWaiterLine($pipes);
+                try {
+                    $this->fixture->insertScoped('scope-a', 3);
+                    $this->pdo()->commit();
+                    $insertCommitted = true;
+                } catch (PDOException $exception) {
+                    if (($exception->errorInfo[1] ?? null) !== self::DEADLOCK_ERROR) {
+                        throw $exception;
+                    }
+                }
+
+                return [$insertCommitted, $this->readWaiterLine($pipes)];
             } finally {
                 if ($this->pdo()->inTransaction()) {
                     $this->pdo()->rollBack();

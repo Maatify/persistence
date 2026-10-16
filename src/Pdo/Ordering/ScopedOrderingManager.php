@@ -84,9 +84,12 @@ final readonly class ScopedOrderingManager
      * column as the tie-breaker.
      *
      * The locking read is repeated until two consecutive reads return the same
-     * last active row. A read that waited for the lock on the previous tail may
-     * resume after another transaction committed a higher tail (observable under
-     * READ COMMITTED); the repeat makes the returned position follow that tail.
+     * order value, so every call issues at least two locking reads, including
+     * for an empty scope. A read that waited for the lock on the previous tail
+     * may resume after another transaction committed a higher tail (observable
+     * under READ COMMITTED); the repeat makes the returned position follow that
+     * tail. The repeat continues only while the tail keeps changing, and each
+     * repeated read can itself wait for a lock or fail as described below.
      *
      * Guarantee: the returned position reflects the latest committed state, and
      * on a non-empty scope concurrent callers that also use locking reads (this
@@ -145,8 +148,9 @@ final readonly class ScopedOrderingManager
 
         // A read that waited for the lock on the previous tail can resume after
         // another transaction committed a higher tail (observable under READ
-        // COMMITTED). Repeat the locking read until it returns the same tail
-        // twice, so the position is derived from a tail this transaction holds.
+        // COMMITTED). Repeat the locking read until it returns the same order
+        // value twice, so the position is derived from a tail this transaction
+        // holds.
         $previousTail = null;
 
         while (true) {

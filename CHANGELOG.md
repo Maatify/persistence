@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-* `ScopedOrderingManager::getNextPositionForUpdate()`: reads the latest committed maximum with a locking read inside an active caller-owned PDO transaction, avoiding stale-snapshot position allocation (duplicate positions under `REPEATABLE READ`) when used instead of `getNextPosition()`. It requires an active transaction and never begins or ends one, and it repeats the locking read until it returns the same tail twice so a call that waited for a lock follows a higher tail committed meanwhile. `getNextPosition()` is unchanged (plain read, no lock).
+* `ScopedOrderingManager::getNextPositionForUpdate()`: reads the latest committed maximum with a locking read inside an active caller-owned PDO transaction, avoiding stale-snapshot position allocation (duplicate positions under `REPEATABLE READ`) when used instead of `getNextPosition()`. It requires an active transaction and never begins or ends one, and it repeats the locking read until two consecutive reads return the same order value (at least two locking reads per call) so a call that waited for a lock follows a higher tail committed meanwhile. `getNextPosition()` is unchanged (plain read, no lock).
 
 ## [1.4.0] - 2026-09-18
 
