@@ -313,8 +313,11 @@ The package-level schema notes are in [schema/README.md](schema/README.md).
 * Atomic composition is supported only when ordinary PDO mutations and all
   package participants use the same PDO connection.
 * `getNextPosition()` does not start a transaction or lock its scope. The
-  caller owns the transaction and locking needed to serialize concurrent
-  position allocation.
+  caller owns the transaction and the lock that serializes concurrent
+  position allocation; under `REPEATABLE READ` that lock must be taken before
+  the transaction's first non-locking read, otherwise the plain read can
+  return a stale maximum. Use `getNextPositionForUpdate()` to allocate a
+  position inside a caller-owned transaction.
 * `getNextPositionForUpdate()` requires an active PDO transaction, never starts
   one, and reads the scope's last active row with `SELECT ... FOR UPDATE`, so it
   sees the latest committed maximum and serializes lock-using allocation and
