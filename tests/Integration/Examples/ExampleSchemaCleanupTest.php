@@ -174,11 +174,6 @@ final class ExampleSchemaCleanupTest extends TestCase
         return (int) $statement->fetchColumn() === 1;
     }
 
-    private function exportString(string $value): string
-    {
-        return var_export($value, true);
-    }
-
     /**
      * @return array{resource, resource}
      */
