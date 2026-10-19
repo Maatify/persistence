@@ -6,6 +6,7 @@ namespace Maatify\Persistence\Tests\Integration\Examples;
 
 use Maatify\Persistence\Tests\Support\MySql\MySqlConnectionFactory;
 use PDO;
+use PHPUnit\Framework\AssertionFailedError;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -103,12 +104,28 @@ final class ExampleSchemaCleanupTest extends TestCase
         }
     }
 
+    public function testRunnerRejectsNonZeroExitCodeEvenWithExpectedOutput(): void
+    {
+        $this->expectException(AssertionFailedError::class);
+        $this->expectExceptionMessage('must exit with code 0');
+
+        $this->runExampleScript("echo \"EXPECTED\\n\";\nexit(7);", 'unused');
+    }
+
+    public function testRunnerFailsAHungProcessAtTheTimeGuard(): void
+    {
+        $this->expectException(AssertionFailedError::class);
+        $this->expectExceptionMessage('1 second guard');
+
+        $this->runExampleScript('sleep(30);', 'unused', 1);
+    }
+
     /**
      * Runs a snippet in a separate PHP process with the example support file
      * loaded and the suffix as $argv[1]. Returns stdout; fails on a non-zero
-     * exit, stderr output, or when the 60 second guard expires.
+     * exit code, stderr output, or when the time guard expires.
      */
-    private function runExampleScript(string $body, string $suffix): string
+    private function runExampleScript(string $body, string $suffix, int $timeoutSeconds = 60): string
     {
         $support = dirname(__DIR__, 3) . '/examples/next-position/_support.php';
         $script = tempnam(sys_get_temp_dir(), 'maatify-example-cleanup-');
@@ -128,7 +145,8 @@ final class ExampleSchemaCleanupTest extends TestCase
 
             $stdout = '';
             $stderr = '';
-            $deadline = microtime(true) + 60;
+            $deadline = microtime(true) + $timeoutSeconds;
+            $exitCode = null;
 
             while (true) {
                 $stdout .= (string) stream_get_contents($stdoutPipe);
@@ -136,6 +154,9 @@ final class ExampleSchemaCleanupTest extends TestCase
                 $status = proc_get_status($process);
 
                 if (! $status['running']) {
+                    // proc_close() returns -1 once the status was read, so keep this code.
+                    $exitCode = $status['exitcode'];
+
                     break;
                 }
 
@@ -144,7 +165,7 @@ final class ExampleSchemaCleanupTest extends TestCase
                     fclose($stdoutPipe);
                     fclose($stderrPipe);
                     proc_close($process);
-                    self::fail('The example process hung (60 second guard).');
+                    self::fail('The example process hung (' . $timeoutSeconds . ' second guard).');
                 }
 
                 usleep(50_000);
@@ -156,6 +177,7 @@ final class ExampleSchemaCleanupTest extends TestCase
             fclose($stderrPipe);
             proc_close($process);
 
+            self::assertSame(0, $exitCode, 'The example process must exit with code 0.' . PHP_EOL . $stdout . $stderr);
             self::assertSame('', $stderr, $stdout . $stderr);
 
             return $stdout;
