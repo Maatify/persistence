@@ -318,10 +318,23 @@ All package-defined exceptions implement the marker interface `Maatify\Persisten
 
 The `ScopedOrderingConfig` validates and quotes all configured table and column identifiers. However, these identifiers **must** still be provided as trusted application configurations (e.g., constants), never as raw user input. All actual runtime values are safely passed using PDO prepared statements.
 
+## 🧪 Examples
+
+Five standalone, runnable scripts cover allocating a position and inserting a row end to end, including rollback, the `REPEATABLE READ` stale-snapshot case, empty scopes, and lock timeouts. They need a real MySQL test database:
+
+```bash
+php examples/next-position/01_allocate_and_insert.php
+```
+
+See the [How-to-Use guide](docs/guides/NEXT_POSITION_ALLOCATION_HOW_TO_USE.md) for the list, setup, and limits. `getNextPositionForUpdate()` is Unreleased and is not part of the stable `v1.4.0`.
+
 ## 📚 Documentation
 
 For a comprehensive guide, please refer to the main technical reference:
 * [Persistence Package Reference](PERSISTENCE_PACKAGE_REFERENCE.md)
+
+Practical guide:
+* [How to Use: Allocating the Next Position Safely](docs/guides/NEXT_POSITION_ALLOCATION_HOW_TO_USE.md) (runnable examples in [`examples/next-position`](examples/next-position))
 
 Other important documentation:
 * [Changelog](CHANGELOG.md)

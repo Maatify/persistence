@@ -256,6 +256,7 @@ function runSingleConsumerVerification(string $repositoryRoot, string $runLabel)
         expectSame($ids[2], (int) $firstId, 'consumer ordering result');
 
         verifyStaleSnapshotAllocation($pdo, $table, $orderingConfig, $ordering);
+        verifyDocumentedExamples($repositoryRoot, $consumerRoot);
 
         echo 'Consumer run ' . $runLabel . " passed.\n";
     } finally {
@@ -362,6 +363,40 @@ function verifyStaleSnapshotAllocation(
         if ($other->inTransaction()) {
             $other->rollBack();
         }
+    }
+}
+
+/**
+ * Runs the documented standalone examples from the clean consumer root. They
+ * resolve `../../vendor/autoload.php` there, so they exercise the package only
+ * through the Composer-installed dependency and its public API.
+ */
+function verifyDocumentedExamples(string $repositoryRoot, string $consumerRoot): void
+{
+    $source = $repositoryRoot . '/examples/next-position';
+    $target = $consumerRoot . '/examples/next-position';
+
+    if (! mkdir($target, 0700, true) && ! is_dir($target)) {
+        throw new RuntimeException('Unable to create the consumer examples directory.');
+    }
+
+    $scripts = glob($source . '/[0-9][0-9]_*.php');
+    if (! is_array($scripts) || $scripts === []) {
+        throw new RuntimeException('No documented examples were found to verify.');
+    }
+
+    if (! copy($source . '/_support.php', $target . '/_support.php')) {
+        throw new RuntimeException('Unable to copy the example support file.');
+    }
+
+    foreach ($scripts as $script) {
+        if (! copy($script, $target . '/' . basename($script))) {
+            throw new RuntimeException('Unable to copy example ' . basename($script) . '.');
+        }
+    }
+
+    foreach ($scripts as $script) {
+        runCommand([PHP_BINARY, $target . '/' . basename($script)], $target);
     }
 }
 
