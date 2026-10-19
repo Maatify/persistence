@@ -367,36 +367,49 @@ function verifyStaleSnapshotAllocation(
 }
 
 /**
- * Runs the documented standalone examples from the clean consumer root. They
- * resolve `../../vendor/autoload.php` there, so they exercise the package only
- * through the Composer-installed dependency and its public API.
+ * Runs the documented standalone examples (position allocation and movement)
+ * from the clean consumer root. They resolve `../../vendor/autoload.php` there,
+ * so they exercise the package only through the Composer-installed dependency
+ * and its public API.
  */
 function verifyDocumentedExamples(string $repositoryRoot, string $consumerRoot): void
 {
-    $source = $repositoryRoot . '/examples/next-position';
-    $target = $consumerRoot . '/examples/next-position';
+    $directories = ['next-position', 'move-within-scope'];
 
-    if (! mkdir($target, 0700, true) && ! is_dir($target)) {
-        throw new RuntimeException('Unable to create the consumer examples directory.');
-    }
+    foreach ($directories as $directory) {
+        $source = $repositoryRoot . '/examples/' . $directory;
+        $target = $consumerRoot . '/examples/' . $directory;
 
-    $scripts = glob($source . '/[0-9][0-9]_*.php');
-    if (! is_array($scripts) || $scripts === []) {
-        throw new RuntimeException('No documented examples were found to verify.');
-    }
+        if (! mkdir($target, 0700, true) && ! is_dir($target)) {
+            throw new RuntimeException('Unable to create the consumer examples directory.');
+        }
 
-    if (! copy($source . '/_support.php', $target . '/_support.php')) {
-        throw new RuntimeException('Unable to copy the example support file.');
-    }
+        $scripts = glob($source . '/[0-9][0-9]_*.php');
+        if (! is_array($scripts) || $scripts === []) {
+            throw new RuntimeException('No documented examples were found to verify in ' . $directory . '.');
+        }
 
-    foreach ($scripts as $script) {
-        if (! copy($script, $target . '/' . basename($script))) {
-            throw new RuntimeException('Unable to copy example ' . basename($script) . '.');
+        if (! copy($source . '/_support.php', $target . '/_support.php')) {
+            throw new RuntimeException('Unable to copy the example support file for ' . $directory . '.');
+        }
+
+        foreach ($scripts as $script) {
+            if (! copy($script, $target . '/' . basename($script))) {
+                throw new RuntimeException('Unable to copy example ' . basename($script) . '.');
+            }
         }
     }
 
-    foreach ($scripts as $script) {
-        runCommand([PHP_BINARY, $target . '/' . basename($script)], $target);
+    foreach ($directories as $directory) {
+        $target = $consumerRoot . '/examples/' . $directory;
+        $scripts = glob($target . '/[0-9][0-9]_*.php');
+        if (! is_array($scripts)) {
+            throw new RuntimeException('Unable to list the consumer examples of ' . $directory . '.');
+        }
+
+        foreach ($scripts as $script) {
+            runCommand([PHP_BINARY, $script], $target);
+        }
     }
 }
 

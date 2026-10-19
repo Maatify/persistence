@@ -102,11 +102,11 @@ The package-level schema notes are in [schema/README.md](schema/README.md).
     * Throws `InvalidOrderingOperationException` for `newOrder <= 0`.
     * Owns a transaction when PDO has no active transaction.
     * Participates in an active caller-owned PDO transaction without beginning, committing, or rolling it back.
-    * Locks the applicable active scope.
+    * Locks the applicable active scope with `SELECT ... FOR UPDATE` and takes the clamp maximum from the order values of the rows that same locking read returns (0 for an empty scope), not from a separate non-locking read. Under `REPEATABLE READ` this means that, inside a caller-owned transaction whose consistent-read snapshot is older than another connection's commit, the clamp follows the latest committed active rows the locking read observed. Scope and soft-delete filtering of that read are the same as for the movement itself. This is not a guarantee that rows inserted later are serialized (no all-isolation phantom-free guarantee; for example InnoDB generally takes no gap locks under `READ COMMITTED`), and an empty scope has no row to lock. Unreleased; not part of the stable `v1.4.0`.
     * A configured nullable scope uses `scopeColumn IS NULL` when `$scopeValue` is null.
     * Reads the target order inside the transaction.
     * Returns `false` if the target is missing.
-    * Clamps above-maximum order to the applicable maximum.
+    * Clamps above-maximum order to the maximum read by the scope lock (see above); gaps are not normalized, so the maximum is the highest active order value.
     * Returns `true` for an already satisfied/clamped no-op.
     * Shifts only the affected range.
     * When `updatedAtColumn` is configured, `$updatedAtValue` is written with the target order in the same update and transaction.
@@ -307,6 +307,16 @@ standalone scripts in [`examples/next-position`](examples/next-position). The
 guide illustrates this contract; this Reference remains normative.
 `getNextPositionForUpdate()` is Unreleased and not part of the stable `v1.4.0`.
 
+For moving a row with `moveWithinScope()`, including inside a caller-owned
+`REPEATABLE READ` transaction whose snapshot is older than another connection's
+commit, see the
+[Move-within-scope How-to-Use guide](docs/guides/MOVE_WITHIN_SCOPE_HOW_TO_USE.md)
+and the runnable script
+[`examples/move-within-scope/01_move_after_older_snapshot.php`](examples/move-within-scope/01_move_after_older_snapshot.php).
+It is a separate path from position allocation: `moveWithinScope()` does not call
+`getNextPositionForUpdate()`, and the `examples/next-position` scripts do not
+cover movement. The movement fix is Unreleased and not part of the stable `v1.4.0`.
+
 ## SQL and Trust Boundaries
 
 * **Identifiers**: SQL identifiers (table, columns) are validated configuration, not user input. They cannot be PDO-bound. Supported formats are standard identifier naming rules and `schema.table`.
@@ -335,7 +345,13 @@ guide illustrates this contract; this Reference remains normative.
   Serializing the first insert into an empty scope remains the caller's
   responsibility.
 * `moveWithinScope()` locks the applicable active ordering scope with
-  `SELECT ... FOR UPDATE` inside the transaction it owns or joins.
+  `SELECT ... FOR UPDATE` inside the transaction it owns or joins, and derives
+  its clamp maximum from the rows that locking read returns. In a caller-owned
+  `REPEATABLE READ` transaction with an older snapshot the clamp therefore
+  follows the latest committed rows the locking read observed, not the
+  snapshot. The locks are held until the owning transaction ends; it never
+  commits or rolls back a caller-owned transaction. This is not a guarantee
+  about later concurrent inserts in any isolation level.
 
 ## Transaction Savepoint Orchestration Boundaries
 
