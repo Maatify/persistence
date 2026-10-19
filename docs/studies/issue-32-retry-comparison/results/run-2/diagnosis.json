@@ -1,0 +1,303 @@
+{
+    "explain": {
+        "find_owner": {
+            "sql": "SELECT `id` AS `product_id` FROM `maa_product_products` WHERE `id` = :id LIMIT 1",
+            "plan": [
+                {
+                    "id": 1,
+                    "select_type": "SIMPLE",
+                    "table": "maa_product_products",
+                    "partitions": null,
+                    "type": "const",
+                    "possible_keys": "PRIMARY",
+                    "key": "PRIMARY",
+                    "key_len": "8",
+                    "ref": "const",
+                    "rows": 1,
+                    "filtered": 100,
+                    "Extra": "Using index"
+                }
+            ]
+        },
+        "lock_product": {
+            "sql": "SELECT `id`, `status`, (`deleted_at` IS NOT NULL) AS `deleted` FROM `maa_product_products` WHERE `id` = :id FOR UPDATE",
+            "plan": [
+                {
+                    "id": 1,
+                    "select_type": "SIMPLE",
+                    "table": "maa_product_products",
+                    "partitions": null,
+                    "type": "const",
+                    "possible_keys": "PRIMARY",
+                    "key": "PRIMARY",
+                    "key_len": "8",
+                    "ref": "const",
+                    "rows": 1,
+                    "filtered": 100,
+                    "Extra": null
+                }
+            ]
+        },
+        "lock_options": {
+            "sql": "SELECT `id`, `product_id`, `status`, (`deleted_at` IS NOT NULL) AS `deleted` FROM `maa_product_options` FORCE INDEX (`uq_maa_product_options_product_code`) WHERE `product_id` = :product_id ORDER BY `id` ASC FOR UPDATE",
+            "plan": [
+                {
+                    "id": 1,
+                    "select_type": "SIMPLE",
+                    "table": "maa_product_options",
+                    "partitions": null,
+                    "type": "ref",
+                    "possible_keys": "uq_maa_product_options_product_code",
+                    "key": "uq_maa_product_options_product_code",
+                    "key_len": "8",
+                    "ref": "const",
+                    "rows": 1,
+                    "filtered": 100,
+                    "Extra": "Using filesort"
+                }
+            ]
+        },
+        "lock_values": {
+            "sql": "SELECT ov.`id`, ov.`option_id`, ov.`status`, (ov.`deleted_at` IS NOT NULL) AS `deleted` FROM `maa_product_options` o FORCE INDEX (`uq_maa_product_options_product_code`) STRAIGHT_JOIN `maa_product_option_values` ov FORCE INDEX (`uq_maa_product_option_values_option_code`) ON ov.`option_id` = o.`id` WHERE o.`product_id` = :product_id ORDER BY ov.`id` ASC FOR UPDATE",
+            "plan": [
+                {
+                    "id": 1,
+                    "select_type": "SIMPLE",
+                    "table": "o",
+                    "partitions": null,
+                    "type": "ref",
+                    "possible_keys": "uq_maa_product_options_product_code",
+                    "key": "uq_maa_product_options_product_code",
+                    "key_len": "8",
+                    "ref": "const",
+                    "rows": 1,
+                    "filtered": 100,
+                    "Extra": "Using index; Using temporary; Using filesort"
+                },
+                {
+                    "id": 1,
+                    "select_type": "SIMPLE",
+                    "table": "ov",
+                    "partitions": null,
+                    "type": "ref",
+                    "possible_keys": "uq_maa_product_option_values_option_code",
+                    "key": "uq_maa_product_option_values_option_code",
+                    "key_len": "8",
+                    "ref": "i32_study.o.id",
+                    "rows": 1,
+                    "filtered": 100,
+                    "Extra": null
+                }
+            ]
+        },
+        "lock_variants": {
+            "sql": "SELECT `id`, `product_id`, `composition_fingerprint`, `status`, (`deleted_at` IS NOT NULL) AS `deleted` FROM `maa_product_variants` FORCE INDEX (`idx_maa_product_variants_product_status_deleted_order`) WHERE `product_id` = :product_id ORDER BY `id` ASC FOR UPDATE",
+            "plan": [
+                {
+                    "id": 1,
+                    "select_type": "SIMPLE",
+                    "table": "maa_product_variants",
+                    "partitions": null,
+                    "type": "ref",
+                    "possible_keys": "idx_maa_product_variants_product_status_deleted_order",
+                    "key": "idx_maa_product_variants_product_status_deleted_order",
+                    "key_len": "8",
+                    "ref": "const",
+                    "rows": 1,
+                    "filtered": 100,
+                    "Extra": "Using filesort"
+                }
+            ]
+        },
+        "lock_name": {
+            "sql": "SELECT 1 FROM `maa_product_product_contents` FORCE INDEX (`uq_maa_product_product_contents_identity`) WHERE `product_id` = :product_id AND `deleted_at` IS NULL AND `name` REGEXP '[^[:space:]]' LIMIT 1 FOR SHARE",
+            "plan": [
+                {
+                    "id": 1,
+                    "select_type": "SIMPLE",
+                    "table": "maa_product_product_contents",
+                    "partitions": null,
+                    "type": "ref",
+                    "possible_keys": "uq_maa_product_product_contents_identity",
+                    "key": "uq_maa_product_product_contents_identity",
+                    "key_len": "8",
+                    "ref": "const",
+                    "rows": 1,
+                    "filtered": 100,
+                    "Extra": "Using where"
+                }
+            ]
+        }
+    },
+    "both_locking_reads_succeeded_without_blocking_ms": 8.09,
+    "data_locks_after_locking_reads": {
+        "conn_a": 89,
+        "conn_b": 90,
+        "locks": [
+            {
+                "conn": 89,
+                "tbl": "maa_product_options",
+                "idx": null,
+                "lock_type": "TABLE",
+                "lock_mode": "IX",
+                "lock_status": "GRANTED",
+                "lock_data": null
+            },
+            {
+                "conn": 89,
+                "tbl": "maa_product_options",
+                "idx": "uq_maa_product_options_product_code",
+                "lock_type": "RECORD",
+                "lock_mode": "X",
+                "lock_status": "GRANTED",
+                "lock_data": "supremum pseudo-record"
+            },
+            {
+                "conn": 89,
+                "tbl": "maa_product_product_contents",
+                "idx": null,
+                "lock_type": "TABLE",
+                "lock_mode": "IS",
+                "lock_status": "GRANTED",
+                "lock_data": null
+            },
+            {
+                "conn": 89,
+                "tbl": "maa_product_product_contents",
+                "idx": "uq_maa_product_product_contents_identity",
+                "lock_type": "RECORD",
+                "lock_mode": "S",
+                "lock_status": "GRANTED",
+                "lock_data": "supremum pseudo-record"
+            },
+            {
+                "conn": 89,
+                "tbl": "maa_product_products",
+                "idx": null,
+                "lock_type": "TABLE",
+                "lock_mode": "IX",
+                "lock_status": "GRANTED",
+                "lock_data": null
+            },
+            {
+                "conn": 89,
+                "tbl": "maa_product_products",
+                "idx": "PRIMARY",
+                "lock_type": "RECORD",
+                "lock_mode": "X,REC_NOT_GAP",
+                "lock_status": "GRANTED",
+                "lock_data": "1"
+            },
+            {
+                "conn": 89,
+                "tbl": "maa_product_variants",
+                "idx": null,
+                "lock_type": "TABLE",
+                "lock_mode": "IX",
+                "lock_status": "GRANTED",
+                "lock_data": null
+            },
+            {
+                "conn": 89,
+                "tbl": "maa_product_variants",
+                "idx": "idx_maa_product_variants_product_status_deleted_order",
+                "lock_type": "RECORD",
+                "lock_mode": "X",
+                "lock_status": "GRANTED",
+                "lock_data": "supremum pseudo-record"
+            },
+            {
+                "conn": 90,
+                "tbl": "maa_product_options",
+                "idx": null,
+                "lock_type": "TABLE",
+                "lock_mode": "IX",
+                "lock_status": "GRANTED",
+                "lock_data": null
+            },
+            {
+                "conn": 90,
+                "tbl": "maa_product_options",
+                "idx": "uq_maa_product_options_product_code",
+                "lock_type": "RECORD",
+                "lock_mode": "X",
+                "lock_status": "GRANTED",
+                "lock_data": "supremum pseudo-record"
+            },
+            {
+                "conn": 90,
+                "tbl": "maa_product_product_contents",
+                "idx": null,
+                "lock_type": "TABLE",
+                "lock_mode": "IS",
+                "lock_status": "GRANTED",
+                "lock_data": null
+            },
+            {
+                "conn": 90,
+                "tbl": "maa_product_product_contents",
+                "idx": "uq_maa_product_product_contents_identity",
+                "lock_type": "RECORD",
+                "lock_mode": "S",
+                "lock_status": "GRANTED",
+                "lock_data": "supremum pseudo-record"
+            },
+            {
+                "conn": 90,
+                "tbl": "maa_product_products",
+                "idx": null,
+                "lock_type": "TABLE",
+                "lock_mode": "IX",
+                "lock_status": "GRANTED",
+                "lock_data": null
+            },
+            {
+                "conn": 90,
+                "tbl": "maa_product_products",
+                "idx": "PRIMARY",
+                "lock_type": "RECORD",
+                "lock_mode": "X,REC_NOT_GAP",
+                "lock_status": "GRANTED",
+                "lock_data": "2"
+            },
+            {
+                "conn": 90,
+                "tbl": "maa_product_variants",
+                "idx": null,
+                "lock_type": "TABLE",
+                "lock_mode": "IX",
+                "lock_status": "GRANTED",
+                "lock_data": null
+            },
+            {
+                "conn": 90,
+                "tbl": "maa_product_variants",
+                "idx": "idx_maa_product_variants_product_status_deleted_order",
+                "lock_type": "RECORD",
+                "lock_mode": "X",
+                "lock_status": "GRANTED",
+                "lock_data": "supremum pseudo-record"
+            }
+        ]
+    },
+    "insert_while_other_holds_gap_lock": {
+        "error": [
+            "HY000",
+            1205,
+            "Lock wait timeout exceeded; try restarting transaction"
+        ],
+        "waited_ms": 1002
+    },
+    "innodb_latest_detected_deadlock": "2026-10-19 15:57:46 281472523681536\n*** (1) TRANSACTION:\nTRANSACTION 5238, ACTIVE 0 sec inserting\nmysql tables in use 1, locked 1\nLOCK WAIT 10 lock struct(s), heap size 1128, 5 row lock(s), undo log entries 1\nMySQL thread id 95, OS thread handle 281472498319104, query id 2962 172.17.0.1 i32 update\nINSERT INTO `maa_product_product_contents` (`product_id`, `language_code`, `name`, `short_description`, `description`, `created_at`, `updated_at`, `deleted_at`) VALUES ('39', NULL, 'op-39', NULL, NULL, '2026-10-19 15:57:46', '2026-10-19 15:57:46', NULL)\n\n*** (1) HOLDS THE LOCK(S):\nRECORD LOCKS space id 223 page no 5 n bits 88 index uq_maa_product_product_contents_identity of table `i32_study`.`maa_product_product_contents` trx id 5238 lock mode S\nRecord lock, heap no 1 PHYSICAL RECORD: n_fields 1; compact format; info bits 0\n 0: len 8; hex 73757072656d756d; asc supremum;;\n\n\n*** (1) WAITING FOR THIS LOCK TO BE GRANTED:\nRECORD LOCKS space id 223 page no 5 n bits 88 index uq_maa_product_product_contents_identity of table `i32_study`.`maa_product_product_contents` trx id 5238 lock_mode X insert intention waiting\nRecord lock, heap no 1 PHYSICAL RECORD: n_fields 1; compact format; info bits 0\n 0: len 8; hex 73757072656d756d; asc supremum;;\n\n\n*** (2) TRANSACTION:\nTRANSACTION 5239, ACTIVE 0 sec inserting\nmysql tables in use 1, locked 1\nLOCK WAIT 10 lock struct(s), heap size 1128, 5 row lock(s), undo log entries 1\nMySQL thread id 94, OS thread handle 281472497200896, query id 2961 172.17.0.1 i32 update\nINSERT INTO `maa_product_product_contents` (`product_id`, `language_code`, `name`, `short_description`, `description`, `created_at`, `updated_at`, `deleted_at`) VALUES ('40', NULL, 'op-40', NULL, NULL, '2026-10-19 15:57:46', '2026-10-19 15:57:46', NULL)\n\n*** (2) HOLDS THE LOCK(S):\nRECORD LOCKS space id 223 page no 5 n bits 88 index uq_maa_product_product_contents_identity of table `i32_study`.`maa_product_product_contents` trx id 5239 lock mode S\nRecord lock, heap no 1 PHYSICAL RECORD: n_fields 1; compact format; info bits 0\n 0: len 8; hex 73757072656d756d; asc supremum;;\n\n\n*** (2) WAITING FOR THIS LOCK TO BE GRANTED:\nRECORD LOCKS space id 223 page no 5 n bits 88 index uq_maa_product_product_contents_identity of table `i32_study`.`maa_product_product_contents` trx id 5239 lock_mode X insert intention waiting\nRecord lock, heap no 1 PHYSICAL RECORD: n_fields 1; compact format; info bits 0\n 0: len 8; hex 73757072656d756d; asc supremum;;\n\n*** WE ROLL BACK TRANSACTION (2)",
+    "deadlock_sample_run": {
+        "policy": "none",
+        "connections": 2,
+        "ops": 40,
+        "client_deadlocks": 20,
+        "server_deadlocks_delta": 20,
+        "error_codes_seen": [
+            1213,
+            0
+        ]
+    }
+}

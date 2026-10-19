@@ -1,0 +1,81 @@
+{
+    "cells": {
+        "sequential-wave": {
+            "levels": [
+                2,
+                4,
+                8,
+                16
+            ],
+            "rounds": 10,
+            "ops": 400,
+            "placement": "sequential",
+            "mode": "wave",
+            "policies": [
+                "immediate",
+                "hybrid"
+            ],
+            "verify": false
+        },
+        "baseline-none": {
+            "levels": [
+                2,
+                8
+            ],
+            "rounds": 5,
+            "ops": 400,
+            "placement": "sequential",
+            "mode": "wave",
+            "policies": [
+                "none"
+            ],
+            "verify": false
+        },
+        "integrity-verify": {
+            "levels": [
+                8
+            ],
+            "rounds": 5,
+            "ops": 400,
+            "placement": "sequential",
+            "mode": "wave",
+            "policies": [
+                "immediate",
+                "hybrid"
+            ],
+            "verify": true
+        },
+        "shuffled-wave": {
+            "levels": [
+                2,
+                8,
+                16
+            ],
+            "rounds": 10,
+            "ops": 400,
+            "placement": "shuffled",
+            "mode": "wave",
+            "policies": [
+                "immediate",
+                "hybrid"
+            ],
+            "verify": false
+        },
+        "sequential-free": {
+            "levels": [
+                4,
+                8,
+                16
+            ],
+            "rounds": 10,
+            "ops": 400,
+            "placement": "sequential",
+            "mode": "free",
+            "policies": [
+                "immediate",
+                "hybrid"
+            ],
+            "verify": false
+        }
+    }
+}

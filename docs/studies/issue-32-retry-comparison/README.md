@@ -10,10 +10,16 @@ Study-only material for [Issue #32](https://github.com/Maatify/persistence/issue
 | `harness/worker.php` | One worker process = one independent PDO connection |
 | `harness/study.php` | Orchestrator: `run`, `diagnose`, `env` |
 | `harness/diagnose.php` | `EXPLAIN`, `data_locks`, blocked insert, InnoDB deadlock report |
-| `harness/analyze.php` | Metrics, tables, pre-registered decision (constants at the top) |
+| `harness/analyze.php` | Fail-closed evidence validation, metrics, tables, pre-registered decision (constants at the top) |
+| `harness/selftest.php` | Negative tests of the harness itself (retry classification, ownership, evidence validation, reuse guard, observer sensitivity) |
 | `schema/php-product-schema.sql` | Verbatim `maatify/php-product` schema (see METHODOLOGY §3) |
-| `run-all.sh` | Whole study, in order |
-| `results/main/` | Raw results (`runs/*.jsonl.gz`), `environment.json`, `diagnosis.json`, `analysis.json`, `ANALYSIS.md`, `run.log` |
+| `run-all.sh` | Whole study, in order, into a fresh directory; waits for a quiet host |
+| `host-load.sh`, `load-report.php` | Host load-average sampling and per-run noisy-host flags |
+| `results/run-1-initial/` | First complete run (earlier harness version, legacy format; reconstructed manifest) |
+| `results/run-2/` | Re-run with the final harness; a later part overlapped heavy load from another project on the same host (see REPORT §6) |
+| `results/run-3/` | Re-run with the final harness behind a quiet-host gate and with host-load logging |
+
+Each results directory holds `runs/*.jsonl.gz`, `manifest.json`, `environment.json`, `preflight/`, `diagnosis.json`, `analysis.json`, `ANALYSIS.md`, `run.log` (run-2/3 also `selftest.txt`; run-3 `host-load.log`, `LOAD.md`, `quiet-gate.txt`).
 
 ## Requirements
 
@@ -31,7 +37,7 @@ docker exec maatify-i32-mysql mysql -uroot -pstudy_root \
 
 ```bash
 cd docs/studies/issue-32-retry-comparison
-STUDY_DOCKER_CONTAINER=maatify-i32-mysql ./run-all.sh ../results/rerun   # relative to harness/; ~25 minutes
+STUDY_DOCKER_CONTAINER=maatify-i32-mysql ./run-all.sh ../results/rerun   # fresh dir, relative to harness/; ~25 minutes (+ quiet-host wait)
 ```
 
 The connection can be changed with `STUDY_MYSQL_DSN`, `STUDY_MYSQL_USER`, `STUDY_MYSQL_PASSWORD` (the user needs `DROP/CREATE DATABASE` and read access to `performance_schema` and `information_schema`; the harness **drops and recreates the database named in the DSN** on every run — point it only at a disposable server).
@@ -40,19 +46,20 @@ Single cells:
 
 ```bash
 cd docs/studies/issue-32-retry-comparison/harness
+php selftest.php --with-db=1                      # harness self-tests (needs the study MySQL)
 php study.php run --out=../results/try --tag=sequential-wave --levels=8 --rounds=2 --ops=400
-php analyze.php --dir=../results/try
+php analyze.php --dir=../results/try                # refuses incomplete/inconsistent evidence (exit 3)
 ```
 
-Absolute timings depend on the host; the pass/fail pattern of the paired comparison is what should reproduce. Re-analysis of the committed raw data needs no database: `php harness/analyze.php --dir=results/main`.
+Absolute timings depend on the host; the pass/fail pattern of the paired comparison is what should reproduce. Re-analysis of committed raw data needs no database: `php harness/analyze.php --dir=results/run-3` (run-1 needs `--allow-legacy=1`).
 
 ## Reading the raw data
 
 `runs/<tag>_c<connections>_r<round>_<policy>.jsonl.gz`: one JSON object per operation (`type":"op"`) and a final `type":"summary"` line.
 
-- `attempts`: list of `[start_us_from_release, duration_us, error_code (0 = committed, 1213 = deadlock), sleep_after_us]`
-- `outcome`: `ok`, `exhausted` (all attempts 1213) or `error` (anything else; must be zero)
+- `attempts`: list of `[start_us_from_release, duration_us, error_code (0 = committed, -1 = non-PDO), sleep_after_us, sqlstate]` (run-1 has no `sqlstate`)
+- `outcome`: `ok`, `exhausted` (all attempts deadlock), `error` (anything else) or `invalid` (ownership precondition failed); the last two must be zero
 - `latency_us`: first attempt start → last attempt end, jitter sleeps included
 - summary: counts, `active_us`, per-wave `wave_active_us`, server deadlock counter delta, integrity block
 
-Quick look: `zcat results/main/runs/sequential-wave_c08_r01_hybrid.jsonl.gz | head`.
+Quick look: `zcat results/run-3/runs/sequential-wave_c08_r01_hybrid.jsonl.gz | head`.

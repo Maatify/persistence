@@ -65,6 +65,59 @@ function resetEnvironment(array $cfg, int $products): void
     }
 }
 
+/**
+ * Proves the server-side transaction observers are SENSITIVE before any measurement: instrumentation is enabled and a
+ * deliberately open transaction is actually seen (positive control) and no longer seen once rolled back. An empty
+ * observer result is only accepted as "no open transaction" because this control passed on the same server.
+ *
+ * @return array<string,mixed>
+ */
+function preflight(array $cfg): array
+{
+    resetEnvironment($cfg, 1);
+    $a = connect($cfg);
+    $b = connect($cfg);
+    $out = ['at' => date('c'), 'checks' => []];
+    $check = static function (string $name, bool $pass, mixed $detail = null) use (&$out): void {
+        $out['checks'][] = ['name' => $name, 'pass' => $pass, 'detail' => $detail];
+    };
+
+    $check('@@performance_schema = 1', (int) $a->query('SELECT @@performance_schema')->fetchColumn() === 1);
+    foreach (['global_instrumentation', 'thread_instrumentation', 'events_transactions_current'] as $consumer) {
+        $statement = $a->prepare('SELECT ENABLED FROM performance_schema.setup_consumers WHERE NAME = ?');
+        $statement->execute([$consumer]);
+        $check('setup_consumers.' . $consumer . ' = YES', $statement->fetchColumn() === 'YES');
+    }
+    $instrument = $a->query("SELECT ENABLED, TIMED FROM performance_schema.setup_instruments WHERE NAME = 'transaction'")->fetch();
+    $check("setup_instruments 'transaction' enabled", ($instrument['ENABLED'] ?? '') === 'YES', $instrument);
+    $check('study connection thread is INSTRUMENTED', $a->query('SELECT INSTRUMENTED FROM performance_schema.threads WHERE PROCESSLIST_ID = CONNECTION_ID()')->fetchColumn() === 'YES');
+
+    // Negative first: nothing open yet.
+    $check('control: no ACTIVE transaction before the probe', serverOpenTransactions($a) === [] && otherActiveTransactions($b) === []);
+
+    // Positive control: an intentionally open transaction must be seen by every observer used in the study.
+    $a->beginTransaction();
+    $a->query('SELECT 1 FROM maa_product_products WHERE id = 1 FOR UPDATE')->fetchAll();
+    $own = serverOpenTransactions($a);
+    $others = otherActiveTransactions($b);
+    usleep(300_000);   // INNODB_TRX is cached for 100 ms
+    $innodb = (int) $b->query('SELECT COUNT(*) FROM information_schema.INNODB_TRX WHERE trx_mysql_thread_id <> CONNECTION_ID()')->fetchColumn();
+    $check('positive control: per-retry probe sees the open transaction', count($own) === 1, $own);
+    $check('positive control: end-of-run probe sees the open transaction', count($others) === 1, $others);
+    $check('positive control: INNODB_TRX sees the open transaction (after cache expiry)', $innodb === 1, $innodb);
+    $check('positive control: PDO::inTransaction() is true', $a->inTransaction());
+
+    $a->rollBack();
+    usleep(300_000);
+    $check('control: per-retry probe empty after rollback', serverOpenTransactions($a) === []);
+    $check('control: end-of-run probe empty after rollback', otherActiveTransactions($b) === []);
+    $check('control: INNODB_TRX empty after rollback', (int) $b->query('SELECT COUNT(*) FROM information_schema.INNODB_TRX WHERE trx_mysql_thread_id <> CONNECTION_ID()')->fetchColumn() === 0);
+
+    $out['pass'] = !in_array(false, array_column($out['checks'], 'pass'), true);
+
+    return $out;
+}
+
 function deadlockCounter(PDO $pdo): int
 {
     $pdo->exec("SET GLOBAL innodb_monitor_enable = 'lock_deadlocks'");
@@ -205,7 +258,7 @@ function runOne(array $cfg, array $p): array
 
     // ---- integrity checks (workers are still connected and idle) ----
     // performance_schema is exact; INNODB_TRX is cached for 100 ms, so it is read after the cache expired.
-    $activePs = $control->query("SELECT THREAD_ID, STATE FROM performance_schema.events_transactions_current WHERE STATE = 'ACTIVE' AND THREAD_ID <> PS_CURRENT_THREAD_ID()")->fetchAll();
+    $activePs = otherActiveTransactions($control);
     usleep(300_000);
     $openTrx = $control->query('SELECT trx_id, trx_state, trx_mysql_thread_id, trx_query, trx_started, trx_rows_locked, trx_rows_modified FROM information_schema.INNODB_TRX WHERE trx_mysql_thread_id <> CONNECTION_ID()')->fetchAll();
     $trxOpen = count($openTrx) + count($activePs);
@@ -276,6 +329,9 @@ function runOne(array $cfg, array $p): array
         'ok' => $count('ok'),
         'exhausted' => $count('exhausted'),
         'errors' => $count('error'),
+        'invalid' => $count('invalid'),
+        'harness_sha256' => harnessHash(),
+        'mysql_version' => (string) $control->query('SELECT VERSION()')->fetchColumn(),
         'client_deadlocks' => $clientDeadlocks,
         'server_deadlocks_delta' => $deadlocksAfter - $deadlocksBefore,
         'integrity' => [
@@ -308,6 +364,18 @@ function writeRun(string $file, array $result): void
     gzclose($gz);
 }
 
+function readSummaryOnly(string $file): array
+{
+    $gz = gzopen($file, 'rb');
+    $last = null;
+    while (($line = gzgets($gz)) !== false) {
+        $last = $line;
+    }
+    gzclose($gz);
+
+    return (array) json_decode((string) $last, true);
+}
+
 function commandRun(array $args): void
 {
     $cfg = connectionConfig();
@@ -326,6 +394,28 @@ function commandRun(array $args): void
         file_put_contents($out . '/environment.json', json_encode(captureEnvironment($cfg), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
     }
 
+    // Fail closed on reuse: the manifest declares exactly which runs must exist for each tag; a tag that already has
+    // run files is only continued with --resume=1, and then every existing file is validated against these parameters.
+    $params = ['levels' => $levels, 'rounds' => $rounds, 'ops' => $ops, 'placement' => $placement, 'mode' => $mode, 'policies' => $policies, 'verify' => $verify];
+    $manifestFile = $out . '/manifest.json';
+    $manifest = is_file($manifestFile) ? json_decode((string) file_get_contents($manifestFile), true, 512, JSON_THROW_ON_ERROR) : ['cells' => []];
+    if (isset($manifest['cells'][$tag]) && $manifest['cells'][$tag] !== $params) {
+        throw new \RuntimeException("Tag '$tag' already exists in $manifestFile with different parameters; use a new --tag or --out.");
+    }
+    $resume = ($args['resume'] ?? '0') === '1';
+    if (!$resume && (glob($out . '/runs/' . $tag . '_*.jsonl.gz') ?: []) !== []) {
+        throw new \RuntimeException("Output already holds runs for tag '$tag'; refusing to mix them with a new run (use a fresh --out, or --resume=1 to continue the same configuration).");
+    }
+    $manifest['cells'][$tag] = $params;
+    file_put_contents($manifestFile, json_encode($manifest, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+
+    $pf = preflight($cfg);
+    @mkdir($out . '/preflight', 0777, true);
+    file_put_contents($out . '/preflight/' . $tag . '.json', json_encode($pf, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+    if (!$pf['pass']) {
+        throw new \RuntimeException('Preflight observer controls failed; see ' . $out . '/preflight/' . $tag . '.json');
+    }
+
     foreach ($levels as $conns) {
         for ($round = 1; $round <= $rounds; ++$round) {
             // Order balancing: odd rounds run policies in the given order, even rounds reversed.
@@ -333,6 +423,13 @@ function commandRun(array $args): void
             foreach ($order as $position => $policy) {
                 $file = sprintf('%s/runs/%s_c%02d_r%02d_%s.jsonl.gz', $out, $tag, $conns, $round, $policy);
                 if (is_file($file)) {
+                    $existing = readSummaryOnly($file);
+                    $expected = ['tag' => $tag, 'connections' => $conns, 'ops' => $ops, 'policy' => $policy, 'round' => $round, 'placement' => $placement, 'mode' => $mode, 'verify_server_state' => $verify, 'harness_sha256' => harnessHash()];
+                    foreach ($expected as $k => $v) {
+                        if (($existing[$k] ?? null) !== $v) {
+                            throw new \RuntimeException("Existing $file does not match this configuration ($k); refusing to resume.");
+                        }
+                    }
                     continue;
                 }
                 $result = runOne($cfg, [
@@ -345,7 +442,7 @@ function commandRun(array $args): void
                     "[%s c=%d r=%d %-9s #%d] ok=%d exhausted=%d err=%d deadlocks(client/server)=%d/%d active=%.2fs integrity=%s\n",
                     $tag, $conns, $round, $policy, $position + 1, $s['ok'], $s['exhausted'], $s['errors'],
                     $s['client_deadlocks'], $s['server_deadlocks_delta'], $s['active_us'] / 1e6,
-                    $s['integrity']['rows_match_ok_ops'] && $s['integrity']['server_open_transactions_after_run'] === 0 ? 'OK' : 'FAIL',
+                    $s['integrity']['rows_match_ok_ops'] && $s['integrity']['server_open_transactions_after_run'] === 0 && $s['invalid'] === 0 && $s['errors'] === 0 ? 'OK' : 'FAIL',
                 ));
             }
         }
@@ -359,6 +456,13 @@ switch ($args['_']) {
     case 'run':
         commandRun($args);
         break;
+    case 'preflight':
+        $out = rtrim($args['out'] ?? '.', '/');
+        @mkdir($out, 0777, true);
+        $pf = preflight(connectionConfig());
+        file_put_contents($out . '/preflight.json', json_encode($pf, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+        fwrite(STDERR, $pf['pass'] ? "preflight OK\n" : "preflight FAILED\n");
+        exit($pf['pass'] ? 0 : 1);
     case 'diagnose':
         commandDiagnose($args);
         break;
@@ -368,6 +472,6 @@ switch ($args['_']) {
         file_put_contents($out . '/environment.json', json_encode(captureEnvironment(connectionConfig()), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
         break;
     default:
-        fwrite(STDERR, "usage: php study.php run|diagnose|env --out=DIR [...]\n");
+        fwrite(STDERR, "usage: php study.php run|diagnose|env|preflight --out=DIR [...]\n");
         exit(2);
 }

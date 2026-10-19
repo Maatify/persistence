@@ -1,0 +1,1 @@
+host quiet gate: quiet_samples=0 waited=1800s load1_now={ 37.67 33.70 34.42 }

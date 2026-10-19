@@ -180,11 +180,120 @@ function serverOpenTransactions(PDO $pdo): array
 }
 
 /**
- * Runs one operation under the given policy. The retry loop is entirely here; each attempt is one
- * call to the unmodified runner, which owns (begins/commits/rolls back) its transaction because the
- * connection is never inside a caller transaction (asserted before every attempt).
+ * ACTIVE transactions of all OTHER connections (exact; performance_schema). Used for the end-of-run check.
+ */
+function otherActiveTransactions(PDO $control): array
+{
+    return $control->query("SELECT THREAD_ID, STATE FROM performance_schema.events_transactions_current WHERE STATE = 'ACTIVE' AND THREAD_ID <> PS_CURRENT_THREAD_ID()")->fetchAll();
+}
+
+/** Hash of the harness sources; stored in every run summary so runs of different harness versions cannot be mixed. */
+function harnessHash(): string
+{
+    $files = glob(__DIR__ . '/*.php') ?: [];
+    sort($files);
+    $ctx = hash_init('sha256');
+    foreach ($files as $f) {
+        hash_update($ctx, basename($f) . "\0" . (string) file_get_contents($f) . "\0");
+    }
+
+    return hash_final($ctx);
+}
+
+/**
+ * The single retry classifier: an InnoDB deadlock is exactly driver error 1213 AND SQLSTATE 40001.
+ * Anything else (1205, 1213 with another SQLSTATE, non-PDO throwables) is never retried.
+ */
+function isDeadlock(\Throwable $throwable): bool
+{
+    return $throwable instanceof PDOException
+        && (int) ($throwable->errorInfo[1] ?? 0) === 1213
+        && (string) ($throwable->errorInfo[0] ?? '') === '40001';
+}
+
+/**
+ * The retry loop, free of any database access so that its decision branches can be tested deterministically
+ * (selftest.php). Preconditions are fail-closed: if the connection is still inside a transaction before an attempt
+ * or after a failure (ownership / cleanup uncertain), the operation ends as `invalid` and NO further attempt runs.
  *
- * Attempt record: [startUs, durationUs, errorCode, sleepAfterUs] (times relative to $t0Ns).
+ * Attempt record: [startUs, durationUs, errorCode (0 ok, -1 non-PDO), sleepAfterUs, sqlState].
+ *
+ * @param callable(int):void $attempt            runs one attempt (one runner->run call); throws on failure
+ * @param callable():bool    $clientInTransaction  PDO::inTransaction()
+ * @param callable():array   $serverOpen         server-side ACTIVE transactions of this connection ([] = none), or null to skip
+ * @param callable(int):void $sleep              sleeps N microseconds
+ * @param callable():int     $nowNs              monotonic nanoseconds
+ * @return array{attempts:list<array>,flags:list<string>,outcome:string,other_error:?string,end_ns:int,start_ns:int}
+ */
+function executeWithPolicy(Policy $policy, callable $attempt, callable $clientInTransaction, ?callable $serverOpen, callable $sleep, callable $nowNs, int $t0Ns): array
+{
+    $attempts = [];
+    $flags = [];
+    $outcome = 'exhausted';
+    $otherError = null;
+    $opStartNs = $nowNs();
+    $lastEndNs = $opStartNs;
+    $total = $policy->maxRetries + 1;
+
+    for ($n = 1; $n <= $total; ++$n) {
+        if ($clientInTransaction()) {
+            $flags[] = 'client_tx_open_before_attempt_' . $n;
+            $outcome = 'invalid';
+            break;
+        }
+        if ($serverOpen !== null && $n > 1) {
+            $open = $serverOpen();
+            if ($open !== []) {
+                $flags[] = 'server_tx_open_before_retry_' . $n . ':' . json_encode($open);
+                $outcome = 'invalid';
+                break;
+            }
+        }
+
+        $startNs = $nowNs();
+        try {
+            $attempt($n);
+            $lastEndNs = $nowNs();
+            $attempts[] = [intdiv($startNs - $t0Ns, 1000), intdiv($lastEndNs - $startNs, 1000), 0, 0, ''];
+            $outcome = 'ok';
+            break;
+        } catch (\Throwable $throwable) {
+            $lastEndNs = $nowNs();
+            $pdo = $throwable instanceof PDOException;
+            $code = $pdo ? (int) ($throwable->errorInfo[1] ?? 0) : -1;
+            $state = $pdo ? (string) ($throwable->errorInfo[0] ?? '') : '';
+            $deadlock = isDeadlock($throwable);
+            $willRetry = $deadlock && $n < $total;
+            $sleepUs = $willRetry ? $policy->delayBeforeRetryUs($n) : 0;
+            $attempts[] = [intdiv($startNs - $t0Ns, 1000), intdiv($lastEndNs - $startNs, 1000), $code, $sleepUs, $state];
+
+            if ($clientInTransaction()) {
+                $flags[] = 'client_tx_open_after_failure_' . $n;
+                $outcome = 'invalid';
+                break;
+            }
+            if (!$deadlock) {
+                $outcome = 'error';
+                $otherError = ($pdo ? $code . ':' . $state : get_class($throwable)) . ':' . $throwable->getMessage();
+                break;
+            }
+            if (!$willRetry) {
+                $outcome = 'exhausted';
+                break;
+            }
+            if ($sleepUs > 0) {
+                $sleep($sleepUs);
+                $lastEndNs = $nowNs();
+            }
+        }
+    }
+
+    return ['attempts' => $attempts, 'flags' => $flags, 'outcome' => $outcome, 'other_error' => $otherError, 'end_ns' => $lastEndNs, 'start_ns' => $opStartNs];
+}
+
+/**
+ * Runs one operation against the real database: every attempt is one call to the unmodified runner, which owns
+ * (begins/commits/rolls back) its transaction because the connection is asserted to be outside any transaction.
  *
  * @return array<string,mixed>
  */
@@ -197,75 +306,34 @@ function runOperation(
     int $t0Ns,
     bool $verifyServerState,
 ): array {
-    $attempts = [];
-    $flags = [];
     $callbackRuns = 0;
-    $outcome = 'exhausted';
-    $otherError = null;
-    $opStartNs = hrtime(true);
-    $lastEndNs = $opStartNs;
     $name = 'op-' . $opId;
-    $total = $policy->maxRetries + 1;
-
-    for ($attempt = 1; $attempt <= $total; ++$attempt) {
-        if ($pdo->inTransaction()) {
-            $flags[] = 'client_tx_open_before_attempt_' . $attempt;
-        }
-        if ($verifyServerState && $attempt > 1) {
-            $open = serverOpenTransactions($pdo);
-            if ($open !== []) {
-                $flags[] = 'server_tx_open_before_retry_' . $attempt . ':' . json_encode($open);
-            }
-        }
-
-        $startNs = hrtime(true);
-        try {
+    $result = executeWithPolicy(
+        $policy,
+        static function () use ($runner, $pdo, $productId, $name, &$callbackRuns): void {
             $runner->run(static function () use ($pdo, $productId, $name, &$callbackRuns): void {
                 ++$callbackRuns;
                 Scenario::create($pdo, $productId, $name);
             });
-            $lastEndNs = hrtime(true);
-            $attempts[] = [intdiv($startNs - $t0Ns, 1000), intdiv($lastEndNs - $startNs, 1000), 0, 0];
-            $outcome = 'ok';
-            break;
-        } catch (PDOException $exception) {
-            $lastEndNs = hrtime(true);
-            $code = (int) ($exception->errorInfo[1] ?? 0);
-            $sqlState = (string) ($exception->errorInfo[0] ?? '');
-            if ($pdo->inTransaction()) {
-                $flags[] = 'client_tx_open_after_failure_' . $attempt;
-            }
-            $sleepUs = 0;
-            if ($code === 1213 && $sqlState === '40001' && $attempt < $total) {
-                $sleepUs = $policy->delayBeforeRetryUs($attempt);
-            }
-            $attempts[] = [intdiv($startNs - $t0Ns, 1000), intdiv($lastEndNs - $startNs, 1000), $code, $sleepUs];
-
-            if ($code !== 1213) {
-                $outcome = 'error';
-                $otherError = $code . ':' . $sqlState . ':' . $exception->getMessage();
-                break;
-            }
-            if ($attempt === $total) {
-                $outcome = 'exhausted';
-                break;
-            }
-            if ($sleepUs > 0) {
-                usleep($sleepUs);
-                $lastEndNs = hrtime(true);
-            }
-        }
-    }
+        },
+        static fn(): bool => $pdo->inTransaction(),
+        $verifyServerState ? static fn(): array => serverOpenTransactions($pdo) : null,
+        static function (int $us): void {
+            usleep($us);
+        },
+        static fn(): int => hrtime(true),
+        $t0Ns,
+    );
 
     return [
         'op' => $opId,
         'product' => $productId,
-        'outcome' => $outcome,
-        'attempts' => $attempts,
+        'outcome' => $result['outcome'],
+        'attempts' => $result['attempts'],
         'callback_runs' => $callbackRuns,
-        'latency_us' => intdiv($lastEndNs - $opStartNs, 1000),
-        'end_ns' => $lastEndNs,
-        'flags' => $flags,
-        'other_error' => $otherError,
+        'latency_us' => intdiv($result['end_ns'] - $result['start_ns'], 1000),
+        'end_ns' => $result['end_ns'],
+        'flags' => $result['flags'],
+        'other_error' => $result['other_error'],
     ];
 }

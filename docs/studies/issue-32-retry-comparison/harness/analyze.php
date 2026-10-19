@@ -94,6 +94,16 @@ function readRun(string $file): array
 }
 
 /** Metrics of one run (one policy, one round). */
+/** An attempt is a deadlock only with driver code 1213 AND SQLSTATE 40001 (legacy run files carry no SQLSTATE). */
+function isDeadlockAttempt(array $attempt): bool
+{
+    if ($attempt[2] !== 1213) {
+        return false;
+    }
+
+    return !array_key_exists(4, $attempt) || $attempt[4] === '40001';
+}
+
 function runMetrics(array $run): array
 {
     $s = $run['summary'];
@@ -111,8 +121,10 @@ function runMetrics(array $run): array
     foreach ($ops as $op) {
         $a = $op['attempts'];
         $attemptsTotal += count($a);
-        foreach ($a as $i => [$start, $dur, $code, $sleep]) {
-            if ($code === 1213) {
+        foreach ($a as $i => $attemptRow) {
+            [$start, $dur, $code, $sleep] = $attemptRow;
+            $isDeadlock = isDeadlockAttempt($attemptRow);
+            if ($isDeadlock) {
                 $i === 0 ? ++$original : ++$repeated;
             }
             $sleepTotal += $sleep;
@@ -121,13 +133,19 @@ function runMetrics(array $run): array
                 if ($start < $ps + $pd + $psl) {
                     $violations[] = $op['op'] . ': attempt ' . ($i + 1) . ' started before the previous attempt ended (+sleep)';
                 }
-                if ($a[$i - 1][2] !== 1213) {
-                    $violations[] = $op['op'] . ': retried after a non-1213 outcome';
+                if (!isDeadlockAttempt($a[$i - 1])) {
+                    $violations[] = $op['op'] . ': retried after a non-deadlock (1213 + SQLSTATE 40001) outcome';
                 }
             }
             if ($sleep > ($bounds[$i] ?? 0)) {
                 $violations[] = $op['op'] . ': sleep ' . $sleep . 'us exceeds policy bound before retry ' . ($i + 1);
             }
+        }
+        if ($op['outcome'] === 'invalid') {
+            $violations[] = $op['op'] . ': ended as invalid (transaction ownership/cleanup precondition failed)';
+        }
+        if ($op['outcome'] === 'exhausted' && ($a === [] || !isDeadlockAttempt(end($a)) || count($a) !== count($bounds) + 1)) {
+            $violations[] = $op['op'] . ': exhausted without four deadlock attempts';
         }
         if ($op['outcome'] === 'ok' && end($a)[2] !== 0) {
             $violations[] = $op['op'] . ': ok without a successful final attempt';
@@ -147,7 +165,7 @@ function runMetrics(array $run): array
     $i = $s['integrity'];
     $integrityPass = $i['rows_match_ok_ops'] && $i['duplicate_product_rows'] === 0 && $i['name_mismatch_rows'] === 0
         && $i['callback_runs_ne_attempts'] === 0 && $i['server_open_transactions_after_run'] === 0 && $i['flags'] === []
-        && $i['other_errors'] === [] && $i['all_isolation_repeatable_read'] && $s['errors'] === 0
+        && $i['other_errors'] === [] && $i['all_isolation_repeatable_read'] && $s['errors'] === 0 && ($s['invalid'] ?? 0) === 0
         && $s['client_deadlocks'] === $s['server_deadlocks_delta'] && $violations === [];
 
     return [
@@ -224,6 +242,9 @@ function compare(array $imm, array $hyb): array
             'immediate_first' => $i['order_in_round'] === 1,
         ];
     }
+    $paired = array_intersect(array_keys($imm), array_keys($hyb));
+    $imm = array_intersect_key($imm, array_flip($paired));
+    $hyb = array_intersect_key($hyb, array_flip($paired));
     $pi = pool($imm);
     $ph = pool($hyb);
     $nr = count($roundRows);
@@ -298,10 +319,125 @@ function fmt(?float $v, int $d = 2): string
     return $v === null ? 'n/a' : number_format($v, $d, '.', '');
 }
 
+/**
+ * Fail-closed input validation. Returns a list of problems (empty = the evidence set is complete, matched and consistent).
+ *
+ * @return array{problems:list<string>,files:array<string,string>,legacy:bool}
+ */
+function validateEvidence(string $dir, bool $allowLegacy): array
+{
+    $problems = [];
+    $manifestFile = $dir . '/manifest.json';
+    if (!is_file($manifestFile)) {
+        return ['problems' => ['manifest.json missing: cannot establish which runs must exist'], 'files' => [], 'legacy' => false];
+    }
+    $manifest = json_decode((string) file_get_contents($manifestFile), true, 512, JSON_THROW_ON_ERROR);
+    $expected = [];
+    foreach ($manifest['cells'] as $tag => $p) {
+        foreach ($p['levels'] as $level) {
+            for ($round = 1; $round <= $p['rounds']; ++$round) {
+                foreach ($p['policies'] as $policy) {
+                    $expected[sprintf('%s_c%02d_r%02d_%s.jsonl.gz', $tag, $level, $round, $policy)] = [$tag, $level, $round, $policy, $p];
+                }
+            }
+        }
+        $hasBoth = in_array('immediate', $p['policies'], true) && in_array('hybrid', $p['policies'], true);
+        if (!$hasBoth && count($p['policies']) !== count(array_unique($p['policies']))) {
+            $problems[] = "tag $tag: duplicate policy in manifest";
+        }
+    }
+    $present = array_map('basename', glob($dir . '/runs/*') ?: []);
+    foreach (array_diff(array_keys($expected), $present) as $missing) {
+        $problems[] = "missing run file: $missing";
+    }
+    foreach (array_diff($present, array_keys($expected)) as $extra) {
+        $problems[] = "unexpected run file not declared in manifest: $extra";
+    }
+    $hashes = [];
+    $versions = [];
+    $legacy = false;
+    $seen = [];
+    foreach ($expected as $name => [$tag, $level, $round, $policy, $p]) {
+        $file = $dir . '/runs/' . $name;
+        if (!is_file($file)) {
+            continue;
+        }
+        try {
+            $run = readRun($file);
+        } catch (\Throwable $e) {
+            $problems[] = "$name: unreadable (" . $e->getMessage() . ')';
+            continue;
+        }
+        $s = $run['summary'];
+        if ($s === null) {
+            $problems[] = "$name: no summary line";
+            continue;
+        }
+        $meta = ['tag' => $tag, 'connections' => $level, 'round' => $round, 'policy' => $policy, 'ops' => $p['ops'], 'placement' => $p['placement'], 'mode' => $p['mode'], 'verify_server_state' => $p['verify']];
+        foreach ($meta as $k => $v) {
+            if (($s[$k] ?? null) !== $v) {
+                $problems[] = "$name: summary $k=" . json_encode($s[$k] ?? null) . ' does not match manifest/file name (' . json_encode($v) . ')';
+            }
+        }
+        $key = $tag . '|' . $level . '|' . $round . '|' . $policy;
+        if (isset($seen[$key])) {
+            $problems[] = "$name: duplicate run for $key";
+        }
+        $seen[$key] = true;
+        $ops = $run['ops'];
+        if (count($ops) !== $p['ops'] || $s['ops'] !== $p['ops']) {
+            $problems[] = "$name: " . count($ops) . ' raw operations, summary says ' . $s['ops'] . ', manifest says ' . $p['ops'];
+        }
+        $ids = array_column($ops, 'op');
+        if (count(array_unique($ids)) !== count($ids) || count(array_unique(array_column($ops, 'product'))) !== count($ops)) {
+            $problems[] = "$name: duplicate operation or product ids";
+        }
+        $byOutcome = array_count_values(array_column($ops, 'outcome'));
+        foreach (['ok' => 'ok', 'exhausted' => 'exhausted', 'error' => 'errors', 'invalid' => 'invalid'] as $outcome => $field) {
+            if (($byOutcome[$outcome] ?? 0) !== ($s[$field] ?? 0)) {
+                $problems[] = "$name: raw outcome '$outcome' count " . ($byOutcome[$outcome] ?? 0) . " != summary $field " . ($s[$field] ?? 0);
+            }
+        }
+        $rawDeadlocks = 0;
+        foreach ($ops as $op) {
+            foreach ($op['attempts'] as $at) {
+                $rawDeadlocks += $at[2] === 1213 ? 1 : 0;
+                if (!array_key_exists(4, $at)) {
+                    $legacy = true;
+                }
+            }
+        }
+        if ($rawDeadlocks !== $s['client_deadlocks']) {
+            $problems[] = "$name: raw 1213 attempts $rawDeadlocks != summary client_deadlocks " . $s['client_deadlocks'];
+        }
+        $hashes[$s['harness_sha256'] ?? 'absent'] = true;
+        $versions[$s['mysql_version'] ?? 'absent'] = true;
+    }
+    if (count($hashes) > 1) {
+        $problems[] = 'runs were produced by different harness versions: ' . implode(', ', array_map(static fn($h) => substr((string) $h, 0, 12), array_keys($hashes)));
+    }
+    if (count($versions) > 1) {
+        $problems[] = 'runs were produced on different MySQL versions: ' . implode(', ', array_keys($versions));
+    }
+    if (isset($hashes['absent']) && !$allowLegacy) {
+        $problems[] = 'runs carry no harness hash (legacy run files); pass --allow-legacy=1 to analyse them explicitly as legacy evidence';
+    }
+    if ($legacy && !$allowLegacy) {
+        $problems[] = 'attempt records carry no SQLSTATE (legacy run files); pass --allow-legacy=1 to analyse them explicitly as legacy evidence';
+    }
+
+    return ['problems' => $problems, 'files' => array_keys($expected), 'legacy' => $legacy || isset($hashes['absent'])];
+}
+
 function main(array $argv): void
 {
     $a = args($argv);
     $dir = rtrim($a['dir'] ?? throw new InvalidArgumentException('--dir required'), '/');
+    $validation = validateEvidence($dir, ($a['allow-legacy'] ?? '0') === '1');
+    if ($validation['problems'] !== []) {
+        fwrite(STDERR, "EVIDENCE VALIDATION FAILED — no analysis written:\n - " . implode("\n - ", $validation['problems']) . "\n");
+        exit(3);
+    }
     $cells = [];   // tag => level => policy => round => metrics
     foreach (glob($dir . '/runs/*.jsonl.gz') ?: [] as $file) {
         $run = readRun($file);
@@ -310,12 +446,12 @@ function main(array $argv): void
         $cells[$s['tag']][$s['connections']][$s['policy']][$s['round']] = $m;
     }
     ksort($cells);
-    $out = ['dir' => $dir, 'generated_at' => date('c'), 'constants' => [
+    $out = ['dir' => $dir, 'generated_at' => date('c'), 'evidence_validated' => true, 'legacy_run_files' => $validation['legacy'], 'run_files' => count($validation['files']), 'constants_note' => 'see METHODOLOGY.md section 6', 'constants' => [
         'MIN_ROUNDS' => MIN_ROUNDS, 'MIN_OPS_PER_ROUND' => MIN_OPS_PER_ROUND, 'MIN_IMMEDIATE_EXHAUSTED_POOLED' => MIN_IMMEDIATE_EXHAUSTED_POOLED,
         'C1_REL' => C1_REL, 'C1_ABS_PP' => C1_ABS_PP, 'C1_ROUND_FRACTION' => C1_ROUND_FRACTION, 'C2_MAX_THROUGHPUT_DROP' => C2_MAX_THROUGHPUT_DROP,
         'C3_REL' => C3_REL, 'C3_ABS_US' => C3_ABS_US,
     ], 'cells' => []];
-    $md = ["# Analysis output — `" . basename($dir) . "`\n", 'Generated by `harness/analyze.php`; all numbers derive from `runs/*.jsonl.gz`. Latencies in ms, throughput in successful ops per active second.', ''];
+    $md = ["# Analysis output — `" . basename($dir) . "`\n", 'Evidence validation: ' . count($validation['files']) . ' declared run files present, matched and internally consistent' . ($validation['legacy'] ? ' (**legacy run files, analysed with --allow-legacy=1: attempt records carry no SQLSTATE**)' : '') . '.', '', 'Generated by `harness/analyze.php`; all numbers derive from `runs/*.jsonl.gz`. Latencies in ms, throughput in successful ops per active second.', ''];
 
     foreach ($cells as $tag => $levels) {
         ksort($levels);
@@ -411,4 +547,6 @@ function main(array $argv): void
     echo implode("\n", $md), "\n";
 }
 
-main($argv);
+if (PHP_SAPI === 'cli' && isset($argv[0]) && realpath($argv[0]) === __FILE__) {
+    main($argv);
+}
