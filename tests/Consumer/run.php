@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Composer\InstalledVersions;
+use Maatify\Persistence\Exception\InvalidOrderingOperationException;
 use Maatify\Persistence\Pdo\Ordering\ScopedOrderingConfig;
 use Maatify\Persistence\Pdo\Ordering\ScopedOrderingManager;
 use Maatify\Persistence\Pdo\Pagination\PageRequest;
@@ -12,6 +13,7 @@ use Maatify\Persistence\Pdo\Pagination\PdoPaginator;
 use Maatify\Persistence\Pdo\Pagination\SortDirectionEnum;
 use Maatify\Persistence\Pdo\Pagination\SortWhitelist;
 use Maatify\Persistence\Pdo\Transaction\PdoSavepointTransactionRunner;
+use Maatify\Persistence\Pdo\Transaction\PdoTransactionRunner;
 
 $repositoryRoot = dirname(__DIR__, 2);
 
@@ -253,6 +255,8 @@ function runSingleConsumerVerification(string $repositoryRoot, string $runLabel)
         }
         expectSame($ids[2], (int) $firstId, 'consumer ordering result');
 
+        verifyStaleSnapshotAllocation($pdo, $table, $orderingConfig, $ordering);
+
         echo 'Consumer run ' . $runLabel . " passed.\n";
     } finally {
         if ($pdo->inTransaction()) {
@@ -262,6 +266,102 @@ function runSingleConsumerVerification(string $repositoryRoot, string $runLabel)
             $pdo->exec('DROP TABLE IF EXISTS ' . $table);
         }
         removeDirectory($consumerRoot);
+    }
+}
+
+/**
+ * Consumer workflow for the documented stale-snapshot case: another connection
+ * commits a row after this transaction's REPEATABLE READ snapshot exists, then
+ * the position is allocated with getNextPositionForUpdate() and the row is
+ * inserted on the same connection and transaction.
+ */
+function verifyStaleSnapshotAllocation(
+    PDO $pdo,
+    string $table,
+    ScopedOrderingConfig $orderingConfig,
+    ScopedOrderingManager $ordering,
+): void {
+    $scope = 'consumer-snapshot';
+    $other = createPdo();
+
+    try {
+        $pdo->exec('SET SESSION TRANSACTION ISOLATION LEVEL REPEATABLE READ');
+
+        $insert = requireStatement(
+            $pdo->prepare(
+                'INSERT INTO ' . $table . ' (scope_key, display_order, name)
+                 VALUES (:scope_key, :display_order, :name)',
+            ),
+            'snapshot scenario insert',
+        );
+        $otherInsert = requireStatement(
+            $other->prepare(
+                'INSERT INTO ' . $table . ' (scope_key, display_order, name)
+                 VALUES (:scope_key, :display_order, :name)',
+            ),
+            'snapshot scenario concurrent insert',
+        );
+
+        $insert->execute(['scope_key' => $scope, 'display_order' => 1, 'name' => 'snapshot-1']);
+
+        try {
+            $ordering->getNextPositionForUpdate($pdo, $orderingConfig, $scope);
+            throw new RuntimeException('Expected the locking next-position read to require a transaction.');
+        } catch (InvalidOrderingOperationException) {
+            expectTrue(! $pdo->inTransaction(), 'locking read outside a transaction left no transaction behind');
+        }
+
+        $allocated = (new PdoTransactionRunner($pdo))->run(
+            function () use ($pdo, $table, $orderingConfig, $ordering, $scope, $insert, $otherInsert): int {
+                // The first non-locking read creates this transaction's snapshot.
+                readScalar($pdo, 'SELECT COUNT(*) FROM ' . $table);
+
+                // Another connection commits a higher tail after the snapshot.
+                $otherInsert->execute(['scope_key' => $scope, 'display_order' => 2, 'name' => 'snapshot-2']);
+
+                // The plain read still sees the snapshot; this keeps the
+                // scenario honest, so the locking read below is not vacuous.
+                expectSame(
+                    2,
+                    $ordering->getNextPosition($pdo, $orderingConfig, $scope),
+                    'plain next position under the older snapshot',
+                );
+
+                $position = $ordering->getNextPositionForUpdate($pdo, $orderingConfig, $scope);
+                expectTrue($pdo->inTransaction(), 'locking read keeps the caller-owned transaction active');
+                $insert->execute(['scope_key' => $scope, 'display_order' => $position, 'name' => 'snapshot-3']);
+
+                return $position;
+            },
+        );
+
+        expectSame(3, $allocated, 'locking next position follows the latest committed tail');
+        expectTrue(! $pdo->inTransaction(), 'transaction runner closed its own transaction');
+        expectSame(
+            3,
+            readInteger(
+                $other,
+                'SELECT COUNT(DISTINCT display_order) FROM ' . $table . " WHERE scope_key = '" . $scope . "'",
+                'distinct snapshot scenario positions',
+            ),
+            'distinct snapshot scenario positions',
+        );
+        expectSame(
+            3,
+            readInteger(
+                $other,
+                'SELECT MAX(display_order) FROM ' . $table . " WHERE scope_key = '" . $scope . "'",
+                'snapshot scenario maximum position',
+            ),
+            'snapshot scenario maximum position',
+        );
+    } finally {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        if ($other->inTransaction()) {
+            $other->rollBack();
+        }
     }
 }
 
@@ -402,6 +502,21 @@ function readScalar(PDO $pdo, string $sql): mixed
     }
 
     return $statement->fetchColumn();
+}
+
+function readInteger(PDO $pdo, string $sql, string $description): int
+{
+    $value = readScalar($pdo, $sql);
+
+    if (is_int($value)) {
+        return $value;
+    }
+
+    if (is_string($value) && ctype_digit($value)) {
+        return (int) $value;
+    }
+
+    throw new RuntimeException('Expected an integer for ' . $description . '.');
 }
 
 function expectSame(mixed $expected, mixed $actual, string $description): void
