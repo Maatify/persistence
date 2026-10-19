@@ -297,6 +297,16 @@ The package-level schema notes are in [schema/README.md](schema/README.md).
 * **Implements**: `Maatify\Persistence\Exception\PersistenceException`
 * **Trigger**: Package-owned non-throwing execution failures for transaction control statements (e.g., when PDO `exec()` returns `false` instead of throwing an exception during savepoint orchestration).
 
+## Usage Guide and Examples
+
+For a practical, runnable walkthrough of position allocation (transaction
+setup, `INSERT`, commit or rollback, `REPEATABLE READ` snapshots, empty scopes,
+locks, and retry responsibility), see the
+[How-to-Use guide](docs/guides/NEXT_POSITION_ALLOCATION_HOW_TO_USE.md) and the
+standalone scripts in [`examples/next-position`](examples/next-position). The
+guide illustrates this contract; this Reference remains normative.
+`getNextPositionForUpdate()` is Unreleased and not part of the stable `v1.4.0`.
+
 ## SQL and Trust Boundaries
 
 * **Identifiers**: SQL identifiers (table, columns) are validated configuration, not user input. They cannot be PDO-bound. Supported formats are standard identifier naming rules and `schema.table`.
