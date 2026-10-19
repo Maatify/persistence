@@ -50,7 +50,8 @@ final readonly class ScopedOrderingManager
      * does not make this read current, and repeating it (for example to retry
      * after a duplicate-key error) returns the same stale value. The read is
      * current only when no older snapshot exists: outside a transaction, under
-     * READ COMMITTED, or when the caller's serialization lock is taken before
+     * READ COMMITTED, or when the caller's serialization lock (a lock that every
+     * competing writer takes first, for example on a parent row) is taken before
      * the transaction's first non-locking read.
      *
      * Both next-position reads are supported. Use getNextPositionForUpdate() to

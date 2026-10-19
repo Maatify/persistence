@@ -72,7 +72,7 @@ The package-level schema notes are in [schema/README.md](schema/README.md).
 * **Constructor**: Stateless class with no explicitly declared constructor.
 * **Public Methods**:
   * `public function getNextPosition(\PDO $pdo, ScopedOrderingConfig $config, int|string|null $scopeValue = null): int`
-    * Supported lock-free read, intended for previews and for allocation only when no older snapshot exists (outside a transaction, under `READ COMMITTED`, or with the caller's serialization lock taken before the transaction's first non-locking read); use `getNextPositionForUpdate()` to allocate a position inside a caller-owned transaction.
+    * Supported lock-free read, intended for previews and for allocation only when no older snapshot exists (outside a transaction, under `READ COMMITTED`, or with the caller's serialization lock, which every competing writer takes first (for example on a parent row), taken before the transaction's first non-locking read); use `getNextPositionForUpdate()` to allocate a position inside a caller-owned transaction.
     * Returns `MAX(order) + 1` (calculated via `COALESCE(MAX(...), 0) + 1`).
     * Returns `1` for an empty applicable scope.
     * Ignores soft-deleted rows when soft-delete filtering is configured.

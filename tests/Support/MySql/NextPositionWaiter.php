@@ -27,9 +27,12 @@ use Maatify\Persistence\Tests\Support\MySql\OrderingSchemaManager;
 
 require dirname(__DIR__, 2) . '/bootstrap.php';
 
-$isolationLevel = $argv[1] ?? '';
-$scope = $argv[2] ?? '';
-$flags = array_slice($argv, 3);
+$rawArguments = $_SERVER['argv'] ?? [];
+$arguments = is_array($rawArguments) ? array_values(array_filter($rawArguments, 'is_string')) : [];
+
+$isolationLevel = $arguments[1] ?? '';
+$scope = $arguments[2] ?? '';
+$flags = array_slice($arguments, 3);
 
 if (
     !in_array($isolationLevel, ['READ COMMITTED', 'REPEATABLE READ'], true)

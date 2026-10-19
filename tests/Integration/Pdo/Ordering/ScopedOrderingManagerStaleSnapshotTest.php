@@ -39,6 +39,7 @@ final class ScopedOrderingManagerStaleSnapshotTest extends MySqlIntegrationTestC
 
         $this->manager = new ScopedOrderingManager();
         $this->otherPdo = (new MySqlConnectionFactory())->create();
+        $this->otherPdo->exec('SET SESSION TRANSACTION ISOLATION LEVEL REPEATABLE READ');
         $this->otherPdo->exec('SET SESSION innodb_lock_wait_timeout = 1');
         $this->otherFixture = new OrderingFixture($this->otherPdo);
         $this->otherReader = new OrderingStateReader($this->otherPdo);
@@ -384,14 +385,18 @@ final class ScopedOrderingManagerStaleSnapshotTest extends MySqlIntegrationTestC
         self::assertSame(2, $this->manager->getNextPositionForUpdate($this->pdo(), $this->scopedConfig(), 'scope-a'));
     }
 
-    public function testPlainReadSeesLatestCommittedWhenTheSerializationLockPrecedesTheSnapshot(): void
+    /**
+     * Snapshot timing only: a locking read as the first statement does not create
+     * the consistent-read snapshot, so the plain read that follows sees rows
+     * committed in between. The locked row (here an unrelated global row) does
+     * not serialize anything for scope-a; the shared-lock tests below cover that.
+     */
+    public function testFirstStatementLockingReadDoesNotCreateTheSnapshot(): void
     {
         $this->fixture->insertGlobal(1);
 
         $this->pdo()->beginTransaction();
 
-        // The serialization lock (here on an unrelated row) is the first statement,
-        // so the snapshot is created by the plain read below, after the lock.
         $statement = $this->pdo()->query('SELECT `id` FROM `' . OrderingSchemaManager::GLOBAL_TABLE . '` FOR UPDATE');
         self::assertNotFalse($statement);
         $statement->fetchAll();
@@ -399,6 +404,97 @@ final class ScopedOrderingManagerStaleSnapshotTest extends MySqlIntegrationTestC
         $this->otherFixture->insertScoped('scope-a', 1);
 
         self::assertSame(2, $this->manager->getNextPosition($this->pdo(), $this->scopedConfig(), 'scope-a'));
+    }
+
+    public function testPlainReadSeesLatestCommittedUnderReadCommitted(): void
+    {
+        $this->pdo()->exec('SET TRANSACTION ISOLATION LEVEL READ COMMITTED');
+        $this->pdo()->beginTransaction();
+        $this->countRows(OrderingSchemaManager::SCOPED_TABLE);
+
+        $this->otherFixture->insertScoped('scope-a', 1);
+
+        self::assertSame(2, $this->manager->getNextPosition($this->pdo(), $this->scopedConfig(), 'scope-a'));
+        self::assertSame(2, $this->manager->getNextPositionForUpdate($this->pdo(), $this->scopedConfig(), 'scope-a'));
+    }
+
+    /**
+     * A real caller-side serialization lock: two writers lock the same parent row
+     * before touching scope-a. The competing writer is blocked behind the first,
+     * and because it takes the lock before its first non-locking read, its
+     * snapshot is created after the first writer committed, so the plain read is
+     * current and the two positions are distinct.
+     */
+    public function testSharedParentLockTakenBeforeTheFirstPlainReadMakesThePlainReadCurrent(): void
+    {
+        $parentId = $this->fixture->insertGlobal(1, 'parent');
+
+        $this->pdo()->beginTransaction();
+        $this->lockParentRow($this->pdo(), $parentId);
+
+        $this->otherPdo->beginTransaction();
+
+        try {
+            $this->lockParentRow($this->otherPdo, $parentId);
+            self::fail('The competing writer must wait for the shared parent lock.');
+        } catch (PDOException $exception) {
+            self::assertSame(self::LOCK_WAIT_TIMEOUT_ERROR, $exception->errorInfo[1] ?? null);
+        }
+
+        $this->otherPdo->rollBack();
+
+        $first = $this->manager->getNextPosition($this->pdo(), $this->scopedConfig(), 'scope-a');
+        self::assertSame(1, $first);
+        $this->fixture->insertScoped('scope-a', $first);
+        $this->pdo()->commit();
+
+        $this->otherPdo->beginTransaction();
+        $this->lockParentRow($this->otherPdo, $parentId);
+        $second = $this->manager->getNextPosition($this->otherPdo, $this->scopedConfig(), 'scope-a');
+        self::assertSame(2, $second);
+        $this->otherFixture->insertScoped('scope-a', $second);
+        $this->otherPdo->commit();
+
+        self::assertSame([1, 2], $this->committedScopeAOrders());
+    }
+
+    /**
+     * The same shared parent lock does not protect a writer whose snapshot was
+     * created before it acquired the lock: its plain read stays stale and would
+     * reuse position 1, while getNextPositionForUpdate() returns the free position.
+     */
+    public function testSharedParentLockTakenAfterTheSnapshotDoesNotMakeThePlainReadCurrent(): void
+    {
+        $parentId = $this->fixture->insertGlobal(1, 'parent');
+
+        $this->pdo()->beginTransaction();
+        $this->lockParentRow($this->pdo(), $parentId);
+
+        // The competing writer creates its snapshot first, then queues for the lock.
+        $this->otherPdo->beginTransaction();
+        $this->establishSnapshot($this->otherPdo);
+
+        try {
+            $this->lockParentRow($this->otherPdo, $parentId);
+            self::fail('The competing writer must wait for the shared parent lock.');
+        } catch (PDOException $exception) {
+            self::assertSame(self::LOCK_WAIT_TIMEOUT_ERROR, $exception->errorInfo[1] ?? null);
+        }
+
+        // The lock wait timeout ends the statement only; the snapshot is kept.
+        self::assertTrue($this->otherPdo->inTransaction());
+
+        $first = $this->manager->getNextPosition($this->pdo(), $this->scopedConfig(), 'scope-a');
+        self::assertSame(1, $first);
+        $this->fixture->insertScoped('scope-a', $first);
+        $this->pdo()->commit();
+
+        $this->lockParentRow($this->otherPdo, $parentId);
+
+        self::assertSame(1, $this->manager->getNextPosition($this->otherPdo, $this->scopedConfig(), 'scope-a'));
+        self::assertSame(2, $this->manager->getNextPositionForUpdate($this->otherPdo, $this->scopedConfig(), 'scope-a'));
+
+        $this->otherPdo->rollBack();
     }
 
     public function testCallerTransactionLockDoesNotBlockRowsOfOtherScopes(): void
@@ -676,6 +772,23 @@ final class ScopedOrderingManagerStaleSnapshotTest extends MySqlIntegrationTestC
 
             proc_close($process);
         }
+    }
+
+    private function lockParentRow(PDO $pdo, int $parentId): void
+    {
+        $statement = $pdo->prepare(
+            'SELECT `id` FROM `' . OrderingSchemaManager::GLOBAL_TABLE . '` WHERE `id` = :id FOR UPDATE'
+        );
+        self::assertNotFalse($statement);
+        $statement->execute(['id' => $parentId]);
+        self::assertCount(1, $statement->fetchAll());
+    }
+
+    private function establishSnapshot(PDO $pdo): void
+    {
+        $statement = $pdo->query('SELECT COUNT(*) FROM `' . OrderingSchemaManager::SCOPED_TABLE . '`');
+        self::assertNotFalse($statement);
+        $statement->fetchColumn();
     }
 
     private function beginTransactionWithSnapshot(): void
