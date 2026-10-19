@@ -63,7 +63,7 @@ Only the decision cell counts toward the verdict; the rest are sensitivity. Per-
 Verified in every run of both candidates (`integrity_pass` in `analysis.json`; all pass; 0 failures in the log):
 
 - every attempt was one call to the unmodified runner with `PDO::inTransaction()` false before it (and false after each failure — the runner owns and ends the transaction); no retry after a non-`1213` outcome; ≤ 4 attempts;
-- in the separate `integrity-verify` runs, `performance_schema.events_transactions_current` showed no `ACTIVE` transaction on the connection before any retry (3,000+ retries probed);
+- in the separate `integrity-verify` runs, `performance_schema.events_transactions_current` showed no `ACTIVE` transaction on the connection before any retry (thousands of retries probed);
 - no `ACTIVE`/`INNODB_TRX` transaction remained after any run; the callback ran exactly once per attempt; no attempt started before the previous one ended plus its jitter sleep; Hybrid sleeps stayed within 0 / 10 ms / 20 ms bounds;
 - stored Content rows correspond exactly to successful operations (no duplicates, no missing rows, none for exhausted operations); isolation `REPEATABLE-READ` on every connection;
 - client-counted deadlocks equal the server's `lock_deadlocks` delta in every run.
