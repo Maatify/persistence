@@ -56,10 +56,7 @@ final class NextPositionExamplesTest extends TestCase
         );
         self::assertIsResource($process);
 
-        $stdoutPipe = $pipes[1] ?? null;
-        $stderrPipe = $pipes[2] ?? null;
-        self::assertIsResource($stdoutPipe);
-        self::assertIsResource($stderrPipe);
+        [$stdoutPipe, $stderrPipe] = self::outputPipes($pipes);
 
         $stdout = (string) stream_get_contents($stdoutPipe);
         $stderr = (string) stream_get_contents($stderrPipe);
@@ -70,6 +67,23 @@ final class NextPositionExamplesTest extends TestCase
         self::assertSame(0, $exitCode, 'Example failed: ' . basename($script) . PHP_EOL . $stdout . $stderr);
         self::assertStringContainsString('OK: ' . basename($script, '.php'), $stdout);
         self::assertSame('', $stderr);
+    }
+
+    /**
+     * Takes `mixed` because proc_open() fills the by-reference array and
+     * PHPStan versions differ in how they type it.
+     *
+     * @return array{resource, resource}
+     */
+    private static function outputPipes(mixed $pipes): array
+    {
+        self::assertIsArray($pipes);
+        $stdoutPipe = $pipes[1] ?? null;
+        $stderrPipe = $pipes[2] ?? null;
+        self::assertIsResource($stdoutPipe);
+        self::assertIsResource($stderrPipe);
+
+        return [$stdoutPipe, $stderrPipe];
     }
 
     private static function examplesDirectory(): string
