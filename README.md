@@ -251,6 +251,7 @@ for that condition.
 * Owns a transaction when called without an active PDO transaction.
 * Participates in an active caller-owned PDO transaction without beginning, committing, or rolling it back.
 * Locks the applicable active scope using `SELECT ... FOR UPDATE`.
+* Derives the clamp maximum from the rows returned by that same locking read, not from a separate non-locking read. Inside a caller-owned `REPEATABLE READ` transaction whose snapshot is older than another connection's commit, a move therefore clamps against the latest committed rows that the locking read observed (rows 1-3 in the snapshot, rows 4-5 committed later: moving the first row to position 5 reaches 5). This is not a guarantee that later concurrent inserts are serialized (for example under `READ COMMITTED`). Unreleased; not part of the stable `v1.4.0`. See [How to Use: Moving a Row Inside an Ordered Scope](docs/guides/MOVE_WITHIN_SCOPE_HOW_TO_USE.md). It is separate from `getNextPositionForUpdate()`, which allocates the position of a new row.
 * Supports `NULL` as a scope value when `nullableScope` is enabled; this is distinct from global ordering, which has no `scopeColumn`.
 * Reads the current order from the database within the same transaction.
 * Does not trust a current order provided by the caller.
@@ -328,6 +329,14 @@ php examples/next-position/01_allocate_and_insert.php
 
 See the [How-to-Use guide](docs/guides/NEXT_POSITION_ALLOCATION_HOW_TO_USE.md) for the list, setup, and limits. `getNextPositionForUpdate()` is Unreleased and is not part of the stable `v1.4.0`.
 
+A separate runnable script covers **moving** a row (`moveWithinScope()`) inside a caller-owned `REPEATABLE READ` transaction whose snapshot is older than another connection's commit (rows 1-3 in the snapshot, rows 4-5 committed meanwhile, first row moved to position 5):
+
+```bash
+php examples/move-within-scope/01_move_after_older_snapshot.php
+```
+
+See [How to Use: Moving a Row Inside an Ordered Scope](docs/guides/MOVE_WITHIN_SCOPE_HOW_TO_USE.md). The movement fix is Unreleased and is not part of the stable `v1.4.0`; the allocation examples above do not exercise the movement path.
+
 ## 📚 Documentation
 
 For a comprehensive guide, please refer to the main technical reference:
@@ -335,6 +344,7 @@ For a comprehensive guide, please refer to the main technical reference:
 
 Practical guide:
 * [How to Use: Allocating the Next Position Safely](docs/guides/NEXT_POSITION_ALLOCATION_HOW_TO_USE.md) (runnable examples in [`examples/next-position`](examples/next-position))
+* [How to Use: Moving a Row Inside an Ordered Scope](docs/guides/MOVE_WITHIN_SCOPE_HOW_TO_USE.md) (runnable example in [`examples/move-within-scope`](examples/move-within-scope))
 
 Other important documentation:
 * [Changelog](CHANGELOG.md)
