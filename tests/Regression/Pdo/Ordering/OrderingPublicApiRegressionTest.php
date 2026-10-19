@@ -17,6 +17,7 @@ use PDO;
 use PHPUnit\Framework\TestCase;
 use ReflectionClass;
 use ReflectionIntersectionType;
+use ReflectionMethod;
 use ReflectionNamedType;
 use ReflectionParameter;
 use ReflectionType;
@@ -69,6 +70,11 @@ final class OrderingPublicApiRegressionTest extends TestCase
             ['config', ScopedOrderingConfig::class, false, false, null],
             ['scopeValue', 'int|string', true, true, null],
         ], 'int');
+        self::assertPublicMethod($class, 'getNextPositionForUpdate', [
+            ['pdo', PDO::class, false, false, null],
+            ['config', ScopedOrderingConfig::class, false, false, null],
+            ['scopeValue', 'int|string', true, true, null],
+        ], 'int');
         self::assertPublicMethod($class, 'moveWithinScope', [
             ['pdo', PDO::class, false, false, null],
             ['config', ScopedOrderingConfig::class, false, false, null],
@@ -83,6 +89,16 @@ final class OrderingPublicApiRegressionTest extends TestCase
             ['scopeValue', 'int|string', true, false, null],
             ['id', 'int', false, false, null],
         ], 'bool');
+    }
+
+    public function testBothNextPositionReadsRemainSupportedAndNotDeprecated(): void
+    {
+        $plainDocComment = (string) (new ReflectionMethod(ScopedOrderingManager::class, 'getNextPosition'))->getDocComment();
+        $lockingDocComment = (string) (new ReflectionMethod(ScopedOrderingManager::class, 'getNextPositionForUpdate'))->getDocComment();
+
+        self::assertStringNotContainsString('@deprecated', $plainDocComment);
+        self::assertStringNotContainsString('@deprecated', $lockingDocComment);
+        self::assertStringContainsString('getNextPositionForUpdate()', $plainDocComment);
     }
 
     public function testPdoTransactionRunnerApiMatchesRepositoryReality(): void

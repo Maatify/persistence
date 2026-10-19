@@ -23,7 +23,9 @@ use Throwable;
  * - It participates in an active caller-owned PDO transaction.
  *
  * Ordering model:
- * - getNextPosition() returns max(order) + 1.
+ * - getNextPosition() returns max(order) + 1 with a plain read and no lock.
+ * - getNextPositionForUpdate() returns max(order) + 1 from the latest committed
+ *   state using a locking read inside an active caller-owned PDO transaction.
  * - moveWithinScope() locks the whole ordering scope with SELECT ... FOR UPDATE,
  *   then reads the current row order from the database inside the transaction.
  * - newOrder is clamped to the current max position inside the same scope.
@@ -38,8 +40,24 @@ final readonly class ScopedOrderingManager
      *
      * Note:
      * This method does not start a transaction and does not lock the scope.
-     * If used for concurrent inserts, call it from a caller-owned transaction
-     * with appropriate locking at the repository/application level.
+     * Concurrent inserts need caller-side serialization, such as a lock held by
+     * the caller's transaction.
+     *
+     * Snapshot rule: this plain read uses the transaction's consistent-read
+     * snapshot. Under REPEATABLE READ that snapshot is created by the
+     * transaction's first non-locking read, and locking reads (FOR UPDATE) do
+     * not refresh it. Locking the scope or a parent row afterwards therefore
+     * does not make this read current, and repeating it (for example to retry
+     * after a duplicate-key error) returns the same stale value. The read is
+     * current only when no older snapshot exists: outside a transaction, under
+     * READ COMMITTED, or when the caller's serialization lock (a lock that every
+     * competing writer takes first, for example on a parent row) is taken before
+     * the transaction's first non-locking read.
+     *
+     * Both next-position reads are supported. Use getNextPositionForUpdate() to
+     * allocate a position for an insert inside a caller-owned transaction, in
+     * particular under REPEATABLE READ; use this plain read for previews and
+     * for the cases above where no older snapshot exists.
      *
      * @param int|string|null $scopeValue Required when config has a non-null scope column; null means global ordering or the configured nullable scope.
      */
@@ -50,13 +68,7 @@ final readonly class ScopedOrderingManager
     ): int {
         $this->assertScopeUsage($config, $scopeValue);
 
-        $where = [];
-        $params = [];
-
-        $this->appendScopeCondition($config, $scopeValue, $where, $params);
-        $this->appendSoftDeleteCondition($config, $where);
-
-        $whereSql = $where !== [] ? ' WHERE ' . implode(' AND ', $where) : '';
+        [$whereSql, $params] = $this->buildScopeWhere($config, $scopeValue);
 
         $stmt = $pdo->prepare(
             'SELECT COALESCE(MAX(' . $config->quotedOrderColumn() . '), 0)
@@ -67,6 +79,110 @@ final readonly class ScopedOrderingManager
         $stmt->execute($params);
 
         return ((int) $stmt->fetchColumn()) + 1;
+    }
+
+    /**
+     * Returns the next available order position from the latest committed state,
+     * using a locking read inside the caller-owned transaction.
+     *
+     * Requires an active PDO transaction on the given connection and never
+     * begins, commits, or rolls back one; the lock is held until the caller ends
+     * the transaction, so perform the insert on the same connection and
+     * transaction. A locking read (SELECT ... FOR UPDATE ... ORDER BY order DESC,
+     * id DESC LIMIT 1) returns the latest committed state instead of the
+     * transaction's REPEATABLE READ snapshot. The row it selects and locks is the
+     * last active row by the configured order column, with the configured id
+     * column as the tie-breaker.
+     *
+     * The locking read is repeated until two consecutive reads return the same
+     * order value, so every call issues at least two locking reads, including
+     * for an empty scope. A read that waited for the lock on the previous tail
+     * may resume after another transaction committed a higher tail (observable
+     * under READ COMMITTED); the repeat makes the returned position follow that
+     * tail. The repeat continues only while the tail keeps changing, and each
+     * repeated read can itself wait for a lock or fail as described below.
+     *
+     * Guarantee: the returned position reflects the latest committed state, and
+     * on a non-empty scope concurrent callers that also use locking reads (this
+     * method, moveWithinScope()) are serialized on the scope's last active row.
+     *
+     * Limits:
+     * - An empty scope has no row to lock, so concurrent first inserts are not
+     *   serialized; the caller must serialize them (e.g. lock a parent row or
+     *   rely on a UNIQUE constraint).
+     * - Lock footprint depends on the access plan. With an index usable for
+     *   (scope, order) the scan stops at the last active row; every soft-deleted
+     *   row above it is scanned and locked as well. Without such an index the
+     *   scan covers, and locks, every row of the table.
+     * - Under REPEATABLE READ the lock also covers the gap above the last
+     *   scanned row up to the next index record, which may belong to another
+     *   scope. Under READ COMMITTED no gap lock is taken.
+     * - Writers that do not use locking reads are not serialized, except by the
+     *   REPEATABLE READ gap lock described above.
+     * - Locks taken by earlier reads of a repeated call are kept until the
+     *   transaction ends, so a call that repeats holds locks on every tail it
+     *   read (the earlier tail and the newer one). This slightly widens the
+     *   lock footprint and the contention and deadlock surface compared with a
+     *   single read.
+     * - The call may wait for locks and fail with a lock wait timeout or
+     *   deadlock PDOException, which propagates unchanged; retrying is the
+     *   caller's responsibility. Under REPEATABLE READ, a call queued behind a
+     *   transaction that then inserts above the locked row typically fails with
+     *   a deadlock instead of resuming.
+     *
+     * @param int|string|null $scopeValue Required when config has a non-null scope column; null means global ordering or the configured nullable scope.
+     *
+     * @throws InvalidOrderingOperationException When no PDO transaction is active or scope usage is inconsistent.
+     * @throws Throwable When a PDO/database operation fails.
+     */
+    public function getNextPositionForUpdate(
+        PDO $pdo,
+        ScopedOrderingConfig $config,
+        int|string|null $scopeValue = null
+    ): int {
+        $this->assertScopeUsage($config, $scopeValue);
+
+        if (!$pdo->inTransaction()) {
+            throw new InvalidOrderingOperationException(
+                'A locking next-position read requires an active PDO transaction.'
+            );
+        }
+
+        [$whereSql, $params] = $this->buildScopeWhere($config, $scopeValue);
+
+        // ORDER BY ... DESC LIMIT 1 lets InnoDB stop at the last active row when
+        // an (scope, order) index exists. MAX(...) FOR UPDATE would lock every
+        // row of the scanned scope range instead.
+        $stmt = $pdo->prepare(
+            'SELECT ' . $config->quotedOrderColumn() . '
+               FROM ' . $config->quotedTable()
+            . $whereSql .
+            ' ORDER BY ' . $config->quotedOrderColumn() . ' DESC, ' . $config->quotedIdColumn() . ' DESC
+              LIMIT 1
+              FOR UPDATE'
+        );
+
+        // A read that waited for the lock on the previous tail can resume after
+        // another transaction committed a higher tail (observable under READ
+        // COMMITTED). Repeat the locking read until it returns the same order
+        // value twice, so the position is derived from a tail this transaction
+        // holds.
+        $previousTail = null;
+
+        while (true) {
+            $stmt->execute($params);
+
+            $value = $stmt->fetchColumn();
+            $stmt->closeCursor();
+
+            $tail = $value === false ? 0 : (int) $value;
+
+            if ($tail === $previousTail) {
+                return $tail + 1;
+            }
+
+            $previousTail = $tail;
+        }
     }
 
     /**
@@ -420,6 +536,24 @@ final readonly class ScopedOrderingManager
         $stmt->execute($params);
 
         return $stmt->rowCount() > 0;
+    }
+
+    /**
+     * Builds the scope and soft-delete WHERE clause shared by position reads.
+     *
+     * @param int|string|null $scopeValue Scope value for scoped ordering.
+     *
+     * @return array{0: string, 1: array<string, int|string|null>} WHERE SQL (empty or with leading space) and bound parameters.
+     */
+    private function buildScopeWhere(ScopedOrderingConfig $config, int|string|null $scopeValue): array
+    {
+        $where = [];
+        $params = [];
+
+        $this->appendScopeCondition($config, $scopeValue, $where, $params);
+        $this->appendSoftDeleteCondition($config, $where);
+
+        return [$where !== [] ? ' WHERE ' . implode(' AND ', $where) : '', $params];
     }
 
     /**

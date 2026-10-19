@@ -72,6 +72,7 @@ The package-level schema notes are in [schema/README.md](schema/README.md).
 * **Constructor**: Stateless class with no explicitly declared constructor.
 * **Public Methods**:
   * `public function getNextPosition(\PDO $pdo, ScopedOrderingConfig $config, int|string|null $scopeValue = null): int`
+    * Supported lock-free read, intended for previews and for allocation only when no older snapshot exists (outside a transaction, under `READ COMMITTED`, or with the caller's serialization lock, which every competing writer takes first (for example on a parent row), taken before the transaction's first non-locking read); use `getNextPositionForUpdate()` to allocate a position inside a caller-owned transaction.
     * Returns `MAX(order) + 1` (calculated via `COALESCE(MAX(...), 0) + 1`).
     * Returns `1` for an empty applicable scope.
     * Ignores soft-deleted rows when soft-delete filtering is configured.
@@ -79,7 +80,16 @@ The package-level schema notes are in [schema/README.md](schema/README.md).
     * Does not lock.
     * May throw `InvalidOrderingOperationException` for inconsistent scope usage.
     * External PDO/database throwables may propagate unchanged.
-    * Concurrency note: Use caller-owned lock for concurrent inserts.
+    * Concurrency note: concurrent inserts need caller-side serialization, such as a lock held by the caller's transaction.
+    * Snapshot rule: under `REPEATABLE READ` the plain read uses the snapshot created by the transaction's first non-locking read, and locking reads do not refresh it. After a later commit by another connection it can return a stale maximum even if the caller locked the scope or a parent row afterwards, and repeating it in the same transaction returns the same stale value; use `getNextPositionForUpdate()` or retry in a new transaction.
+  * `public function getNextPositionForUpdate(\PDO $pdo, ScopedOrderingConfig $config, int|string|null $scopeValue = null): int`
+    * Returns `MAX(order) + 1` from the latest committed state (`1` for an empty applicable scope); soft-deleted rows are ignored when soft-delete filtering is configured.
+    * Requires an active PDO transaction on the connection; throws `InvalidOrderingOperationException` when none is active. Never begins, commits, or rolls back a transaction.
+    * Performs `SELECT order ... ORDER BY order DESC, id DESC LIMIT 1 FOR UPDATE` (configured order and id columns); the lock is held until the caller ends the transaction. The locking read is repeated until two consecutive reads return the same order value, so every call issues at least two locking reads (also for an empty scope), and a call that waited for the lock on the previous tail follows a higher tail committed meanwhile (observable under `READ COMMITTED`). The repeat continues only while the tail keeps changing, and each repeated read can itself wait for a lock or fail with a lock wait timeout or deadlock.
+    * May throw `InvalidOrderingOperationException` for inconsistent scope usage.
+    * External PDO/database throwables, including lock wait timeout and deadlock errors, may propagate unchanged; retrying is the caller's responsibility. Under `REPEATABLE READ`, a call queued behind a transaction that then inserts above the locked row typically fails with a deadlock instead of resuming.
+    * Guarantee: on a non-empty scope, callers that also use locking reads (this method, `moveWithinScope()`) are serialized on the scope's last active row.
+    * Limits: an empty scope has no row to lock, so the caller must serialize the first insert. Lock footprint depends on the access plan (an index usable for `(scope, order)` stops at the last active row but also locks soft-deleted rows above it; without one, every table row is scanned and locked). Under `REPEATABLE READ` the gap above the last scanned row, possibly belonging to another scope, is locked; under `READ COMMITTED` it is not. Writers that do not use locking reads are not serialized. Locks taken by earlier reads of a repeated call are kept until the transaction ends, so a call that repeats holds locks on every tail it read (the earlier tail and the newer one), which slightly widens the lock footprint and the contention and deadlock surface compared with a single read.
   * `public function rowExistsInScope(\PDO $pdo, ScopedOrderingConfig $config, int|string|null $scopeValue, int $id): bool`
     * Returns `false` for `id <= 0`.
     * Returns `false` when the row is absent from the requested scope.
@@ -303,8 +313,17 @@ The package-level schema notes are in [schema/README.md](schema/README.md).
 * Atomic composition is supported only when ordinary PDO mutations and all
   package participants use the same PDO connection.
 * `getNextPosition()` does not start a transaction or lock its scope. The
-  caller owns the transaction and locking needed to serialize concurrent
-  position allocation.
+  caller owns the transaction and the lock that serializes concurrent
+  position allocation; under `REPEATABLE READ` that lock must be taken before
+  the transaction's first non-locking read, otherwise the plain read can
+  return a stale maximum. Use `getNextPositionForUpdate()` to allocate a
+  position inside a caller-owned transaction.
+* `getNextPositionForUpdate()` requires an active PDO transaction, never starts
+  one, and reads the scope's last active row with `SELECT ... FOR UPDATE`, so it
+  sees the latest committed maximum and serializes lock-using allocation and
+  reordering on a non-empty scope until the caller commits or rolls back.
+  Serializing the first insert into an empty scope remains the caller's
+  responsibility.
 * `moveWithinScope()` locks the applicable active ordering scope with
   `SELECT ... FOR UPDATE` inside the transaction it owns or joins.
 
@@ -347,7 +366,7 @@ Renaming the marker MAY be reconsidered only as part of a separately approved, m
 | --------- | ------------------ | ---------- | --------------- | --------------------- |
 | `PersistenceException` | `\Throwable` | N/A | N/A | Interface implemented by all package exceptions. |
 | `InvalidOrderingConfigurationException` | `SystemMaatifyException` | `ErrorCodeEnum::MAATIFY_ERROR` | default | Invalid/unsafe trusted SQL configuration identifiers. |
-| `InvalidOrderingOperationException` | `ValidationMaatifyException` | `ErrorCodeEnum::INVALID_ARGUMENT` | default | Invalid runtime id, new order, or scope usage. |
+| `InvalidOrderingOperationException` | `ValidationMaatifyException` | `ErrorCodeEnum::INVALID_ARGUMENT` | default | Invalid runtime id, new order, or scope usage, or an unmet operation precondition (`getNextPositionForUpdate()` without an active PDO transaction). |
 | `OrderingTransactionException` | `UnsupportedMaatifyException` | `ErrorCodeEnum::UNSUPPORTED_OPERATION` | `defaultIsSafe(): false` | Deprecated compatibility exception; no longer thrown by `moveWithinScope()` for active caller-owned transactions. |
 | `InvalidPaginationConfigurationException` | `SystemMaatifyException` | `ErrorCodeEnum::MAATIFY_ERROR` | default | Invalid per-page bounds, whitelist errors. |
 | `InvalidPaginationQueryException` | `SystemMaatifyException` | `ErrorCodeEnum::MAATIFY_ERROR` | default | Missing/empty SQL, semicolons, reserved parameters. |
@@ -386,6 +405,7 @@ Renaming the marker MAY be reconsidered only as part of a separately approved, m
   * Invalid movement id
   * Invalid new ordering value
   * Inconsistent scope usage
+  * Unmet operation precondition: `getNextPositionForUpdate()` called without an active PDO transaction
 
 ### `Maatify\Persistence\Exception\OrderingTransactionException`
 * **Status**: `final class`, `@deprecated`

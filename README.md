@@ -61,6 +61,7 @@ composer require maatify/persistence
 ```php
 use Maatify\Persistence\Pdo\Ordering\ScopedOrderingConfig;
 use Maatify\Persistence\Pdo\Ordering\ScopedOrderingManager;
+use Maatify\Persistence\Pdo\Transaction\PdoTransactionRunner;
 
 // 1. Configure the ordering behavior for a table
 $config = new ScopedOrderingConfig(
@@ -77,12 +78,20 @@ $config = new ScopedOrderingConfig(
 
 $ordering = new ScopedOrderingManager();
 
-// 2. Get the next position for a new insert
-$nextPosition = $ordering->getNextPosition(
-    pdo: $pdo,
-    config: $config,
-    scopeValue: 2, // Use null for global ordering
-);
+// 2. Get the next position for a new insert. Inside a PDO transaction use
+// getNextPositionForUpdate() and insert on the same connection (see
+// "Critical Runtime Behavior" for when the plain getNextPosition() fits instead).
+$transactions = new PdoTransactionRunner($pdo);
+
+$transactions->run(function () use ($pdo, $ordering, $config): void {
+    $nextPosition = $ordering->getNextPositionForUpdate(
+        pdo: $pdo,
+        config: $config,
+        scopeValue: 2, // Use null for global ordering
+    );
+
+    // Insert the new row at $nextPosition using the same PDO connection.
+});
 
 // 3. Move an existing row within its scope
 $success = $ordering->moveWithinScope(
@@ -219,10 +228,21 @@ for that condition.
 
 ## ⚠️ Critical Runtime Behavior
 
+**Choosing between the two next-position reads** (both are supported):
+* `getNextPositionForUpdate()`: allocate a position for an insert inside a caller-owned transaction, in particular under `REPEATABLE READ` (the MySQL default), where a plain read can be stale.
+* `getNextPosition()`: plain, lock-free read for previews, and for allocation only when no older snapshot exists: outside a transaction, under `READ COMMITTED`, or when the caller's serialization lock (a lock that every competing writer takes first, for example on a parent row) is taken before the transaction's first non-locking read. Concurrent allocation still needs that caller-side serialization.
+
 **`getNextPosition()`:**
 * Does not start a transaction.
 * Does not lock the applicable scope.
 * For concurrent inserts, the host application must provide the transaction and locking mechanism required to serialize position allocation.
+* Snapshot rule: under `REPEATABLE READ` the plain read uses the snapshot created by the transaction's first non-locking read, and locking reads (`FOR UPDATE`) do not refresh it. If another connection committed after that snapshot, the plain read can return a stale maximum even when the caller locked the scope or a parent row afterwards, and repeating it in the same transaction (for example to retry after a duplicate-key error) returns the same stale value. Use `getNextPositionForUpdate()` in that case, or retry in a new transaction.
+
+**`getNextPositionForUpdate()`:**
+* Requires an active PDO transaction on the given connection; throws `InvalidOrderingOperationException` otherwise. It never begins, commits, or rolls back a transaction.
+* Performs a locking read (`SELECT ... ORDER BY order DESC, id DESC LIMIT 1 FOR UPDATE`) of the last active row in the applicable scope, repeated until two consecutive reads return the same order value, so the result reflects the latest committed state instead of the transaction snapshot. The lock is held until the caller ends the transaction; insert on the same connection and transaction (see the transaction example above).
+* Guarantee: on a non-empty scope, callers that also use locking reads (`getNextPositionForUpdate()`, `moveWithinScope()`) are serialized on the scope's last active row.
+* Limits: an empty scope has no row to lock, so the host application must still serialize the first insert (for example by locking a parent row or relying on a `UNIQUE` constraint). Lock footprint, gap locking, repeated-read lock retention, and lock wait timeouts or deadlocks (retry is the caller's responsibility) are detailed in the [Package Reference](PERSISTENCE_PACKAGE_REFERENCE.md).
 
 **`moveWithinScope()`:**
 * Rejects inconsistent scope usage.
