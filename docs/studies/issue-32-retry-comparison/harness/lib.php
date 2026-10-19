@@ -190,8 +190,8 @@ function otherActiveTransactions(PDO $control): array
 /** Hash of the harness sources; stored in every run summary so runs of different harness versions cannot be mixed. */
 function harnessHash(): string
 {
-    $files = glob(__DIR__ . '/*.php') ?: [];
-    sort($files);
+    // Only the files that determine what a run does and records (not the analyzer or the self-tests).
+    $files = array_map(static fn(string $f): string => __DIR__ . '/' . $f, ['diagnose.php', 'lib.php', 'study.php', 'worker.php']);
     $ctx = hash_init('sha256');
     foreach ($files as $f) {
         hash_update($ctx, basename($f) . "\0" . (string) file_get_contents($f) . "\0");

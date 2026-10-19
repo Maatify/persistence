@@ -149,6 +149,7 @@ function makeSet(array $overrides = [], int $rounds = 2): string
 {
     $dir = sys_get_temp_dir() . '/i32-selftest-' . bin2hex(random_bytes(4));
     mkdir($dir . '/runs', 0777, true);
+    file_put_contents($dir . '/load.json', json_encode(['noisy_runs' => []]));
     file_put_contents($dir . '/manifest.json', json_encode(['cells' => ['t' => ['levels' => [2], 'rounds' => $rounds, 'ops' => 4, 'placement' => 'sequential', 'mode' => 'wave', 'policies' => ['immediate', 'hybrid'], 'verify' => false]]]));
     for ($round = 1; $round <= $rounds; ++$round) {
         foreach (['immediate', 'hybrid'] as $policy) {
@@ -194,6 +195,10 @@ $dir = makeSet(['2hybrid' => ['summary' => ['harness_sha256' => 'h2']]]);
 t('analyzer: runs from different harness versions are rejected', $has(validateEvidence($dir, false), 'different harness versions'));
 
 $dir = makeSet();
+unlink($dir . '/load.json');
+t('analyzer: missing load.json (host conditions not recorded) is rejected unless --allow-legacy=1', $has(validateEvidence($dir, false), 'load.json missing') && !$has(validateEvidence($dir, true), 'load.json missing'));
+
+$dir = makeSet();
 unlink($dir . '/manifest.json');
 t('analyzer: missing manifest is rejected', $has(validateEvidence($dir, false), 'manifest.json missing'));
 
@@ -220,6 +225,7 @@ if ($withDb) {
     t('reuse guard: second run into the same directory/tag is refused', $cmd($base) !== 0);
     t('reuse guard: --resume=1 with the same configuration is accepted', $cmd($base . ' --resume=1') === 0);
     t('reuse guard: same tag with different parameters is refused even with --resume=1', $cmd(str_replace('--ops=4', '--ops=8', $base) . ' --resume=1') !== 0);
+    file_put_contents($out . '/load.json', json_encode(['noisy_runs' => []]));   // fixture: load-report.php is exercised by run-all.sh
     $summaryFile = glob($out . '/runs/st_*.jsonl.gz')[0];
     $analysis = (function () use ($out): int {
         exec(escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg(__DIR__ . '/analyze.php') . ' --dir=' . escapeshellarg($out) . ' 2>&1', $o, $code);

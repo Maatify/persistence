@@ -1,0 +1,407 @@
+{
+    "format": "cpu",
+    "rule": "mean foreign CPU above 200% of one core (25% of the 8 vCPUs) or peak above 400%, or no samples",
+    "noisy_runs": [],
+    "runs": {
+        "sequential-wave-probed_c08_r01_hybrid": {
+            "samples": 3,
+            "mean": 163,
+            "max": 184,
+            "noisy": false,
+            "tag": "sequential-wave-probed",
+            "connections": 8,
+            "round": 1,
+            "policy": "hybrid"
+        },
+        "sequential-wave-probed_c08_r01_immediate": {
+            "samples": 3,
+            "mean": 170,
+            "max": 221,
+            "noisy": false,
+            "tag": "sequential-wave-probed",
+            "connections": 8,
+            "round": 1,
+            "policy": "immediate"
+        },
+        "sequential-wave-probed_c08_r02_hybrid": {
+            "samples": 4,
+            "mean": 148.5,
+            "max": 184,
+            "noisy": false,
+            "tag": "sequential-wave-probed",
+            "connections": 8,
+            "round": 2,
+            "policy": "hybrid"
+        },
+        "sequential-wave-probed_c08_r02_immediate": {
+            "samples": 3,
+            "mean": 143,
+            "max": 172,
+            "noisy": false,
+            "tag": "sequential-wave-probed",
+            "connections": 8,
+            "round": 2,
+            "policy": "immediate"
+        },
+        "sequential-wave-probed_c08_r03_hybrid": {
+            "samples": 3,
+            "mean": 143,
+            "max": 168,
+            "noisy": false,
+            "tag": "sequential-wave-probed",
+            "connections": 8,
+            "round": 3,
+            "policy": "hybrid"
+        },
+        "sequential-wave-probed_c08_r03_immediate": {
+            "samples": 3,
+            "mean": 154,
+            "max": 172,
+            "noisy": false,
+            "tag": "sequential-wave-probed",
+            "connections": 8,
+            "round": 3,
+            "policy": "immediate"
+        },
+        "sequential-wave-probed_c08_r04_hybrid": {
+            "samples": 3,
+            "mean": 146.66666666666666,
+            "max": 168,
+            "noisy": false,
+            "tag": "sequential-wave-probed",
+            "connections": 8,
+            "round": 4,
+            "policy": "hybrid"
+        },
+        "sequential-wave-probed_c08_r04_immediate": {
+            "samples": 3,
+            "mean": 145.33333333333334,
+            "max": 160,
+            "noisy": false,
+            "tag": "sequential-wave-probed",
+            "connections": 8,
+            "round": 4,
+            "policy": "immediate"
+        },
+        "sequential-wave-probed_c08_r05_hybrid": {
+            "samples": 3,
+            "mean": 151.33333333333334,
+            "max": 166,
+            "noisy": false,
+            "tag": "sequential-wave-probed",
+            "connections": 8,
+            "round": 5,
+            "policy": "hybrid"
+        },
+        "sequential-wave-probed_c08_r05_immediate": {
+            "samples": 3,
+            "mean": 147.33333333333334,
+            "max": 166,
+            "noisy": false,
+            "tag": "sequential-wave-probed",
+            "connections": 8,
+            "round": 5,
+            "policy": "immediate"
+        },
+        "sequential-wave-probed_c08_r06_hybrid": {
+            "samples": 3,
+            "mean": 158.66666666666666,
+            "max": 195,
+            "noisy": false,
+            "tag": "sequential-wave-probed",
+            "connections": 8,
+            "round": 6,
+            "policy": "hybrid"
+        },
+        "sequential-wave-probed_c08_r06_immediate": {
+            "samples": 3,
+            "mean": 165.33333333333334,
+            "max": 177,
+            "noisy": false,
+            "tag": "sequential-wave-probed",
+            "connections": 8,
+            "round": 6,
+            "policy": "immediate"
+        },
+        "sequential-wave-probed_c08_r07_hybrid": {
+            "samples": 3,
+            "mean": 143,
+            "max": 181,
+            "noisy": false,
+            "tag": "sequential-wave-probed",
+            "connections": 8,
+            "round": 7,
+            "policy": "hybrid"
+        },
+        "sequential-wave-probed_c08_r07_immediate": {
+            "samples": 3,
+            "mean": 153,
+            "max": 177,
+            "noisy": false,
+            "tag": "sequential-wave-probed",
+            "connections": 8,
+            "round": 7,
+            "policy": "immediate"
+        },
+        "sequential-wave-probed_c08_r08_hybrid": {
+            "samples": 3,
+            "mean": 145.33333333333334,
+            "max": 156,
+            "noisy": false,
+            "tag": "sequential-wave-probed",
+            "connections": 8,
+            "round": 8,
+            "policy": "hybrid"
+        },
+        "sequential-wave-probed_c08_r08_immediate": {
+            "samples": 3,
+            "mean": 144.33333333333334,
+            "max": 156,
+            "noisy": false,
+            "tag": "sequential-wave-probed",
+            "connections": 8,
+            "round": 8,
+            "policy": "immediate"
+        },
+        "sequential-wave-probed_c08_r09_hybrid": {
+            "samples": 3,
+            "mean": 149,
+            "max": 177,
+            "noisy": false,
+            "tag": "sequential-wave-probed",
+            "connections": 8,
+            "round": 9,
+            "policy": "hybrid"
+        },
+        "sequential-wave-probed_c08_r09_immediate": {
+            "samples": 3,
+            "mean": 153.66666666666666,
+            "max": 177,
+            "noisy": false,
+            "tag": "sequential-wave-probed",
+            "connections": 8,
+            "round": 9,
+            "policy": "immediate"
+        },
+        "sequential-wave-probed_c08_r10_hybrid": {
+            "samples": 3,
+            "mean": 146,
+            "max": 168,
+            "noisy": false,
+            "tag": "sequential-wave-probed",
+            "connections": 8,
+            "round": 10,
+            "policy": "hybrid"
+        },
+        "sequential-wave-probed_c08_r10_immediate": {
+            "samples": 2,
+            "mean": 159,
+            "max": 168,
+            "noisy": false,
+            "tag": "sequential-wave-probed",
+            "connections": 8,
+            "round": 10,
+            "policy": "immediate"
+        },
+        "sequential-wave_c08_r01_hybrid": {
+            "samples": 3,
+            "mean": 140.33333333333334,
+            "max": 168,
+            "noisy": false,
+            "tag": "sequential-wave",
+            "connections": 8,
+            "round": 1,
+            "policy": "hybrid"
+        },
+        "sequential-wave_c08_r01_immediate": {
+            "samples": 3,
+            "mean": 154,
+            "max": 168,
+            "noisy": false,
+            "tag": "sequential-wave",
+            "connections": 8,
+            "round": 1,
+            "policy": "immediate"
+        },
+        "sequential-wave_c08_r02_hybrid": {
+            "samples": 3,
+            "mean": 130.33333333333334,
+            "max": 142,
+            "noisy": false,
+            "tag": "sequential-wave",
+            "connections": 8,
+            "round": 2,
+            "policy": "hybrid"
+        },
+        "sequential-wave_c08_r02_immediate": {
+            "samples": 3,
+            "mean": 146.66666666666666,
+            "max": 159,
+            "noisy": false,
+            "tag": "sequential-wave",
+            "connections": 8,
+            "round": 2,
+            "policy": "immediate"
+        },
+        "sequential-wave_c08_r03_hybrid": {
+            "samples": 3,
+            "mean": 143.33333333333334,
+            "max": 159,
+            "noisy": false,
+            "tag": "sequential-wave",
+            "connections": 8,
+            "round": 3,
+            "policy": "hybrid"
+        },
+        "sequential-wave_c08_r03_immediate": {
+            "samples": 3,
+            "mean": 142,
+            "max": 159,
+            "noisy": false,
+            "tag": "sequential-wave",
+            "connections": 8,
+            "round": 3,
+            "policy": "immediate"
+        },
+        "sequential-wave_c08_r04_hybrid": {
+            "samples": 3,
+            "mean": 136,
+            "max": 147,
+            "noisy": false,
+            "tag": "sequential-wave",
+            "connections": 8,
+            "round": 4,
+            "policy": "hybrid"
+        },
+        "sequential-wave_c08_r04_immediate": {
+            "samples": 3,
+            "mean": 140.66666666666666,
+            "max": 187,
+            "noisy": false,
+            "tag": "sequential-wave",
+            "connections": 8,
+            "round": 4,
+            "policy": "immediate"
+        },
+        "sequential-wave_c08_r05_hybrid": {
+            "samples": 3,
+            "mean": 138.66666666666666,
+            "max": 153,
+            "noisy": false,
+            "tag": "sequential-wave",
+            "connections": 8,
+            "round": 5,
+            "policy": "hybrid"
+        },
+        "sequential-wave_c08_r05_immediate": {
+            "samples": 3,
+            "mean": 150,
+            "max": 187,
+            "noisy": false,
+            "tag": "sequential-wave",
+            "connections": 8,
+            "round": 5,
+            "policy": "immediate"
+        },
+        "sequential-wave_c08_r06_hybrid": {
+            "samples": 3,
+            "mean": 137,
+            "max": 158,
+            "noisy": false,
+            "tag": "sequential-wave",
+            "connections": 8,
+            "round": 6,
+            "policy": "hybrid"
+        },
+        "sequential-wave_c08_r06_immediate": {
+            "samples": 3,
+            "mean": 142.66666666666666,
+            "max": 186,
+            "noisy": false,
+            "tag": "sequential-wave",
+            "connections": 8,
+            "round": 6,
+            "policy": "immediate"
+        },
+        "sequential-wave_c08_r07_hybrid": {
+            "samples": 4,
+            "mean": 160.25,
+            "max": 194,
+            "noisy": false,
+            "tag": "sequential-wave",
+            "connections": 8,
+            "round": 7,
+            "policy": "hybrid"
+        },
+        "sequential-wave_c08_r07_immediate": {
+            "samples": 4,
+            "mean": 160.75,
+            "max": 194,
+            "noisy": false,
+            "tag": "sequential-wave",
+            "connections": 8,
+            "round": 7,
+            "policy": "immediate"
+        },
+        "sequential-wave_c08_r08_hybrid": {
+            "samples": 3,
+            "mean": 138.66666666666666,
+            "max": 155,
+            "noisy": false,
+            "tag": "sequential-wave",
+            "connections": 8,
+            "round": 8,
+            "policy": "hybrid"
+        },
+        "sequential-wave_c08_r08_immediate": {
+            "samples": 3,
+            "mean": 140.66666666666666,
+            "max": 177,
+            "noisy": false,
+            "tag": "sequential-wave",
+            "connections": 8,
+            "round": 8,
+            "policy": "immediate"
+        },
+        "sequential-wave_c08_r09_hybrid": {
+            "samples": 3,
+            "mean": 145.66666666666666,
+            "max": 169,
+            "noisy": false,
+            "tag": "sequential-wave",
+            "connections": 8,
+            "round": 9,
+            "policy": "hybrid"
+        },
+        "sequential-wave_c08_r09_immediate": {
+            "samples": 3,
+            "mean": 156.33333333333334,
+            "max": 177,
+            "noisy": false,
+            "tag": "sequential-wave",
+            "connections": 8,
+            "round": 9,
+            "policy": "immediate"
+        },
+        "sequential-wave_c08_r10_hybrid": {
+            "samples": 3,
+            "mean": 135,
+            "max": 169,
+            "noisy": false,
+            "tag": "sequential-wave",
+            "connections": 8,
+            "round": 10,
+            "policy": "hybrid"
+        },
+        "sequential-wave_c08_r10_immediate": {
+            "samples": 3,
+            "mean": 156,
+            "max": 221,
+            "noisy": false,
+            "tag": "sequential-wave",
+            "connections": 8,
+            "round": 10,
+            "policy": "immediate"
+        }
+    }
+}

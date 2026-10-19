@@ -419,6 +419,9 @@ function validateEvidence(string $dir, bool $allowLegacy): array
     if (count($versions) > 1) {
         $problems[] = 'runs were produced on different MySQL versions: ' . implode(', ', array_keys($versions));
     }
+    if (!is_file($dir . '/load.json') && !$allowLegacy) {
+        $problems[] = 'load.json missing: host conditions during the runs are not recorded (run load-report.php, or pass --allow-legacy=1 for legacy evidence)';
+    }
     if (isset($hashes['absent']) && !$allowLegacy) {
         $problems[] = 'runs carry no harness hash (legacy run files); pass --allow-legacy=1 to analyse them explicitly as legacy evidence';
     }
@@ -438,6 +441,7 @@ function main(array $argv): void
         fwrite(STDERR, "EVIDENCE VALIDATION FAILED — no analysis written:\n - " . implode("\n - ", $validation['problems']) . "\n");
         exit(3);
     }
+    $noisyRuns = is_file($dir . '/load.json') ? array_flip((array) json_decode((string) file_get_contents($dir . '/load.json'), true)['noisy_runs']) : null;
     $cells = [];   // tag => level => policy => round => metrics
     foreach (glob($dir . '/runs/*.jsonl.gz') ?: [] as $file) {
         $run = readRun($file);
@@ -465,6 +469,16 @@ function main(array $argv): void
             if (isset($policies['immediate'], $policies['hybrid'])) {
                 $c = compare($policies['immediate'], $policies['hybrid']);
                 $d = decide($c);
+                $noisyInCell = 0;
+                foreach (['immediate', 'hybrid'] as $pol) {
+                    foreach (array_keys($policies[$pol]) as $rd) {
+                        $noisyInCell += isset($noisyRuns[sprintf('%s_c%02d_r%02d_%s', $tag, $level, $rd, $pol)]) ? 1 : 0;
+                    }
+                }
+                if ($noisyRuns !== null && $noisyInCell > 0 && in_array($d['verdict'], ['HYBRID', 'IMMEDIATE'], true)) {
+                    $d = ['verdict' => 'INCONCLUSIVE', 'reason' => $noisyInCell . ' run(s) of this cell overlapped foreign host load (load.json); latency/throughput acceptance is EVIDENCE REQUIRED (rule outcome would have been ' . $d['verdict'] . ')'];
+                }
+                $c['host_noisy_runs'] = $noisyInCell;
                 $out['cells'][$key] = ['comparison' => $c, 'decision' => $d];
                 $pi = $c['immediate'];
                 $ph = $c['hybrid'];
@@ -503,6 +517,8 @@ function main(array $argv): void
                     fmt($c['c3_p95']['delta_us'] / 1000), fmt($c['c3_p95']['allowance_us'] / 1000), $c['c3_p95']['pass'] ? 'pass' : 'fail',
                     $c['c4_guarantees']['pass'] ? 'pass' : 'fail', $c['sufficient_sample'] ? 'yes' : 'NO',
                 );
+                $md[] = '';
+                $md[] = $noisyRuns === null ? 'Host conditions: not recorded (legacy evidence).' : 'Host conditions: ' . $noisyInCell . ' of ' . (2 * $c['rounds']) . ' runs flagged noisy (load.json).';
                 $md[] = '';
                 $md[] = '**Rule outcome for this cell:** `' . $d['verdict'] . '` — ' . $d['reason'] . '.';
                 $md[] = '';

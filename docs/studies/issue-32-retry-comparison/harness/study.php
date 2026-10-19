@@ -128,6 +128,9 @@ function deadlockCounter(PDO $pdo): int
 /** @return array<string,mixed> */
 function captureEnvironment(array $cfg): array
 {
+    // A genuinely fresh server only has an empty database: create the schema first (zero Products), so that
+    // SHOW CREATE TABLE below works from an empty instance (review F41-04).
+    resetEnvironment($cfg, 0);
     $pdo = connect($cfg);
     $variables = [];
     foreach ($pdo->query("SHOW VARIABLES WHERE Variable_name IN ('version','version_comment','version_compile_os','version_compile_machine','transaction_isolation','innodb_deadlock_detect','innodb_lock_wait_timeout','innodb_flush_log_at_trx_commit','innodb_buffer_pool_size','innodb_print_all_deadlocks','autocommit','innodb_autoinc_lock_mode','innodb_thread_concurrency','max_connections','sql_mode','character_set_server','collation_server','innodb_rollback_on_timeout','innodb_adaptive_hash_index','sync_binlog','log_bin','innodb_page_size','innodb_log_file_size','innodb_redo_log_capacity')") as $row) {
