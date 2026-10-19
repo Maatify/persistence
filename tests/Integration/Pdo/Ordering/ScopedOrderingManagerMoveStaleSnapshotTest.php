@@ -239,21 +239,15 @@ final class ScopedOrderingManagerMoveStaleSnapshotTest extends MySqlIntegrationT
         self::assertTrue($this->manager->moveWithinScope($this->pdo(), $config, 'scope-a', $one, 3, '2026-02-03 04:05:06'));
         $this->pdo()->commit();
 
-        $statement = $this->otherPdo->query(
-            'SELECT `id`, `updated_at` FROM `' . OrderingSchemaManager::SCOPED_TABLE . '` ORDER BY `id`'
+        $statement = $this->otherPdo->prepare(
+            'SELECT `updated_at` FROM `' . OrderingSchemaManager::SCOPED_TABLE . '` WHERE `id` = :id'
         );
         self::assertNotFalse($statement);
-        self::assertSame(
-            [
-                [$one, '2026-02-03 04:05:06'],
-                [$two, null],
-                [$three, null],
-            ],
-            array_map(
-                static fn (array $row): array => [(int) $row['id'], $row['updated_at']],
-                $statement->fetchAll(),
-            ),
-        );
+
+        foreach ([[$one, '2026-02-03 04:05:06'], [$two, null], [$three, null]] as [$id, $expected]) {
+            $statement->execute(['id' => $id]);
+            self::assertSame($expected, $statement->fetchColumn(), 'updated_at of row ' . $id);
+        }
     }
 
     public function testMissingRowReturnsFalseAndLeavesTheCallerTransactionActive(): void
@@ -361,6 +355,29 @@ final class ScopedOrderingManagerMoveStaleSnapshotTest extends MySqlIntegrationT
         $statement->execute(['label' => 'updated outside the locked scope', 'id' => $otherId]);
 
         self::assertSame(1, $statement->rowCount());
+    }
+
+    public function testMoveCompletesOnAnUnbufferedConnectionWithoutLeavingAnOpenCursor(): void
+    {
+        $one = $this->fixture->insertScoped('scope-a', 1);
+        $two = $this->fixture->insertScoped('scope-a', 2);
+        $three = $this->fixture->insertScoped('scope-a', 3);
+
+        // PHP 8.4+ moves the driver constant to Pdo\Mysql; the package still supports 8.2.
+        $bufferedQueryAttribute = defined('Pdo\\Mysql::ATTR_USE_BUFFERED_QUERY')
+            ? constant('Pdo\\Mysql::ATTR_USE_BUFFERED_QUERY')
+            : constant('PDO::MYSQL_ATTR_USE_BUFFERED_QUERY');
+        self::assertIsInt($bufferedQueryAttribute);
+        $this->otherPdo->setAttribute($bufferedQueryAttribute, false);
+
+        self::assertTrue($this->manager->moveWithinScope($this->otherPdo, $this->scopedConfig(), 'scope-a', $one, 3));
+        self::assertFalse($this->otherPdo->inTransaction());
+
+        // A further statement on the same connection fails if a cursor were left open.
+        self::assertSame(
+            [$one => 3, $two => 1, $three => 2],
+            $this->otherReader->scopedOrdersById('scope-a'),
+        );
     }
 
     private function beginTransactionWithSnapshot(): void

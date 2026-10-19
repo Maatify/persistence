@@ -28,7 +28,9 @@ use Throwable;
  *   state using a locking read inside an active caller-owned PDO transaction.
  * - moveWithinScope() locks the whole ordering scope with SELECT ... FOR UPDATE,
  *   then reads the current row order from the database inside the transaction.
- * - newOrder is clamped to the current max position inside the same scope.
+ * - newOrder is clamped to the maximum position read by that same locking read,
+ *   so the clamp reflects the latest committed state even when the caller's
+ *   REPEATABLE READ snapshot is older.
  */
 final readonly class ScopedOrderingManager
 {
@@ -236,7 +238,7 @@ final readonly class ScopedOrderingManager
         try {
             return (new PdoTransactionRunner($pdo))->run(
                 function () use ($pdo, $config, $scopeValue, $id, $newOrder, $updatedAtValue, $rollbackResult): bool {
-                    $this->lockScopeForUpdate($pdo, $config, $scopeValue);
+                    $maxOrder = $this->lockScopeForUpdate($pdo, $config, $scopeValue);
 
                     $currentOrder = $this->getCurrentOrderForUpdate($pdo, $config, $scopeValue, $id);
 
@@ -244,7 +246,6 @@ final readonly class ScopedOrderingManager
                         throw $rollbackResult;
                     }
 
-                    $maxOrder = $this->getMaxPosition($pdo, $config, $scopeValue);
                     $newOrder = min($newOrder, max(1, $maxOrder));
 
                     if ($currentOrder === $newOrder) {
@@ -331,13 +332,21 @@ final readonly class ScopedOrderingManager
      *
      * Soft-deleted rows are ignored when deletedAtColumn is configured.
      *
+     * Returns the highest order position among the locked rows, or 0 for an
+     * empty scope. The maximum is taken from this locking read, which returns the
+     * latest committed state, and not from a separate non-locking read: under
+     * REPEATABLE READ a plain read in a caller-owned transaction uses an older
+     * snapshot that locking reads do not refresh, which would make the movement
+     * clamp stale. Rows arrive in ascending order, so the last row read holds the
+     * maximum; the cursor is read row by row and closed without building an array.
+     *
      * @param int|string|null $scopeValue Required when config has a non-null scope column; null means global ordering or the configured nullable scope.
      */
     private function lockScopeForUpdate(
         PDO $pdo,
         ScopedOrderingConfig $config,
         int|string|null $scopeValue
-    ): void {
+    ): int {
         $where = [];
         $params = [];
 
@@ -347,7 +356,7 @@ final readonly class ScopedOrderingManager
         $whereSql = $where !== [] ? ' WHERE ' . implode(' AND ', $where) : '';
 
         $stmt = $pdo->prepare(
-            'SELECT ' . $config->quotedIdColumn() . '
+            'SELECT ' . $config->quotedIdColumn() . ', ' . $config->quotedOrderColumn() . '
                FROM ' . $config->quotedTable()
             . $whereSql .
             ' ORDER BY ' . $config->quotedOrderColumn() . ' ASC, ' . $config->quotedIdColumn() . ' ASC
@@ -355,6 +364,17 @@ final readonly class ScopedOrderingManager
         );
 
         $stmt->execute($params);
+
+        $maxOrder = 0;
+
+        // Column 1 is the order column; false marks the end of the result set.
+        while (($order = $stmt->fetchColumn(1)) !== false) {
+            $maxOrder = (int) $order;
+        }
+
+        $stmt->closeCursor();
+
+        return $maxOrder;
     }
 
     /**
@@ -392,35 +412,6 @@ final readonly class ScopedOrderingManager
         $value = $stmt->fetchColumn();
 
         return $value === false ? null : (int) $value;
-    }
-
-    /**
-     * Returns the current maximum order position inside the scope.
-     *
-     * @param int|string|null $scopeValue Required when config has a non-null scope column; null means global ordering or the configured nullable scope.
-     */
-    private function getMaxPosition(
-        PDO $pdo,
-        ScopedOrderingConfig $config,
-        int|string|null $scopeValue
-    ): int {
-        $where = [];
-        $params = [];
-
-        $this->appendScopeCondition($config, $scopeValue, $where, $params);
-        $this->appendSoftDeleteCondition($config, $where);
-
-        $whereSql = $where !== [] ? ' WHERE ' . implode(' AND ', $where) : '';
-
-        $stmt = $pdo->prepare(
-            'SELECT COALESCE(MAX(' . $config->quotedOrderColumn() . '), 0)
-               FROM ' . $config->quotedTable()
-            . $whereSql
-        );
-
-        $stmt->execute($params);
-
-        return (int) $stmt->fetchColumn();
     }
 
     /**

@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+* `ScopedOrderingManager::moveWithinScope()` no longer clamps the target position against a stale maximum when it participates in a caller-owned `REPEATABLE READ` transaction whose snapshot is older than another connection's commit (Issue #33). The maximum is now taken from the scope's existing `SELECT ... FOR UPDATE` read instead of a separate non-locking `MAX()` read, so the clamp follows the latest committed rows. Public API, transaction ownership, scope-lock order and SQL access plan are unchanged; the lock footprint was measured identical on MySQL 8.4.
+
 ### Added
 * `ScopedOrderingManager::getNextPositionForUpdate()`: reads the latest committed maximum with a locking read inside an active caller-owned PDO transaction, avoiding stale-snapshot position allocation (duplicate positions under `REPEATABLE READ`) when used instead of `getNextPosition()`. It requires an active transaction and never begins or ends one, and it repeats the locking read until two consecutive reads return the same order value (at least two locking reads per call) so a call that waited for a lock follows a higher tail committed meanwhile. `getNextPosition()` is unchanged (plain read, no lock) and remains a supported, non-deprecated alternative for previews and for callers with no older snapshot (outside a transaction, under `READ COMMITTED`, or with a serialization lock that every competing writer takes first, taken before the transaction's first non-locking read).
 * How-to-Use guide (`docs/guides/NEXT_POSITION_ALLOCATION_HOW_TO_USE.md`) and five standalone, MySQL-verified examples (`examples/next-position/`) for position allocation, with integration coverage and Consumer Verification Harness execution. Documentation, examples, and tests only; no runtime or public API change.
