@@ -58,56 +58,124 @@ function example_connect(): PDO
         throw new RuntimeException('These examples require the MySQL PDO driver.');
     }
 
+    ExampleConnections::register($pdo);
+
     return $pdo;
 }
 
 /**
+ * Remembers every connection the example opened, so cleanup can end their open
+ * transactions: a connection still inside a transaction holds metadata locks
+ * and would make DROP TABLE wait when an example fails mid-scenario.
+ */
+final class ExampleConnections
+{
+    /** @var list<PDO> */
+    private static array $connections = [];
+
+    public static function register(PDO $pdo): void
+    {
+        self::$connections[] = $pdo;
+    }
+
+    /**
+     * @return list<PDO>
+     */
+    public static function all(): array
+    {
+        return self::$connections;
+    }
+}
+
+/**
  * Creates uniquely named example tables, runs the scenario, and always drops
- * them again, so examples never touch host tables and can be re-run.
+ * the tables it created, so examples never touch host tables and can be re-run.
  *
  * `items` holds ordered rows (scope column `playlist_id`, order column
  * `position`, optional soft delete). `playlists` is the parent table whose rows
  * a host can lock to serialize the first insert into an empty scope.
  *
+ * Setup is inside the cleanup scope: only tables whose CREATE succeeded are
+ * tracked and dropped, so a failure part-way through setup leaves nothing
+ * behind and never drops a table this call did not create. The original
+ * failure is rethrown; a cleanup failure is reported only when nothing else
+ * failed. `$suffix` makes the table names deterministic (tests only).
+ *
  * @param callable(PDO, array{items: non-empty-string, playlists: non-empty-string}): void $scenario
+ * @param non-empty-string|null $suffix
  */
-function example_with_schema(callable $scenario, bool $uniquePosition = false): void
+function example_with_schema(callable $scenario, bool $uniquePosition = false, ?string $suffix = null): void
 {
     $pdo = example_connect();
-    $suffix = bin2hex(random_bytes(6));
+    $suffix ??= bin2hex(random_bytes(6));
     $tables = [
         'items' => 'maa_example_items_' . $suffix,
         'playlists' => 'maa_example_playlists_' . $suffix,
     ];
-
-    $pdo->exec(
-        'CREATE TABLE ' . $tables['playlists'] . ' (
-            id BIGINT UNSIGNED NOT NULL COMMENT "Host-owned parent identity.",
-            name VARCHAR(64) NOT NULL COMMENT "Host-owned parent name.",
-            PRIMARY KEY (id)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT="Temporary example parents."',
-    );
-    $pdo->exec(
-        'CREATE TABLE ' . $tables['items'] . ' (
-            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT "Row identity.",
-            playlist_id BIGINT UNSIGNED NOT NULL COMMENT "Ordering scope.",
-            position INT NOT NULL COMMENT "Ordering position inside the scope.",
-            title VARCHAR(64) NOT NULL COMMENT "Row title.",
-            deleted_at DATETIME NULL DEFAULT NULL COMMENT "Optional soft-delete timestamp.",
-            PRIMARY KEY (id),
-            ' . ($uniquePosition ? 'UNIQUE ' : '') . 'KEY idx_items_scope_position (playlist_id, position)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT="Temporary example rows."',
-    );
+    $created = [];
+    $failure = null;
 
     try {
-        $scenario($pdo, $tables);
-    } finally {
-        if ($pdo->inTransaction()) {
-            $pdo->rollBack();
-        }
+        $pdo->exec(
+            'CREATE TABLE ' . $tables['playlists'] . ' (
+                id BIGINT UNSIGNED NOT NULL COMMENT "Host-owned parent identity.",
+                name VARCHAR(64) NOT NULL COMMENT "Host-owned parent name.",
+                PRIMARY KEY (id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT="Temporary example parents."',
+        );
+        $created[] = $tables['playlists'];
 
-        $pdo->exec('DROP TABLE IF EXISTS ' . $tables['items']);
-        $pdo->exec('DROP TABLE IF EXISTS ' . $tables['playlists']);
+        $pdo->exec(
+            'CREATE TABLE ' . $tables['items'] . ' (
+                id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT "Row identity.",
+                playlist_id BIGINT UNSIGNED NOT NULL COMMENT "Ordering scope.",
+                position INT NOT NULL COMMENT "Ordering position inside the scope.",
+                title VARCHAR(64) NOT NULL COMMENT "Row title.",
+                deleted_at DATETIME NULL DEFAULT NULL COMMENT "Optional soft-delete timestamp.",
+                PRIMARY KEY (id),
+                ' . ($uniquePosition ? 'UNIQUE ' : '') . 'KEY idx_items_scope_position (playlist_id, position)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT="Temporary example rows."',
+        );
+        $created[] = $tables['items'];
+
+        $scenario($pdo, $tables);
+    } catch (Throwable $throwable) {
+        $failure = $throwable;
+    }
+
+    $cleanupFailure = null;
+
+    foreach (ExampleConnections::all() as $connection) {
+        try {
+            if ($connection->inTransaction()) {
+                $connection->rollBack();
+            }
+        } catch (Throwable $throwable) {
+            $cleanupFailure ??= $throwable;
+        }
+    }
+
+    // Never wait indefinitely for a metadata lock during cleanup.
+    try {
+        $pdo->exec('SET SESSION lock_wait_timeout = 10');
+    } catch (Throwable $throwable) {
+        $cleanupFailure ??= $throwable;
+    }
+
+    foreach (array_reverse($created) as $table) {
+        try {
+            $pdo->exec('DROP TABLE IF EXISTS ' . $table);
+        } catch (Throwable $throwable) {
+            $cleanupFailure ??= $throwable;
+        }
+    }
+
+    if ($failure !== null) {
+        throw $failure;
+    }
+
+    if ($cleanupFailure !== null) {
+        throw $cleanupFailure;
     }
 }
 

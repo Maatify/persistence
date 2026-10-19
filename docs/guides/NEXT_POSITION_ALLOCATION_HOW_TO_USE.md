@@ -34,7 +34,7 @@ temporary tables, asserts what it claims, and exits non-zero on any mismatch.
 | [`examples/next-position/02_rollback_on_failure.php`](../../examples/next-position/02_rollback_on_failure.php) | Host failure and `INSERT` failure after allocation: rollback, original error preserved, position free again |
 | [`examples/next-position/03_stale_snapshot_vs_plain_read.php`](../../examples/next-position/03_stale_snapshot_vs_plain_read.php) | `getNextPosition()` vs `getNextPositionForUpdate()` under `REPEATABLE READ`, and the `READ COMMITTED` contrast |
 | [`examples/next-position/04_empty_scope_and_ownership.php`](../../examples/next-position/04_empty_scope_and_ownership.php) | No-transaction rejection, empty scope, parent-row lock, `UNIQUE` safety net, outer-transaction ownership |
-| [`examples/next-position/05_lock_timeout_and_retry.php`](../../examples/next-position/05_lock_timeout_and_retry.php) | Lock wait timeout propagation and a caller-owned retry loop |
+| [`examples/next-position/05_lock_timeout_and_retry.php`](../../examples/next-position/05_lock_timeout_and_retry.php) | Lock wait timeout propagation and a bounded, caller-owned retry policy with its safety conditions and failure boundaries |
 
 `examples/next-position/_support.php` is example scaffolding only (connection,
 temporary tables, assertions); it is not package API.
@@ -200,7 +200,28 @@ swallow it; it propagates unchanged and is not a `PersistenceException`.
 * Retry the **entire unit of work in a new transaction**. Never reuse the stale
   allocation or continue in the failed transaction.
 * Bound the attempts and retry only 1205 and 1213; let every other error
-  propagate. Example 05 contains a small reference retry loop.
+  (constraint violations, host exceptions) propagate unchanged. Example 05
+  contains a small reference policy and proves each of these boundaries:
+  success after a blocker commits, exhaustion with the original `PDOException`
+  rethrown and no lock leaked, no retry for other errors, and refusal to run
+  inside a transaction it does not own.
+
+**When is re-running the unit of work safe?** Only if a rollback undoes
+everything it did:
+
+* It must be idempotent from the database's point of view: all its effects live
+  inside the transaction, so each attempt starts from a clean state.
+* It must not perform effects a `ROLLBACK` cannot undo: sending a message,
+  calling an external API, enqueueing a job, writing a file. Run those **after**
+  the retry returns, that is, after `COMMIT`, so they happen once even when two
+  attempts ran. Example 05 section 6 shows this.
+* Only retry in a transaction you own. If an outer caller owns the transaction,
+  a deadlock has already rolled back the whole of it, and a lock wait timeout
+  leaves it half-done; do not retry inside it. Propagate the error to the
+  owner, which decides. The example helper refuses to run in that situation.
+
+The example policy is host-owned illustration code, not a package feature; the
+package itself performs no retries.
 * Under `REPEATABLE READ`, a call queued behind a transaction that then inserts
   above the locked row typically fails with a deadlock rather than resuming.
 
@@ -210,7 +231,11 @@ Proven by the examples against real MySQL (and re-proven from a clean Composer
 consumer by `composer test:consumer`): the full allocate / insert / commit and
 rollback paths, both ownership styles, the stale-snapshot hazard and its fix,
 the `READ COMMITTED` contrast, empty-scope serialization and its `UNIQUE`
-safety net, lock timeout propagation, and caller-side retry.
+safety net, lock timeout propagation, and a caller-side retry policy including
+its failure boundaries (bounded attempts, no retry of other errors, refusal
+inside a foreign transaction, no leaked locks, side effects only after commit).
+Example setup cleanup after a part-way setup failure is verified by
+`tests/Integration/Examples/ExampleSchemaCleanupTest.php`.
 
 Deliberately not demonstrated by the examples:
 
