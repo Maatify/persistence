@@ -12,6 +12,8 @@ use Maatify\Persistence\Pdo\Pagination\PdoPaginationQueryDescriptor;
 use Maatify\Persistence\Pdo\Pagination\PdoPaginator;
 use Maatify\Persistence\Pdo\Pagination\SortDirectionEnum;
 use Maatify\Persistence\Pdo\Pagination\SortWhitelist;
+use Maatify\Persistence\Pdo\Transaction\PdoDeadlockRetrySavepointTransactionRunner;
+use Maatify\Persistence\Pdo\Transaction\PdoDeadlockRetryTransactionRunner;
 use Maatify\Persistence\Pdo\Transaction\PdoSavepointTransactionRunner;
 use Maatify\Persistence\Pdo\Transaction\PdoTransactionRunner;
 
@@ -155,7 +157,7 @@ function runSingleConsumerVerification(string $repositoryRoot, string $runLabel)
             'consumer row existence',
         );
 
-        $savepointRunner = new PdoSavepointTransactionRunner($pdo);
+        $savepointRunner = new PdoDeadlockRetrySavepointTransactionRunner($pdo, 3);
         $pdo->beginTransaction();
 
         try {
@@ -256,6 +258,7 @@ function runSingleConsumerVerification(string $repositoryRoot, string $runLabel)
         expectSame($ids[2], (int) $firstId, 'consumer ordering result');
 
         verifyStaleSnapshotAllocation($pdo, $table, $orderingConfig, $ordering);
+        verifyDeprecatedRunnerCompatibility($pdo, $table, $ids[1]);
         verifyDocumentedExamples($repositoryRoot, $consumerRoot);
 
         echo 'Consumer run ' . $runLabel . " passed.\n";
@@ -312,7 +315,7 @@ function verifyStaleSnapshotAllocation(
             expectTrue(! $pdo->inTransaction(), 'locking read outside a transaction left no transaction behind');
         }
 
-        $allocated = (new PdoTransactionRunner($pdo))->run(
+        $allocated = (new PdoDeadlockRetryTransactionRunner($pdo, 3))->run(
             function () use ($pdo, $table, $orderingConfig, $ordering, $scope, $insert, $otherInsert): int {
                 // The first non-locking read creates this transaction's snapshot.
                 readScalar($pdo, 'SELECT COUNT(*) FROM ' . $table);
@@ -372,9 +375,61 @@ function verifyStaleSnapshotAllocation(
  * so they exercise the package only through the Composer-installed dependency
  * and its public API.
  */
+/**
+ * The deprecated v1 runners stay public, autoloadable and behavior-compatible
+ * for existing consumers of the installed package: owned commit, and
+ * operation-local savepoint rollback inside a caller-owned transaction.
+ */
+function verifyDeprecatedRunnerCompatibility(PDO $pdo, string $table, int $id): void
+{
+    $rename = static function (string $name) use ($pdo, $table, $id): void {
+        executeStatement(
+            $pdo->prepare('UPDATE ' . $table . ' SET name = :name WHERE id = :id'),
+            ['name' => $name, 'id' => $id],
+            'deprecated runner update',
+        );
+    };
+    $currentName = static fn (): mixed => readScalar($pdo, 'SELECT name FROM ' . $table . ' WHERE id = ' . $id);
+
+    expectSame('owned', (new PdoTransactionRunner($pdo))->run(static function () use ($rename): string {
+        $rename('deprecated-owned');
+
+        return 'owned';
+    }), 'deprecated owned runner result');
+    expectTrue(! $pdo->inTransaction(), 'deprecated owned runner committed its transaction');
+    expectSame('deprecated-owned', $currentName(), 'deprecated owned runner committed state');
+
+    $pdo->beginTransaction();
+
+    try {
+        $failure = new RuntimeException('deprecated savepoint callback failure.');
+        $thrown = null;
+
+        try {
+            (new PdoSavepointTransactionRunner($pdo))->run(static function () use ($rename, $failure): never {
+                $rename('deprecated-isolated');
+
+                throw $failure;
+            });
+        } catch (Throwable $throwable) {
+            $thrown = $throwable;
+        }
+
+        expectSame($failure, $thrown, 'deprecated savepoint runner original Throwable');
+        expectTrue($pdo->inTransaction(), 'deprecated savepoint runner keeps the caller-owned transaction');
+        expectSame('deprecated-owned', $currentName(), 'deprecated savepoint runner rolled back to its savepoint');
+        $pdo->commit();
+    } finally {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+    }
+}
+
 function verifyDocumentedExamples(string $repositoryRoot, string $consumerRoot): void
 {
-    $directories = ['next-position', 'move-within-scope'];
+    // deadlock-retry runs real InnoDB deadlocks between two processes of the consumer project.
+    $directories = ['next-position', 'move-within-scope', 'deadlock-retry'];
 
     foreach ($directories as $directory) {
         $source = $repositoryRoot . '/examples/' . $directory;
@@ -389,8 +444,15 @@ function verifyDocumentedExamples(string $repositoryRoot, string $consumerRoot):
             throw new RuntimeException('No documented examples were found to verify in ' . $directory . '.');
         }
 
-        if (! copy($source . '/_support.php', $target . '/_support.php')) {
-            throw new RuntimeException('Unable to copy the example support file for ' . $directory . '.');
+        $helpers = glob($source . '/_*.php');
+        if (! is_array($helpers) || ! in_array($source . '/_support.php', $helpers, true)) {
+            throw new RuntimeException('No example support file was found for ' . $directory . '.');
+        }
+
+        foreach ($helpers as $helper) {
+            if (! copy($helper, $target . '/' . basename($helper))) {
+                throw new RuntimeException('Unable to copy the example helper ' . basename($helper) . ' for ' . $directory . '.');
+            }
         }
 
         foreach ($scripts as $script) {

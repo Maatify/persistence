@@ -94,7 +94,7 @@ Host input -> ScopedOrderingConfig -> transaction -> getNextPositionForUpdate()
 3. **Allocate and insert on the same connection and transaction.**
 
    ```php
-   $transactions = new PdoTransactionRunner($pdo);
+   $transactions = new PdoDeadlockRetryTransactionRunner($pdo);
 
    $position = $transactions->run(function () use ($pdo, $ordering, $config, $playlistId): int {
        $position = $ordering->getNextPositionForUpdate($pdo, $config, $playlistId);
@@ -167,8 +167,8 @@ error either way.)
 ### Transaction ownership
 
 * `getNextPositionForUpdate()` never begins, commits, or rolls back. The
-  transaction is yours, or `PdoTransactionRunner`'s when it started it.
-* `PdoTransactionRunner` participates in an already-active transaction without
+  transaction is yours, or `PdoDeadlockRetryTransactionRunner`'s when it started it.
+* `PdoDeadlockRetryTransactionRunner` participates in an already-active transaction without
   committing it; the outer owner decides the outcome (example 04, part D).
 * Everything that must commit together must use the **same PDO connection**.
 
@@ -192,8 +192,18 @@ this summary alone.
 ### Deadlocks and lock wait timeouts are the consumer's responsibility
 
 Waiting for a lock can fail with `PDOException` (MySQL error 1205 for a lock
-wait timeout, 1213 for a deadlock). The package does **not** retry, wrap, or
-swallow it; it propagates unchanged and is not a `PersistenceException`.
+wait timeout, 1213 for a deadlock). `getNextPositionForUpdate()` does **not**
+retry, wrap, or swallow it; it propagates unchanged and is not a
+`PersistenceException`.
+
+The one exception is opt-in and limited to deadlocks: a
+`PdoDeadlockRetryTransactionRunner` constructed with `maxDeadlockRetries` 1 to 3
+replays the whole callback of a transaction **it owns** after a 1213 deadlock
+(see the [Package Reference](../../PERSISTENCE_PACKAGE_REFERENCE.md) and
+[`examples/deadlock-retry`](../../examples/deadlock-retry)). It never retries
+1205, and never retries inside a transaction it does not own. Everything below
+still applies to lock wait timeouts, to caller-owned transactions, and to the
+safety of whatever the replayed callback does. This feature is Unreleased.
 
 * A deadlock rolls back the whole transaction. A lock wait timeout rolls back
   only the failed statement by default, so always end the transaction yourself.
@@ -220,8 +230,9 @@ everything it did:
   leaves it half-done; do not retry inside it. Propagate the error to the
   owner, which decides. The example helper refuses to run in that situation.
 
-The example policy is host-owned illustration code, not a package feature; the
-package itself performs no retries.
+The example policy is host-owned illustration code, not a package feature.
+Apart from the opt-in deadlock replay of `PdoDeadlockRetryTransactionRunner`
+for transactions it owns, the package performs no retries.
 * Under `REPEATABLE READ`, a call queued behind a transaction that then inserts
   above the locked row typically fails with a deadlock rather than resuming.
 
@@ -240,10 +251,12 @@ Example setup cleanup after a part-way setup failure is verified by
 Deliberately not demonstrated by the examples:
 
 * **Deadlock (1213) reproduction.** A deadlock needs two sessions blocking each
-  other and cannot be produced deterministically from a single PHP process. It
-  is covered with separate processes by the package integration tests
-  (`ScopedOrderingManagerStaleSnapshotTest`); the retry loop here handles 1213
-  with the same classification as 1205.
+  other and cannot be produced deterministically from a single PHP process. The
+  allocation case is covered with separate processes by the package integration
+  tests (`ScopedOrderingManagerStaleSnapshotTest`), and
+  [`examples/deadlock-retry`](../../examples/deadlock-retry) reproduces a real
+  deadlock with a second process; the retry loop here handles 1213 with the same
+  classification as 1205.
 * **Multi-process throughput or fairness.** The examples prove correctness
   boundaries, not performance.
 * **Soft-delete lock footprint and index-less scans.** Described above and in

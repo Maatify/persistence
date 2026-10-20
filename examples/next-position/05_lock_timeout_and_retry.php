@@ -34,6 +34,11 @@ declare(strict_types=1);
  * covered with separate processes by the package integration tests. Section 5
  * therefore simulates the driver error only to prove the classification branch.
  *
+ * For deadlocks only, the package now offers an opt-in replay of transactions it
+ * owns (PdoDeadlockRetryTransactionRunner with maxDeadlockRetries 1-3; see
+ * examples/deadlock-retry). It never retries 1205, so a policy like this one is
+ * still the host's choice for lock wait timeouts.
+ *
  * Run: php examples/next-position/05_lock_timeout_and_retry.php
  */
 

@@ -2,6 +2,8 @@
 
 This document is the durable architectural reference for the complete PDO Transaction capability in `maatify/persistence`.
 
+> **Current generation (Unreleased):** new code uses `PdoDeadlockRetryTransactionRunner` and `PdoDeadlockRetrySavepointTransactionRunner` (see [Unreleased — Deadlock-retry runner generation](#unreleased--deadlock-retry-runner-generation), [ADR 0004](../adr/0004-deadlock-retry-transaction-runner-generation.md)). The v1.3.0 and v1.4.0 sections below are kept as the historical record of the runners they introduced; their behavior is unchanged, and both runners are now deprecated.
+
 ## v1.3.0 — Transaction composition
 
 ### Components
@@ -12,8 +14,8 @@ This document is the durable architectural reference for the complete PDO Transa
 ### PdoTransactionRunner Roles
 
 - **Public API:** Yes.
-- **Supported:** Yes.
-- **Deprecated:** No.
+- **Supported:** Yes, behavior-compatible through the `1.x` line.
+- **Deprecated:** Yes, Unreleased (ADR 0004), in favor of `PdoDeadlockRetryTransactionRunner`. It was not deprecated in the released v1.3.0 and v1.4.0.
 - **Intended use:** Intended for transaction ownership/participation without operation-local savepoint isolation.
 
 ### Behavior when no transaction is active
@@ -50,11 +52,11 @@ When invoked within an active caller-owned transaction, the runner participates 
 ### PdoSavepointTransactionRunner Roles
 
 - **Public API:** Yes.
-- **Supported:** Yes.
-- **Deprecated:** No.
+- **Supported:** Yes, behavior-compatible through the `1.x` line.
+- **Deprecated:** Yes, Unreleased (ADR 0004), in favor of `PdoDeadlockRetrySavepointTransactionRunner`. It was not deprecated in the released v1.4.0.
 - **Intended use:** Intended when operation-local savepoint isolation is required inside an existing caller-owned transaction.
 
-> **Note:** Neither runner replaces the other. Choose `PdoTransactionRunner` for standard composition without isolation, and `PdoSavepointTransactionRunner` for isolated operations within a broader transaction.
+> **Note:** Neither runner behavior replaces the other. In v1.4.0 the choice was `PdoTransactionRunner` for standard composition without isolation and `PdoSavepointTransactionRunner` for isolated operations within a broader transaction; the current generation keeps the same two behaviors as `PdoDeadlockRetryTransactionRunner` and `PdoDeadlockRetrySavepointTransactionRunner`.
 
 ### Behavior when no transaction is active
 
@@ -95,3 +97,52 @@ If an outer transaction is active, the runner establishes an operation-local bou
 - **Same-PDO requirement:** Savepoint orchestration is strictly connection-local.
 - **MySQL 8.4 verified boundary:** The savepoint behavior is verified strictly against MySQL 8.4 boundaries.
 - **Cross-connection out of scope:** Cross-connection and distributed transactions are explicitly out of scope.
+
+## Unreleased — Deadlock-retry runner generation
+
+Decision: [ADR 0004](../adr/0004-deadlock-retry-transaction-runner-generation.md), [Issue #32](https://github.com/Maatify/persistence/issues/32). Not part of the stable `v1.4.0`.
+
+### Components
+
+- `PdoDeadlockRetryTransactionRunner` implements the unchanged `TransactionRunnerInterface`.
+- `PdoDeadlockRetrySavepointTransactionRunner` implements the unchanged `SavepointTransactionRunnerInterface`.
+- `InvalidTransactionConfigurationException` for an invalid retry limit.
+- One internal mechanism (`Internal\OwnedTransactionExecutor`, `@internal`, not public API) implements the owned transaction and its replay for both runners; the deprecated runners do not use it and are unchanged.
+
+Constructor of both: `__construct(PDO $pdo, int $maxDeadlockRetries = 0)`, range `0` to `3`, default `0`. With `0` both behave exactly like the runner they replace.
+
+### Roles
+
+- `PdoDeadlockRetryTransactionRunner`: transaction ownership/participation without operation-local savepoint isolation (the behavior of `PdoTransactionRunner`), plus optional owned-transaction replay.
+- `PdoDeadlockRetrySavepointTransactionRunner`: operation-local savepoint isolation inside a caller-owned transaction (the behavior of `PdoSavepointTransactionRunner`, savepoint code unchanged), plus the same optional owned-transaction replay when no transaction is active.
+
+### Owned-transaction replay
+
+Applies only to a transaction the runner begins itself. One attempt is: fresh `BEGIN`, callback, `COMMIT`. A failed attempt is replayed only when:
+
+1. the **callback** threw a `PDOException` whose `errorInfo` is SQLSTATE `40001` with driver code `1213` (a `BEGIN` or `COMMIT` failure is never replayed);
+2. a replay is left (at most `$maxDeadlockRetries`, so at most `$maxDeadlockRetries + 1` attempts);
+3. the server is proven to have ended the transaction: a no-op probe (`DO 0`) succeeds and the connection then reports no active transaction. InnoDB rolls back the whole transaction of a deadlock victim, but `pdo_mysql` refreshes `inTransaction()` only from successful server replies, so the deadlock's error reply alone does not prove it. A failing probe, or a transaction that is still active (for example a `1213` raised by another connection used inside the callback), is not a proven clean boundary.
+
+Otherwise the attempt ends like a non-retrying owned transaction: rollback if still active (best effort), original `Throwable` rethrown unchanged.
+
+Delays (Hybrid policy, measured in the Issue #32 study): before replay 1 none, before replay 2 uniform 0-10 ms, before replay 3 uniform 0-20 ms; smaller limits use the prefix. No transaction or lock is held while waiting.
+
+Failure precedence: after the last attempt the exact final `PDOException` is rethrown, never wrapped; a failing `BEGIN` of a replay propagates and ends the attempts; a probe failure never replaces the deadlock.
+
+### Caller-owned transactions and savepoints
+
+- With an active transaction, `PdoDeadlockRetryTransactionRunner` only participates: no `BEGIN`, `COMMIT`, rollback, or replay.
+- `PdoDeadlockRetrySavepointTransactionRunner` uses an operation-local savepoint with the unchanged v1.4.0 contract (naming, release, rollback-to, failure precedence) and never replays the savepoint or the caller's transaction.
+- A deadlock inside a caller-owned transaction has already rolled back the whole caller transaction on the server; the runner propagates the original `PDOException`, and the caller decides whether to re-run its whole transaction.
+- Nested composition: a deadlock in a savepoint inside an owned, replay-enabled transaction replays the whole owned transaction, never only the savepoint.
+
+### Callback replay contract
+
+When replay is enabled the whole callback may run several times. Only its work on the runner's PDO connection inside the owned transaction is undone between attempts; external effects (e-mail, HTTP, queues, files, other connections, in-memory state) are not and must stay outside the callback or be idempotent. The callback must not begin, commit, or roll back the runner-owned transaction; a manually ended transaction followed by a later deadlock is not detectable by the runner. All participants must use the same PDO connection.
+
+### Verification boundary
+
+- Real InnoDB deadlocks (`1213`/`40001`) against a second process on MySQL 8.4 (integration suite and `examples/deadlock-retry`, also executed by the Consumer Verification Harness from a clean Composer project): owned replay and single commit, exhaustion with the exact final `PDOException`, no replay by default, no replay in caller-owned transactions and savepoints, nested replay of the whole owned transaction.
+- Unit decision tests for every non-replayable branch, the probe, the delay schedule and bounds, and the range validation; parity tests run the complete v1.4.0 savepoint unit and integration cases against the new savepoint runner configured with `3`.
+- The value `3` and the delay schedule are supported by the Issue #32 study only for one synchronized 8-connection workload; they are opt-in, not a default.

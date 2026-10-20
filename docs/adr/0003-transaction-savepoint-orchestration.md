@@ -5,6 +5,7 @@
 - **Runtime status:** Implemented for v1.4.0
 - **Implementation authorization:** Implemented
 - **Related contract:** [PDO Transaction Architecture](../architecture/PDO_TRANSACTION_ARCHITECTURE.md)
+- **Amended by:** [ADR 0004](0004-deadlock-retry-transaction-runner-generation.md) (2026-10-20) — supersedes only the statement below that `PdoTransactionRunner` and `PdoSavepointTransactionRunner` are not deprecated; both are now deprecated in favor of the deadlock-retry runner generation. The savepoint decisions of this ADR remain in force. The original text below is kept unchanged as the historical record.
 
 ## Context
 The existing `PdoTransactionRunner` works well for single, global transactions. However, complex orchestration requires operation-local transactional boundaries (savepoints) that do not terminate the outer transaction.
