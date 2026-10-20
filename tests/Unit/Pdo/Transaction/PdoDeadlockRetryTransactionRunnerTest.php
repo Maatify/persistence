@@ -91,7 +91,8 @@ final class PdoDeadlockRetryTransactionRunnerTest extends TestCase
         $failure = new RuntimeException('owned transaction failure.');
         $calls = 0;
 
-        $thrown = $this->runCatching(new PdoDeadlockRetryTransactionRunner($pdo, $retries),
+        $thrown = $this->runCatching(
+            new PdoDeadlockRetryTransactionRunner($pdo, $retries),
             static function () use ($failure, &$calls): never {
                 $calls++;
 
@@ -113,7 +114,8 @@ final class PdoDeadlockRetryTransactionRunnerTest extends TestCase
         $failure = new RuntimeException('callback failure.');
         $pdo = new RetryTransactionPdo(rollbackFailure: new RuntimeException('rollback failure.'));
 
-        $thrown = $this->runCatching(new PdoDeadlockRetryTransactionRunner($pdo, $retries),
+        $thrown = $this->runCatching(
+            new PdoDeadlockRetryTransactionRunner($pdo, $retries),
             static function () use ($failure): never {
                 throw $failure;
             },
@@ -145,7 +147,8 @@ final class PdoDeadlockRetryTransactionRunnerTest extends TestCase
         $deadlock = PdoErrors::deadlock();
         $calls = 0;
 
-        $thrown = $this->runCatching(new PdoDeadlockRetryTransactionRunner($pdo, $retries),
+        $thrown = $this->runCatching(
+            new PdoDeadlockRetryTransactionRunner($pdo, $retries),
             static function () use ($pdo, $deadlock, &$calls): never {
                 $calls++;
                 $pdo->endTransactionOnServer();
@@ -167,7 +170,8 @@ final class PdoDeadlockRetryTransactionRunnerTest extends TestCase
         $deadlock = PdoErrors::deadlock();
         $calls = 0;
 
-        $thrown = $this->runCatching(new PdoDeadlockRetryTransactionRunner($pdo),
+        $thrown = $this->runCatching(
+            new PdoDeadlockRetryTransactionRunner($pdo),
             static function () use ($pdo, $deadlock, &$calls): never {
                 $calls++;
                 $pdo->endTransactionOnServer();
@@ -219,7 +223,8 @@ final class PdoDeadlockRetryTransactionRunnerTest extends TestCase
         /** @var list<PDOException> $raised */
         $raised = [];
 
-        $thrown = $this->runCatching(new PdoDeadlockRetryTransactionRunner($pdo, $retries),
+        $thrown = $this->runCatching(
+            new PdoDeadlockRetryTransactionRunner($pdo, $retries),
             static function () use ($pdo, &$raised): never {
                 $deadlock = PdoErrors::deadlock('attempt ' . (count($raised) + 1));
                 $raised[] = $deadlock;
@@ -230,7 +235,9 @@ final class PdoDeadlockRetryTransactionRunnerTest extends TestCase
         );
 
         self::assertCount($retries + 1, $raised);
-        self::assertSame($raised[array_key_last($raised)], $thrown);
+        $finalDeadlock = array_pop($raised);
+        self::assertNotNull($finalDeadlock);
+        self::assertSame($finalDeadlock, $thrown);
         self::assertSame($retries + 1, $pdo->beginTransactionCalls);
         self::assertSame(
             array_fill(0, $retries, 'DO 0'),
@@ -248,7 +255,8 @@ final class PdoDeadlockRetryTransactionRunnerTest extends TestCase
         $pdo = new RetryTransactionPdo();
         $calls = 0;
 
-        $thrown = $this->runCatching(new PdoDeadlockRetryTransactionRunner($pdo, 3),
+        $thrown = $this->runCatching(
+            new PdoDeadlockRetryTransactionRunner($pdo, 3),
             static function () use ($pdo, $failure, &$calls): never {
                 $calls++;
                 // Even with the server-side transaction already gone, the failure itself is not replayable.
@@ -272,7 +280,8 @@ final class PdoDeadlockRetryTransactionRunnerTest extends TestCase
         $deadlock = PdoErrors::deadlock('other connection');
         $calls = 0;
 
-        $thrown = $this->runCatching(new PdoDeadlockRetryTransactionRunner($pdo, 3),
+        $thrown = $this->runCatching(
+            new PdoDeadlockRetryTransactionRunner($pdo, 3),
             static function () use ($deadlock, &$calls): never {
                 $calls++;
 
@@ -293,7 +302,8 @@ final class PdoDeadlockRetryTransactionRunnerTest extends TestCase
         $pdo = new RetryTransactionPdo(commitFailures: [$commitDeadlock]);
         $calls = 0;
 
-        $thrown = $this->runCatching(new PdoDeadlockRetryTransactionRunner($pdo, 3),
+        $thrown = $this->runCatching(
+            new PdoDeadlockRetryTransactionRunner($pdo, 3),
             static function () use (&$calls): string {
                 $calls++;
 
@@ -313,7 +323,8 @@ final class PdoDeadlockRetryTransactionRunnerTest extends TestCase
         $pdo = new RetryTransactionPdo();
         $calls = 0;
 
-        $thrown = $this->runCatching(new PdoDeadlockRetryTransactionRunner($pdo, 3),
+        $thrown = $this->runCatching(
+            new PdoDeadlockRetryTransactionRunner($pdo, 3),
             static function () use ($pdo, &$calls): string {
                 $calls++;
                 $pdo->commit();
@@ -334,7 +345,8 @@ final class PdoDeadlockRetryTransactionRunnerTest extends TestCase
         $pdo = new RetryTransactionPdo(beginFailures: [$beginFailure]);
         $calls = 0;
 
-        $thrown = $this->runCatching(new PdoDeadlockRetryTransactionRunner($pdo, 3),
+        $thrown = $this->runCatching(
+            new PdoDeadlockRetryTransactionRunner($pdo, 3),
             static function () use (&$calls): string {
                 $calls++;
 
@@ -353,7 +365,8 @@ final class PdoDeadlockRetryTransactionRunnerTest extends TestCase
         $pdo = new RetryTransactionPdo(beginFailures: [null, $replayBeginFailure]);
         $calls = 0;
 
-        $thrown = $this->runCatching(new PdoDeadlockRetryTransactionRunner($pdo, 3),
+        $thrown = $this->runCatching(
+            new PdoDeadlockRetryTransactionRunner($pdo, 3),
             static function () use ($pdo, &$calls): never {
                 $calls++;
                 $pdo->endTransactionOnServer();
@@ -384,7 +397,8 @@ final class PdoDeadlockRetryTransactionRunnerTest extends TestCase
         $deadlock = PdoErrors::deadlock();
         $calls = 0;
 
-        $thrown = $this->runCatching(new PdoDeadlockRetryTransactionRunner($pdo, 3),
+        $thrown = $this->runCatching(
+            new PdoDeadlockRetryTransactionRunner($pdo, 3),
             static function () use ($pdo, $deadlock, &$calls): never {
                 $calls++;
                 $pdo->endTransactionOnServer();

@@ -30,6 +30,7 @@ final class OwnedTransactionExecutorTest extends TestCase
         ];
     }
 
+    /** @param list<array{int, int}> $expectedBounds */
     #[DataProvider('delaySchedules')]
     public function testHybridDelaysAreRequestedOnlyBeforeRetriesTwoAndThree(int $retries, array $expectedBounds): void
     {
@@ -58,7 +59,7 @@ final class OwnedTransactionExecutorTest extends TestCase
         }));
 
         self::assertSame($expectedBounds, $requested);
-        self::assertSame(array_map(static fn (array $bounds): int => $bounds[1], $expectedBounds), $slept);
+        self::assertSame(array_column($expectedBounds, 1), $slept);
         self::assertNotContains(true, $inTransactionWhileSleeping, 'No transaction (and no lock) may be held while waiting.');
         self::assertSame($retries + 1, $pdo->beginTransactionCalls);
     }

@@ -60,7 +60,8 @@ final class PdoDeadlockRetrySavepointTransactionRunnerRetryTest extends TestCase
         $deadlock = PdoErrors::deadlock();
         $calls = 0;
 
-        $thrown = $this->runCatching(new PdoDeadlockRetrySavepointTransactionRunner($pdo),
+        $thrown = $this->runCatching(
+            new PdoDeadlockRetrySavepointTransactionRunner($pdo),
             static function () use ($pdo, $deadlock, &$calls): never {
                 $calls++;
                 $pdo->endTransactionOnServer();
@@ -79,7 +80,8 @@ final class PdoDeadlockRetrySavepointTransactionRunnerRetryTest extends TestCase
         $pdo = new RetryTransactionPdo();
         $raised = [];
 
-        $thrown = $this->runCatching(new PdoDeadlockRetrySavepointTransactionRunner($pdo, 3),
+        $thrown = $this->runCatching(
+            new PdoDeadlockRetrySavepointTransactionRunner($pdo, 3),
             static function () use ($pdo, &$raised): never {
                 $deadlock = PdoErrors::deadlock('attempt ' . (count($raised) + 1));
                 $raised[] = $deadlock;
@@ -100,7 +102,8 @@ final class PdoDeadlockRetrySavepointTransactionRunnerRetryTest extends TestCase
         $deadlock = PdoErrors::deadlock();
         $calls = 0;
 
-        $thrown = $this->runCatching(new PdoDeadlockRetrySavepointTransactionRunner($pdo, 3),
+        $thrown = $this->runCatching(
+            new PdoDeadlockRetrySavepointTransactionRunner($pdo, 3),
             static function () use ($pdo, $deadlock, &$calls): never {
                 $calls++;
                 // InnoDB rolls back the whole caller-owned transaction of a deadlock victim.
@@ -125,7 +128,8 @@ final class PdoDeadlockRetrySavepointTransactionRunnerRetryTest extends TestCase
         $deadlock = PdoErrors::deadlock('reported while the caller transaction is still active');
         $calls = 0;
 
-        $thrown = $this->runCatching(new PdoDeadlockRetrySavepointTransactionRunner($pdo, 3),
+        $thrown = $this->runCatching(
+            new PdoDeadlockRetrySavepointTransactionRunner($pdo, 3),
             static function () use ($deadlock, &$calls): never {
                 $calls++;
 

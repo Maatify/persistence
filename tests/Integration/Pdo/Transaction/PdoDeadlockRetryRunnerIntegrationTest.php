@@ -35,7 +35,8 @@ final class PdoDeadlockRetryRunnerIntegrationTest extends DeadlockRetryIntegrati
         $calls = 0;
         $raised = null;
 
-        $thrown = $this->runCatching(new PdoTransactionRunner($this->pdo()),
+        $thrown = $this->runCatching(
+            new PdoTransactionRunner($this->pdo()),
             function () use (&$calls, &$raised): never {
                 $calls++;
                 $this->insert('deprecated-runner');
@@ -56,7 +57,8 @@ final class PdoDeadlockRetryRunnerIntegrationTest extends DeadlockRetryIntegrati
         $calls = 0;
         $raised = null;
 
-        $thrown = $this->runCatching(new PdoDeadlockRetryTransactionRunner($this->pdo()),
+        $thrown = $this->runCatching(
+            new PdoDeadlockRetryTransactionRunner($this->pdo()),
             function () use (&$calls, &$raised): never {
                 $calls++;
                 $this->insert('default-no-retry');
@@ -90,10 +92,10 @@ final class PdoDeadlockRetryRunnerIntegrationTest extends DeadlockRetryIntegrati
                 throw $raised = $this->provokeDeadlockAsVictim();
             }
 
-            return 'committed on attempt ' . $calls;
+            return 'committed after replay';
         });
 
-        self::assertSame('committed on attempt 2', $result);
+        self::assertSame('committed after replay', $result);
         self::assertSame(2, $calls);
         self::assertSame([true, true], $inTransactionAtStart);
         self::assertInstanceOf(PDOException::class, $raised);
@@ -109,7 +111,8 @@ final class PdoDeadlockRetryRunnerIntegrationTest extends DeadlockRetryIntegrati
         /** @var list<PDOException> $raised */
         $raised = [];
 
-        $thrown = $this->runCatching($runnerFactory($this->pdo()),
+        $thrown = $this->runCatching(
+            $runnerFactory($this->pdo()),
             function () use (&$raised): never {
                 $this->insert('attempt-' . (count($raised) + 1));
 
@@ -135,7 +138,8 @@ final class PdoDeadlockRetryRunnerIntegrationTest extends DeadlockRetryIntegrati
         $this->pdo()->beginTransaction();
         $this->insert('caller-before');
 
-        $thrown = $this->runCatching($runnerFactory($this->pdo()),
+        $thrown = $this->runCatching(
+            $runnerFactory($this->pdo()),
             function () use (&$calls, &$raised): never {
                 $calls++;
                 $this->insert('operation');
