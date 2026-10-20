@@ -9,7 +9,7 @@ declare(strict_types=1);
  * -> real INSERT on the same connection -> COMMIT -> observable rows.
  *
  * Shows both ways to own the transaction:
- *   A. PdoTransactionRunner owns BEGIN / COMMIT / ROLLBACK.
+ *   A. PdoDeadlockRetryTransactionRunner owns BEGIN / COMMIT / ROLLBACK.
  *   B. The caller owns them with plain PDO calls.
  *
  * Run: php examples/next-position/01_allocate_and_insert.php
@@ -19,7 +19,7 @@ require __DIR__ . '/_support.php';
 
 use Maatify\Persistence\Pdo\Ordering\ScopedOrderingConfig;
 use Maatify\Persistence\Pdo\Ordering\ScopedOrderingManager;
-use Maatify\Persistence\Pdo\Transaction\PdoTransactionRunner;
+use Maatify\Persistence\Pdo\Transaction\PdoDeadlockRetryTransactionRunner;
 
 example_with_schema(static function (PDO $pdo, array $tables): void {
     $playlistId = 7;
@@ -42,7 +42,7 @@ example_with_schema(static function (PDO $pdo, array $tables): void {
 
     // A. The runner begins the transaction, commits on success and rolls back
     //    (rethrowing the original Throwable) on failure.
-    $transactions = new PdoTransactionRunner($pdo);
+    $transactions = new PdoDeadlockRetryTransactionRunner($pdo);
     $bridgeId = $transactions->run(
         static function () use ($pdo, $ordering, $config, $insert, $playlistId): int {
             $position = $ordering->getNextPositionForUpdate($pdo, $config, $playlistId);

@@ -21,7 +21,7 @@ require __DIR__ . '/_support.php';
 use Maatify\Persistence\Exception\InvalidOrderingOperationException;
 use Maatify\Persistence\Pdo\Ordering\ScopedOrderingConfig;
 use Maatify\Persistence\Pdo\Ordering\ScopedOrderingManager;
-use Maatify\Persistence\Pdo\Transaction\PdoTransactionRunner;
+use Maatify\Persistence\Pdo\Transaction\PdoDeadlockRetryTransactionRunner;
 
 example_with_schema(static function (PDO $pdo, array $tables): void {
     $other = example_connect();
@@ -110,7 +110,7 @@ example_with_schema(static function (PDO $pdo, array $tables): void {
     // D. Caller-owned outer transaction: the runner participates, the caller decides.
     $owned = 12;
     example_seed($pdo, $tables['items'], $owned, ['x', 'y']);
-    $transactions = new PdoTransactionRunner($pdo);
+    $transactions = new PdoDeadlockRetryTransactionRunner($pdo);
 
     $pdo->beginTransaction();
     $position = $transactions->run(

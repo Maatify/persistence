@@ -21,7 +21,7 @@ require __DIR__ . '/_support.php';
 use Maatify\Persistence\Exception\PersistenceException;
 use Maatify\Persistence\Pdo\Ordering\ScopedOrderingConfig;
 use Maatify\Persistence\Pdo\Ordering\ScopedOrderingManager;
-use Maatify\Persistence\Pdo\Transaction\PdoTransactionRunner;
+use Maatify\Persistence\Pdo\Transaction\PdoDeadlockRetryTransactionRunner;
 
 example_with_schema(static function (PDO $pdo, array $tables): void {
     $playlistId = 3;
@@ -29,7 +29,7 @@ example_with_schema(static function (PDO $pdo, array $tables): void {
 
     $config = new ScopedOrderingConfig(table: $tables['items'], scopeColumn: 'playlist_id', orderColumn: 'position');
     $ordering = new ScopedOrderingManager();
-    $transactions = new PdoTransactionRunner($pdo);
+    $transactions = new PdoDeadlockRetryTransactionRunner($pdo);
     $insert = $pdo->prepare(
         'INSERT INTO ' . $config->quotedTable() . ' (playlist_id, position, title)
          VALUES (:playlist_id, :position, :title)',

@@ -37,4 +37,5 @@ The following status values are used:
 |---|---|---|---|---|---|
 | [0001](0001-pdo-pagination-architecture.md) | PDO Pagination Architecture | Accepted | 2026-07-11 | Released in v1.1.0 | [PDO Pagination Contract](../architecture/PDO_PAGINATION_CONTRACT.md) |
 | [0002](0002-ordering-hard-delete-compaction.md) | Ordering Hard-Delete Compaction | Accepted — Deferred | 2026-07-11 | Not implemented; no stable public API | None |
-| [0003](0003-transaction-savepoint-orchestration.md) | Transaction Savepoint Orchestration | Accepted | 2026-09-17 | Implemented for v1.4.0 | [PDO Transaction Architecture](../architecture/PDO_TRANSACTION_ARCHITECTURE.md) |
+| [0003](0003-transaction-savepoint-orchestration.md) | Transaction Savepoint Orchestration | Accepted (deprecation statement superseded by [0004](0004-deadlock-retry-transaction-runner-generation.md)) | 2026-09-17 | Implemented for v1.4.0 | [PDO Transaction Architecture](../architecture/PDO_TRANSACTION_ARCHITECTURE.md) |
+| [0004](0004-deadlock-retry-transaction-runner-generation.md) | Deadlock-Retry Transaction Runner Generation | Accepted | 2026-10-20 | Implemented; Unreleased | [PDO Transaction Architecture](../architecture/PDO_TRANSACTION_ARCHITECTURE.md) |
