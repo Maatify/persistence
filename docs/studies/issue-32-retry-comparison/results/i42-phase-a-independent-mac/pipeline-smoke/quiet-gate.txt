@@ -1,0 +1,1 @@
+host quiet gate: OFF (smoke profile)

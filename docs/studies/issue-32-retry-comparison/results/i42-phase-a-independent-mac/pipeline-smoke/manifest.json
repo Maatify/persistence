@@ -1,0 +1,19 @@
+{
+    "cells": {
+        "smoke": {
+            "levels": [
+                2,
+                8
+            ],
+            "rounds": 1,
+            "ops": 8,
+            "placement": "sequential",
+            "mode": "wave",
+            "policies": [
+                "immediate",
+                "hybrid"
+            ],
+            "verify": false
+        }
+    }
+}

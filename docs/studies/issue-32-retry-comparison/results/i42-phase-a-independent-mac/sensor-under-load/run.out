@@ -1,0 +1,1 @@
+[loadcheck c=8 r=1 immediate #1] ok=341 exhausted=59 err=0 deadlocks(client/server)=821/821 active=1.76s integrity=OK

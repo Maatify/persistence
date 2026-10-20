@@ -1,0 +1,5 @@
+# Issue #42 evidence directories hold verbatim tool output (top/docker/harness reports, including trailing padding and
+# final blank lines); it is kept byte-for-byte and therefore exempt from whitespace linting. Runs 1-5 are not affected.
+i42-phase-a-independent-mac/** -whitespace
+run-6-i42-decision-a/** -whitespace
+run-7-i42-decision-b/** -whitespace
