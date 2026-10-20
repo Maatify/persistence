@@ -1,0 +1,40 @@
+# Probe output - MySQL 8.4.10 (docker mysql:8.4.10), PHP 8.4.4, 2026-10-20
+
+## p1_unique_index_move.php
+[move id 3 -> 1 (shift up)] PDOException: SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry '1-2' for key 'probe_uq.uq'
+[move id 1 -> 3 (shift down)] PDOException: SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry '1-1' for key 'probe_uq.uq'
+[rows afterwards] [{"id":1,"display_order":1},{"id":2,"display_order":2},{"id":3,"display_order":3}]
+
+## p2_joined_transaction_partial_state.php
+[moveWithinScope (id 3 -> 1) in caller-owned transaction] PDOException: SQLSTATE[45000]: <<Unknown error>>: 1644 boom
+[caller still in transaction] true
+[rows after the failed move (caller catches and continues)] [{"id":1,"display_order":2},{"id":2,"display_order":3},{"id":3,"display_order":3}]
+[rows after the caller COMMIT] [{"id":1,"display_order":2},{"id":2,"display_order":3},{"id":3,"display_order":3}]
+
+## p3_error_modes_and_identifiers.php
+-- RC-05: identifiers ending in a newline are accepted
+[ScopedOrderingConfig table "t\n"] "`t\n`"
+[SortWhitelist key "id\n"] true
+[SortWhitelist identifier "id\n"] "`id\n`"
+-- RC-03: ordering manager outside ERRMODE_EXCEPTION (missing table)
+[getNextPosition SILENT] Error: Call to a member function execute() on false
+[rowExistsInScope SILENT] Error: Call to a member function execute() on false
+[moveWithinScope SILENT] Error: Call to a member function execute() on false
+[getNextPosition WARNING] Error: Call to a member function execute() on false
+[rowExistsInScope WARNING] Error: Call to a member function execute() on false
+[moveWithinScope WARNING] Error: Call to a member function execute() on false
+-- DG-04: the same named placeholder twice, native vs emulated prepares; page beyond the last page
+[emulate=false repeated :n] PDOException: SQLSTATE[HY093]: Invalid parameter number
+[emulate=false page 99 of 2] 1
+[emulate=true repeated :n] 1
+[emulate=true page 99 of 2] 1
+
+## p4_deadlock_then_continue.php
+caught driver code 1213; inTransaction() right after = true
+inTransaction() after the next statement = false
+commit() -> PDOException: There is no active transaction
+committed labels seen by another connection: ["caller-after"]
+
+## p5_autocommit_session.php
+inTransaction() after a plain SELECT under autocommit=0 = false
+row committed and visible to another connection: true
