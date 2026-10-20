@@ -92,7 +92,9 @@ final class PdoDeadlockRetrySavepointTransactionRunnerRetryTest extends TestCase
         );
 
         self::assertCount(4, $raised);
-        self::assertSame($raised[3], $thrown);
+        $finalDeadlock = array_pop($raised);
+        self::assertNotNull($finalDeadlock);
+        self::assertSame($finalDeadlock, $thrown);
         self::assertSame(4, $pdo->beginTransactionCalls);
     }
 

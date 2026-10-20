@@ -121,9 +121,11 @@ final class PdoDeadlockRetryRunnerIntegrationTest extends DeadlockRetryIntegrati
         );
 
         self::assertCount(4, $raised, 'Initial attempt plus three retries.');
-        self::assertSame($raised[3], $thrown);
-        self::assertSame(self::DEADLOCK_SQLSTATE, $raised[3]->errorInfo[0] ?? null);
-        self::assertSame(self::DEADLOCK_DRIVER_CODE, $raised[3]->errorInfo[1] ?? null);
+        $finalDeadlock = array_pop($raised);
+        self::assertNotNull($finalDeadlock);
+        self::assertSame($finalDeadlock, $thrown);
+        self::assertSame(self::DEADLOCK_SQLSTATE, $finalDeadlock->errorInfo[0] ?? null);
+        self::assertSame(self::DEADLOCK_DRIVER_CODE, $finalDeadlock->errorInfo[1] ?? null);
         self::assertFalse($this->pdo()->inTransaction());
         self::assertSame([], $this->committedPayloads());
         self::assertSame(['ACQUIRED', 'ACQUIRED', 'ACQUIRED', 'ACQUIRED'], $this->partnerReports());
