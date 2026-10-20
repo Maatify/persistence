@@ -11,6 +11,8 @@
 
 declare(strict_types=1);
 
+require_once __DIR__ . '/loadlib.php';
+
 // ---- pre-registered decision constants -------------------------------------------------------------------------
 const MIN_ROUNDS = 5;
 const MIN_OPS_PER_ROUND = 200;
@@ -320,6 +322,65 @@ function fmt(?float $v, int $d = 2): string
 }
 
 /**
+ * Host-condition evidence: load.json is never trusted on its own. It must describe exactly the declared runs, and its
+ * per-run sample counts / noisy classification and noisy_runs list must equal what is re-computed here from the raw
+ * host-load.log and the run summaries. New evidence additionally needs the process-tree attribution (host-quiet v2).
+ *
+ * @param list<string> $expectedRuns run names without extension
+ * @return list<string> problems
+ */
+function validateLoadEvidence(string $dir, array $expectedRuns, bool $allowLegacy): array
+{
+    $problems = [];
+    if (!is_file($dir . '/load.json')) {
+        return $allowLegacy ? [] : ['load.json missing: host conditions during the runs are not recorded (run load-report.php, or pass --allow-legacy=1 for legacy evidence)'];
+    }
+    $recorded = json_decode((string) file_get_contents($dir . '/load.json'), true);
+    if (!is_array($recorded) || !isset($recorded['runs'], $recorded['noisy_runs']) || !is_array($recorded['runs']) || !is_array($recorded['noisy_runs'])) {
+        return ['load.json is malformed (needs "runs" and "noisy_runs")'];
+    }
+    if (!is_file($dir . '/host-load.log')) {
+        return ['host-load.log missing: load.json cannot be verified'];
+    }
+    $computed = computeLoadReport($dir);
+    foreach (array_diff($expectedRuns, array_keys($recorded['runs'])) as $m) {
+        $problems[] = "load.json has no record for declared run $m";
+    }
+    foreach (array_diff(array_keys($recorded['runs']), $expectedRuns) as $u) {
+        $problems[] = "load.json has a record for an undeclared run $u";
+    }
+    foreach ($expectedRuns as $name) {
+        $r = $recorded['runs'][$name] ?? null;
+        $c = $computed['runs'][$name] ?? null;
+        if ($r === null || $c === null) {
+            continue;
+        }
+        if (!is_int($r['samples'] ?? null) || !is_bool($r['noisy'] ?? null)) {
+            $problems[] = "load.json record for $name is malformed (samples/noisy)";
+            continue;
+        }
+        if ($r['samples'] !== $c['samples'] || $r['noisy'] !== $c['noisy']) {
+            $problems[] = "load.json record for $name (samples={$r['samples']}, noisy=" . json_encode($r['noisy']) . ") does not match the host-load.log recomputation (samples={$c['samples']}, noisy=" . json_encode($c['noisy']) . ')';
+        }
+        if ($c['samples'] === 0 && !$allowLegacy) {
+            $problems[] = "no host sample overlaps run $name";
+        }
+    }
+    $listed = $recorded['noisy_runs'];
+    sort($listed);
+    $real = $computed['noisy_runs'];
+    sort($real);
+    if ($listed !== $real) {
+        $problems[] = 'load.json noisy_runs does not equal the recomputed set';
+    }
+    if ($computed['attribution'] !== 'process-tree-v2' && !$allowLegacy) {
+        $problems[] = 'host-load.log uses the superseded attribution "' . $computed['attribution'] . '" (not process-tree v2); pass --allow-legacy=1 to analyse it explicitly as legacy host evidence';
+    }
+
+    return $problems;
+}
+
+/**
  * Fail-closed input validation. Returns a list of problems (empty = the evidence set is complete, matched and consistent).
  *
  * @return array{problems:list<string>,files:array<string,string>,legacy:bool}
@@ -419,9 +480,7 @@ function validateEvidence(string $dir, bool $allowLegacy): array
     if (count($versions) > 1) {
         $problems[] = 'runs were produced on different MySQL versions: ' . implode(', ', array_keys($versions));
     }
-    if (!is_file($dir . '/load.json') && !$allowLegacy) {
-        $problems[] = 'load.json missing: host conditions during the runs are not recorded (run load-report.php, or pass --allow-legacy=1 for legacy evidence)';
-    }
+    array_push($problems, ...validateLoadEvidence($dir, array_map(static fn(string $n): string => basename($n, '.jsonl.gz'), array_keys($expected)), $allowLegacy));
     if (isset($hashes['absent']) && !$allowLegacy) {
         $problems[] = 'runs carry no harness hash (legacy run files); pass --allow-legacy=1 to analyse them explicitly as legacy evidence';
     }
@@ -441,7 +500,7 @@ function main(array $argv): void
         fwrite(STDERR, "EVIDENCE VALIDATION FAILED — no analysis written:\n - " . implode("\n - ", $validation['problems']) . "\n");
         exit(3);
     }
-    $noisyRuns = is_file($dir . '/load.json') ? array_flip((array) json_decode((string) file_get_contents($dir . '/load.json'), true)['noisy_runs']) : null;
+    $noisyRuns = is_file($dir . '/load.json') ? array_flip(computeLoadReport($dir)['noisy_runs']) : null;
     $cells = [];   // tag => level => policy => round => metrics
     foreach (glob($dir . '/runs/*.jsonl.gz') ?: [] as $file) {
         $run = readRun($file);

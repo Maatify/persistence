@@ -14,11 +14,12 @@ Study-only material for [Issue #32](https://github.com/Maatify/persistence/issue
 | `harness/selftest.php` | Negative tests of the harness itself (retry classification, ownership, evidence validation, reuse guard, observer sensitivity) |
 | `schema/php-product-schema.sql` | Verbatim `maatify/php-product` schema (see METHODOLOGY §3) |
 | `run-all.sh` | `full` / `decision` / `smoke` profile into a fresh directory; fail-closed quiet-host gate; works from an empty database |
-| `host-quiet.sh`, `host-load.sh`, `load-report.php` | Foreign-CPU measurement for the gate and the per-run noisy-host flags |
+| `host-quiet.sh` (v2), `host-load.sh`, `load-report.php`, `harness/loadlib.php` | Foreign-CPU measurement (process-tree attribution) for the gate and the per-run noisy-host flags; classification shared with the analyzer |
 | `results/run-1-initial/` | First complete run (earlier harness version, legacy format; reconstructed manifest) |
 | `results/run-2/` | Re-run with the final harness; a later part overlapped heavy load from another project on the same host (see REPORT §6) |
 | `results/run-3/` | Re-run with the final harness (primary for the full design; its quiet gate timed out, see REPORT §6) |
-| `results/run-4-decision-cell/` | Targeted controlled repeat of the 8-connection decision cell (fail-closed gate passed, 0/40 noisy runs) |
+| `results/run-4-decision-cell/` | Targeted repeat of the 8-connection decision cell (name-based host attribution, superseded; legacy host evidence) |
+| `results/run-5-decision-cell/` | Corrected targeted repeat (process-tree attribution); the host became busy, 34/40 runs flagged → performance `EVIDENCE REQUIRED` |
 | `results/f41-04-fresh-database-proof.txt`, `results/f41-06-local-gates.txt` | Review evidence: run from an empty database; full local repository gates |
 
 Each results directory holds `runs/*.jsonl.gz`, `manifest.json`, `environment.json`, `preflight/`, `diagnosis.json`, `analysis.json`, `ANALYSIS.md`, `run.log` (run-2/3 also `selftest.txt`; run-3 `host-load.log`, `LOAD.md`, `quiet-gate.txt`).
@@ -55,7 +56,7 @@ php study.php run --out=../results/try --tag=sequential-wave --levels=8 --rounds
 php analyze.php --dir=../results/try                # refuses incomplete/inconsistent evidence (exit 3)
 ```
 
-Absolute timings depend on the host; the pass/fail pattern of the paired comparison is what should reproduce. Re-analysis of committed raw data needs no database: `php harness/analyze.php --dir=results/run-4-decision-cell` (run-1, run-2 and run-3 predate parts of the evidence format and need `--allow-legacy=1`).
+Absolute timings depend on the host; the pass/fail pattern of the paired comparison is what should reproduce. Re-analysis of committed raw data needs no database: `php harness/analyze.php --dir=results/run-5-decision-cell` (run-1…run-4 predate parts of the evidence format or host attribution and need `--allow-legacy=1`).
 
 ## Reading the raw data
 

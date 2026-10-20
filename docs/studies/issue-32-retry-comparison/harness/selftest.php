@@ -130,7 +130,7 @@ function writeRunFile(string $dir, string $tag, int $level, int $round, string $
     }
     $deadlocks = ($attempts - 1) * $ops;
     $summary = ['type' => 'summary', 'tag' => $tag, 'policy' => $policy, 'connections' => $level, 'ops' => $ops, 'round' => $round, 'order_in_round' => 1, 'placement' => 'sequential', 'mode' => 'wave', 'verify_server_state' => false,
-        'active_us' => 1000, 'wall_us' => 2000, 'wave_active_us' => [], 'ok' => $ops, 'exhausted' => 0, 'errors' => 0, 'invalid' => 0, 'harness_sha256' => 'h1', 'mysql_version' => '8.0.46',
+        'started_at' => gmdate('c', $over['end'] ?? 1_800_000_000), 'active_us' => 1000, 'wall_us' => 2000, 'wave_active_us' => [], 'ok' => $ops, 'exhausted' => 0, 'errors' => 0, 'invalid' => 0, 'harness_sha256' => 'h1', 'mysql_version' => '8.0.46',
         'client_deadlocks' => $deadlocks, 'server_deadlocks_delta' => $deadlocks,
         'integrity' => ['contents_rows' => $ops, 'ok_ops' => $ops, 'rows_match_ok_ops' => true, 'duplicate_product_rows' => 0, 'name_mismatch_rows' => 0, 'callback_runs_ne_attempts' => 0, 'server_open_transactions_after_run' => 0, 'flags' => [], 'other_errors' => [], 'all_isolation_repeatable_read' => true]];
     $summary = array_replace($summary, $over['summary'] ?? []);
@@ -145,17 +145,43 @@ function writeRunFile(string $dir, string $tag, int $level, int $round, string $
     gzclose($gz);
 }
 
-function makeSet(array $overrides = [], int $rounds = 2): string
+const HOST_BASE = 1_800_000_000;
+
+/** Synthetic host-load.log: one sample per second; $heavy = list of [fromOffset, toOffset] with 600 % foreign CPU. */
+function writeHostLog(string $dir, int $seconds, array $heavy = [], string $suffix = ' v=2', string $dsl = 'foreign'): void
+{
+    $lines = [];
+    for ($t = 0; $t <= $seconds; ++$t) {
+        $f = 50;
+        foreach ($heavy as [$a, $b]) {
+            if ($t >= $a && $t <= $b) {
+                $f = 600;
+            }
+        }
+        $lines[] = gmdate('Y-m-d\TH:i:s\Z', HOST_BASE + $t) . " foreign=$f load1=3.0" . $suffix;
+    }
+    file_put_contents($dir . '/host-load.log', implode("\n", $lines) . "\n");
+}
+
+function writeLoadJson(string $dir): void
+{
+    file_put_contents($dir . '/load.json', json_encode(computeLoadReport($dir), JSON_PRETTY_PRINT));
+}
+
+function makeSet(array $overrides = [], int $rounds = 2, array $heavy = [], string $logSuffix = ' v=2'): string
 {
     $dir = sys_get_temp_dir() . '/i32-selftest-' . bin2hex(random_bytes(4));
     mkdir($dir . '/runs', 0777, true);
-    file_put_contents($dir . '/load.json', json_encode(['noisy_runs' => []]));
     file_put_contents($dir . '/manifest.json', json_encode(['cells' => ['t' => ['levels' => [2], 'rounds' => $rounds, 'ops' => 4, 'placement' => 'sequential', 'mode' => 'wave', 'policies' => ['immediate', 'hybrid'], 'verify' => false]]]));
+    $i = 0;
     for ($round = 1; $round <= $rounds; ++$round) {
         foreach (['immediate', 'hybrid'] as $policy) {
-            writeRunFile($dir, 't', 2, $round, $policy, $overrides[$round . $policy] ?? []);
+            ++$i;
+            writeRunFile($dir, 't', 2, $round, $policy, ['end' => HOST_BASE + $i * 20] + ($overrides[$round . $policy] ?? []));
         }
     }
+    writeHostLog($dir, ($i + 1) * 20, $heavy, $logSuffix);
+    writeLoadJson($dir);
 
     return $dir;
 }
@@ -198,6 +224,59 @@ $dir = makeSet();
 unlink($dir . '/load.json');
 t('analyzer: missing load.json (host conditions not recorded) is rejected unless --allow-legacy=1', $has(validateEvidence($dir, false), 'load.json missing') && !$has(validateEvidence($dir, true), 'load.json missing'));
 
+// ---- host-condition evidence (F41-07): load.json is verified against the raw log, never trusted alone ----
+$dir = makeSet();
+file_put_contents($dir . '/load.json', json_encode(['noisy_runs' => []]));
+t('host evidence: a bare {"noisy_runs":[]} (no per-run records) is rejected as malformed', $has(validateEvidence($dir, false), 'malformed'));
+
+$dir = makeSet();
+$j = json_decode((string) file_get_contents($dir . '/load.json'), true);
+unset($j['runs']['t_c02_r01_immediate']);
+file_put_contents($dir . '/load.json', json_encode($j));
+t('host evidence: a declared run without a load.json record is rejected', $has(validateEvidence($dir, false), 'no record for declared run t_c02_r01_immediate'));
+
+$dir = makeSet();
+$j = json_decode((string) file_get_contents($dir . '/load.json'), true);
+$j['runs']['t_c09_r09_hybrid'] = $j['runs']['t_c02_r01_hybrid'];
+file_put_contents($dir . '/load.json', json_encode($j));
+t('host evidence: a record for an undeclared run is rejected', $has(validateEvidence($dir, false), 'undeclared run t_c09_r09_hybrid'));
+
+$dir = makeSet([], 2, [[15, 45]]);   // heavy foreign CPU while runs 1-2 execute
+$j = json_decode((string) file_get_contents($dir . '/load.json'), true);
+$noisy = $j['noisy_runs'];
+t('host evidence: heavy foreign CPU overlapping a run is classified noisy by the recomputation', $noisy !== [] && validateEvidence($dir, false)['problems'] === []);
+foreach ($j['runs'] as $name => &$rec) {
+    $rec['noisy'] = false;
+}
+unset($rec);
+$j['noisy_runs'] = [];
+file_put_contents($dir . '/load.json', json_encode($j));
+t('host evidence: load.json that hides noisy runs (all noisy=false) is rejected', $has(validateEvidence($dir, false), 'does not match the host-load.log recomputation'));
+
+$dir = makeSet();
+$j = json_decode((string) file_get_contents($dir . '/load.json'), true);
+$j['runs']['t_c02_r01_hybrid']['samples'] = 99;
+file_put_contents($dir . '/load.json', json_encode($j));
+t('host evidence: a wrong per-run sample count is rejected', $has(validateEvidence($dir, false), 'does not match the host-load.log recomputation'));
+
+$dir = makeSet([], 2, [[15, 45]]);
+$j = json_decode((string) file_get_contents($dir . '/load.json'), true);
+$j['noisy_runs'] = [];
+file_put_contents($dir . '/load.json', json_encode($j));
+t('host evidence: a noisy_runs list that differs from the recomputed set is rejected', $has(validateEvidence($dir, false), 'noisy_runs does not equal'));
+
+$dir = makeSet();
+unlink($dir . '/host-load.log');
+t('host evidence: load.json without the raw host-load.log is rejected', $has(validateEvidence($dir, false), 'host-load.log missing'));
+
+$dir = makeSet();
+file_put_contents($dir . '/host-load.log', "garbage\n");
+$j = json_decode((string) file_get_contents($dir . '/load.json'), true);
+t('host evidence: a log with no usable samples cannot validate (no sample overlaps the runs)', $has(validateEvidence($dir, false), 'no host sample overlaps run'));
+
+$dir = makeSet([], 2, [], '');
+t('host evidence: v1 (process-name) attribution is rejected unless --allow-legacy=1', $has(validateEvidence($dir, false), 'superseded attribution') && !$has(validateEvidence($dir, true), 'superseded attribution'));
+
 $dir = makeSet();
 unlink($dir . '/manifest.json');
 t('analyzer: missing manifest is rejected', $has(validateEvidence($dir, false), 'manifest.json missing'));
@@ -210,6 +289,57 @@ $dir = makeSet(['1immediate' => ['ops' => static function (array $lines): array 
     return $lines;
 }]]);
 t('analyzer: legacy attempt records (no SQLSTATE) are rejected unless --allow-legacy=1', $has(validateEvidence($dir, false), 'no SQLSTATE') && !$has(validateEvidence($dir, true), 'no SQLSTATE'));
+
+// ---- host-CPU attribution sensitivity (F41-08): needs real processes ----
+if (in_array('--with-host=1', $argv, true)) {
+    $hq = realpath(__DIR__ . '/../host-quiet.sh');
+    $measure = static function (int $rootPid) use ($hq): float {
+        $vals = [];
+        for ($i = 0; $i < 3; ++$i) {
+            $vals[] = (float) trim((string) shell_exec('STUDY_ROOT_PID=' . $rootPid . ' ' . escapeshellarg($hq) . ' 2>/dev/null'));
+        }
+        sort($vals);
+
+        return $vals[1];
+    };
+    // One launcher L runs three CPU-busy processes whose names collide with the old name-based exclusion list
+    // (worker.php, study.php, bash). The same busy set is measured twice back to back: once declaring L as the study
+    // root (the busy processes are its descendants -> own -> excluded) and once declaring an UNRELATED root (they are
+    // not its descendants -> foreign -> counted). Background noise on the host cancels out in the difference.
+    $tmp = sys_get_temp_dir() . '/i32-hostq-' . bin2hex(random_bytes(3));
+    mkdir($tmp);
+    file_put_contents($tmp . '/worker.php', '<?php while (true) { }');
+    file_put_contents($tmp . '/study.php', '<?php while (true) { }');
+    $launcher = proc_open(['bash', '-c', escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg($tmp . '/worker.php') . ' & ' . escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg($tmp . '/study.php') . ' & bash -c "while :; do :; done" & wait'], [], $p1);
+    $launcherPid = (int) proc_get_status($launcher)['pid'];
+    $idle = proc_open(['sleep', '300'], [], $p2);
+    $idlePid = (int) proc_get_status($idle)['pid'];
+    usleep(800_000);
+    $ownSet = static fn(int $root): array => array_filter(explode(' ', trim((string) shell_exec('HOST_QUIET_PRINT_OWN=1 STUDY_ROOT_PID=' . $root . ' ' . escapeshellarg($hq) . ' 2>/dev/null'))));
+    $busyPids = array_map('intval', array_filter(explode("\n", trim((string) shell_exec('pgrep -P ' . $launcherPid)))));
+    $viewAsOwn = array_map('intval', $ownSet($launcherPid));
+    $viewAsForeign = array_map('intval', $ownSet($idlePid));
+    $asOwn = [];
+    $asForeign = [];
+    for ($i = 0; $i < 5; ++$i) {   // interleaved CPU measurements
+        $asOwn[] = $measure($launcherPid);
+        $asForeign[] = $measure($idlePid);
+    }
+    sort($asOwn);
+    sort($asForeign);
+    exec('pkill -P ' . $launcherPid . ' 2>/dev/null');
+    proc_terminate($launcher);
+    proc_close($launcher);
+    proc_terminate($idle);
+    proc_close($idle);
+    array_map('unlink', glob($tmp . '/*.php') ?: []);
+    rmdir($tmp);
+
+    $diff = $asForeign[2] - $asOwn[2];
+    t(sprintf('host attribution: the busy processes (%d of them, named worker.php/study.php/bash) are in the OWN set when descendants of the study root', count($busyPids)), count($busyPids) >= 3 && array_diff($busyPids, $viewAsOwn) === []);
+    t('host attribution: the same processes are NOT in the own set when they are not descendants of the study root (name collisions do not make them own)', array_intersect($busyPids, $viewAsForeign) === []);
+    t(sprintf('host attribution: measured foreign CPU reflects it (median of 5 interleaved pairs: %.0f%% as foreign vs %.0f%% as own, difference %.0f%%)', $asForeign[2], $asOwn[2], $diff), $diff >= 60);
+}
 
 // ---- tests that need the study MySQL ----
 $withDb = in_array('--with-db=1', $argv, true);
@@ -225,7 +355,14 @@ if ($withDb) {
     t('reuse guard: second run into the same directory/tag is refused', $cmd($base) !== 0);
     t('reuse guard: --resume=1 with the same configuration is accepted', $cmd($base . ' --resume=1') === 0);
     t('reuse guard: same tag with different parameters is refused even with --resume=1', $cmd(str_replace('--ops=4', '--ops=8', $base) . ' --resume=1') !== 0);
-    file_put_contents($out . '/load.json', json_encode(['noisy_runs' => []]));   // fixture: load-report.php is exercised by run-all.sh
+    // Fixture host log (quiet, v2) covering the run, then the real classifier writes load.json (the sampler itself is exercised by run-all.sh).
+    $now = time();
+    $lines = [];
+    for ($t = $now - 120; $t <= $now + 10; ++$t) {
+        $lines[] = gmdate('Y-m-d\TH:i:s\Z', $t) . ' foreign=10 load1=1.0 v=2';
+    }
+    file_put_contents($out . '/host-load.log', implode("\n", $lines) . "\n");
+    writeLoadJson($out);
     $summaryFile = glob($out . '/runs/st_*.jsonl.gz')[0];
     $analysis = (function () use ($out): int {
         exec(escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg(__DIR__ . '/analyze.php') . ' --dir=' . escapeshellarg($out) . ' 2>&1', $o, $code);

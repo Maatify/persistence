@@ -1,0 +1,525 @@
+{
+    "dir": "../results/run-5-decision-cell",
+    "generated_at": "2026-10-20T00:04:11+00:00",
+    "evidence_validated": true,
+    "legacy_run_files": false,
+    "run_files": 40,
+    "constants_note": "see METHODOLOGY.md section 6",
+    "constants": {
+        "MIN_ROUNDS": 5,
+        "MIN_OPS_PER_ROUND": 200,
+        "MIN_IMMEDIATE_EXHAUSTED_POOLED": 30,
+        "C1_REL": 0.2,
+        "C1_ABS_PP": 1,
+        "C1_ROUND_FRACTION": 0.8,
+        "C2_MAX_THROUGHPUT_DROP": 0.05,
+        "C3_REL": 0.1,
+        "C3_ABS_US": 10000
+    },
+    "cells": {
+        "sequential-wave/c8": {
+            "comparison": {
+                "rounds": 10,
+                "rounds_needed_for_c1": 8,
+                "c1_round_wins": 10,
+                "sufficient_sample": true,
+                "immediate": {
+                    "rounds": 10,
+                    "ops": 4000,
+                    "ok": 3572,
+                    "exhausted": 428,
+                    "errors": 0,
+                    "exhausted_rate": 0.107,
+                    "success_rate": 0.893,
+                    "attempts_total": 10605,
+                    "attempts_per_op": 2.65125,
+                    "deadlocks_original": 3300,
+                    "deadlocks_repeated": 3733,
+                    "original_deadlock_rate": 0.825,
+                    "active_s": 57.815148,
+                    "goodput_ops_s": 61.78311607885186,
+                    "completed_ops_s": 69.18602024507487,
+                    "lat_all_us": {
+                        "p50": 47000,
+                        "p95": 341517,
+                        "p99": 574343,
+                        "mean": 86240.78775
+                    },
+                    "lat_ok_us": {
+                        "p50": 44659,
+                        "p95": 324982,
+                        "p99": 557761
+                    },
+                    "ok_by_attempts": {
+                        "1": 700,
+                        "2": 1115,
+                        "3": 1065,
+                        "4": 692
+                    },
+                    "sleep_total_ms": 0,
+                    "integrity_pass_all_runs": true,
+                    "exhausted_wilson95": [
+                        0.09779489328132675,
+                        0.11695922915626404
+                    ]
+                },
+                "hybrid": {
+                    "rounds": 10,
+                    "ops": 4000,
+                    "ok": 3957,
+                    "exhausted": 43,
+                    "errors": 0,
+                    "exhausted_rate": 0.01075,
+                    "success_rate": 0.98925,
+                    "attempts_total": 10079,
+                    "attempts_per_op": 2.51975,
+                    "deadlocks_original": 3374,
+                    "deadlocks_repeated": 2748,
+                    "original_deadlock_rate": 0.8435,
+                    "active_s": 58.010372000000004,
+                    "goodput_ops_s": 68.21193975449769,
+                    "completed_ops_s": 68.95318650947455,
+                    "lat_all_us": {
+                        "p50": 43233,
+                        "p95": 331101,
+                        "p99": 581692,
+                        "mean": 81025.64825
+                    },
+                    "lat_ok_us": {
+                        "p50": 42995,
+                        "p95": 314255,
+                        "p99": 562539
+                    },
+                    "ok_by_attempts": {
+                        "1": 626,
+                        "2": 1095,
+                        "3": 1853,
+                        "4": 383
+                    },
+                    "sleep_total_ms": 15984.785000000002,
+                    "integrity_pass_all_runs": true,
+                    "exhausted_wilson95": [
+                        0.007990865645598422,
+                        0.014447949628170781
+                    ]
+                },
+                "per_round": [
+                    {
+                        "round": 1,
+                        "immediate_exhausted_pct": 10.5,
+                        "hybrid_exhausted_pct": 0.75,
+                        "abs_pp": 9.75,
+                        "rel": 0.9285714285714286,
+                        "c1_win": true,
+                        "immediate_goodput": 44.12028767906459,
+                        "hybrid_goodput": 76.47158194661975,
+                        "immediate_p95_ms": 404.163,
+                        "hybrid_p95_ms": 247.342,
+                        "immediate_first": true
+                    },
+                    {
+                        "round": 2,
+                        "immediate_exhausted_pct": 8.5,
+                        "hybrid_exhausted_pct": 0.25,
+                        "abs_pp": 8.25,
+                        "rel": 0.9705882352941176,
+                        "c1_win": true,
+                        "immediate_goodput": 47.6358806989303,
+                        "hybrid_goodput": 70.8755618753425,
+                        "immediate_p95_ms": 439.446,
+                        "hybrid_p95_ms": 345.359,
+                        "immediate_first": false
+                    },
+                    {
+                        "round": 3,
+                        "immediate_exhausted_pct": 7.5,
+                        "hybrid_exhausted_pct": 0.5,
+                        "abs_pp": 6.999999999999999,
+                        "rel": 0.9333333333333332,
+                        "c1_win": true,
+                        "immediate_goodput": 46.82258757057714,
+                        "hybrid_goodput": 100.69306174205069,
+                        "immediate_p95_ms": 388.287,
+                        "hybrid_p95_ms": 177.5,
+                        "immediate_first": true
+                    },
+                    {
+                        "round": 4,
+                        "immediate_exhausted_pct": 12,
+                        "hybrid_exhausted_pct": 0,
+                        "abs_pp": 12,
+                        "rel": 1,
+                        "c1_win": true,
+                        "immediate_goodput": 98.07068221532755,
+                        "hybrid_goodput": 106.57532450854121,
+                        "immediate_p95_ms": 129.647,
+                        "hybrid_p95_ms": 194.325,
+                        "immediate_first": false
+                    },
+                    {
+                        "round": 5,
+                        "immediate_exhausted_pct": 5.75,
+                        "hybrid_exhausted_pct": 3.25,
+                        "abs_pp": 2.5,
+                        "rel": 0.43478260869565216,
+                        "c1_win": true,
+                        "immediate_goodput": 56.15477148731796,
+                        "hybrid_goodput": 42.22159332292231,
+                        "immediate_p95_ms": 364.113,
+                        "hybrid_p95_ms": 391.125,
+                        "immediate_first": true
+                    },
+                    {
+                        "round": 6,
+                        "immediate_exhausted_pct": 12,
+                        "hybrid_exhausted_pct": 3,
+                        "abs_pp": 9,
+                        "rel": 0.75,
+                        "c1_win": true,
+                        "immediate_goodput": 68.16200947800488,
+                        "hybrid_goodput": 45.38897179005214,
+                        "immediate_p95_ms": 371.59,
+                        "hybrid_p95_ms": 464.455,
+                        "immediate_first": false
+                    },
+                    {
+                        "round": 7,
+                        "immediate_exhausted_pct": 10,
+                        "hybrid_exhausted_pct": 0.75,
+                        "abs_pp": 9.25,
+                        "rel": 0.9249999999999999,
+                        "c1_win": true,
+                        "immediate_goodput": 88.37461409751845,
+                        "hybrid_goodput": 77.3016618494296,
+                        "immediate_p95_ms": 234.69,
+                        "hybrid_p95_ms": 331.017,
+                        "immediate_first": true
+                    },
+                    {
+                        "round": 8,
+                        "immediate_exhausted_pct": 9.5,
+                        "hybrid_exhausted_pct": 1.25,
+                        "abs_pp": 8.25,
+                        "rel": 0.868421052631579,
+                        "c1_win": true,
+                        "immediate_goodput": 52.87948517000682,
+                        "hybrid_goodput": 46.16284498691955,
+                        "immediate_p95_ms": 318.017,
+                        "hybrid_p95_ms": 401.008,
+                        "immediate_first": false
+                    },
+                    {
+                        "round": 9,
+                        "immediate_exhausted_pct": 15.5,
+                        "hybrid_exhausted_pct": 0,
+                        "abs_pp": 15.5,
+                        "rel": 1,
+                        "c1_win": true,
+                        "immediate_goodput": 86.48356543594754,
+                        "hybrid_goodput": 99.69893414361981,
+                        "immediate_p95_ms": 258.824,
+                        "hybrid_p95_ms": 164.775,
+                        "immediate_first": true
+                    },
+                    {
+                        "round": 10,
+                        "immediate_exhausted_pct": 15.75,
+                        "hybrid_exhausted_pct": 1,
+                        "abs_pp": 14.75,
+                        "rel": 0.9365079365079364,
+                        "c1_win": true,
+                        "immediate_goodput": 88.19839981407672,
+                        "hybrid_goodput": 97.42248638914378,
+                        "immediate_p95_ms": 295.386,
+                        "hybrid_p95_ms": 207.095,
+                        "immediate_first": false
+                    }
+                ],
+                "c1_exhausted": {
+                    "pooled_abs_pp": 9.625,
+                    "pooled_rel": 0.8995327102803738,
+                    "pooled_pass": true,
+                    "rounds_pass": true,
+                    "diff_hybrid_minus_immediate_ci95_pp": [
+                        -10.658436344302922,
+                        -8.632987796674598
+                    ],
+                    "ci_excludes_zero": true,
+                    "pass": true
+                },
+                "c2_throughput": {
+                    "goodput_ratio_hybrid_over_immediate": 1.1040547010843695,
+                    "completed_ratio_hybrid_over_immediate": 0.9966346707792186,
+                    "pass": true
+                },
+                "c3_p95": {
+                    "immediate_us": 341517,
+                    "hybrid_us": 331101,
+                    "delta_us": -10416,
+                    "allowance_us": 34151.700000000004,
+                    "pass": true
+                },
+                "c4_guarantees": {
+                    "pass": true
+                },
+                "host_noisy_runs": 14
+            },
+            "decision": {
+                "verdict": "INCONCLUSIVE",
+                "reason": "14 run(s) of this cell overlapped foreign host load (load.json); latency/throughput acceptance is EVIDENCE REQUIRED (rule outcome would have been HYBRID)"
+            }
+        },
+        "sequential-wave-probed/c8": {
+            "comparison": {
+                "rounds": 10,
+                "rounds_needed_for_c1": 8,
+                "c1_round_wins": 10,
+                "sufficient_sample": true,
+                "immediate": {
+                    "rounds": 10,
+                    "ops": 4000,
+                    "ok": 3449,
+                    "exhausted": 551,
+                    "errors": 0,
+                    "exhausted_rate": 0.13775,
+                    "success_rate": 0.86225,
+                    "attempts_total": 11386,
+                    "attempts_per_op": 2.8465,
+                    "deadlocks_original": 3485,
+                    "deadlocks_repeated": 4452,
+                    "original_deadlock_rate": 0.87125,
+                    "active_s": 47.439587,
+                    "goodput_ops_s": 72.70299380979012,
+                    "completed_ops_s": 84.31776608847795,
+                    "lat_all_us": {
+                        "p50": 46847,
+                        "p95": 272277,
+                        "p99": 599818,
+                        "mean": 71876.1775
+                    },
+                    "lat_ok_us": {
+                        "p50": 43930,
+                        "p95": 283442,
+                        "p99": 569022
+                    },
+                    "ok_by_attempts": {
+                        "1": 515,
+                        "2": 982,
+                        "3": 1105,
+                        "4": 847
+                    },
+                    "sleep_total_ms": 0,
+                    "integrity_pass_all_runs": true,
+                    "exhausted_wilson95": [
+                        0.12741679921794885,
+                        0.14877831745639536
+                    ]
+                },
+                "hybrid": {
+                    "rounds": 10,
+                    "ops": 4000,
+                    "ok": 3984,
+                    "exhausted": 16,
+                    "errors": 0,
+                    "exhausted_rate": 0.004,
+                    "success_rate": 0.996,
+                    "attempts_total": 10491,
+                    "attempts_per_op": 2.62275,
+                    "deadlocks_original": 3490,
+                    "deadlocks_repeated": 3017,
+                    "original_deadlock_rate": 0.8725,
+                    "active_s": 35.33122,
+                    "goodput_ops_s": 112.76146139306822,
+                    "completed_ops_s": 113.21431866773918,
+                    "lat_all_us": {
+                        "p50": 45667,
+                        "p95": 90259,
+                        "p99": 126685,
+                        "mean": 48365.25775
+                    },
+                    "lat_ok_us": {
+                        "p50": 45566,
+                        "p95": 88927,
+                        "p99": 126685
+                    },
+                    "ok_by_attempts": {
+                        "1": 510,
+                        "2": 968,
+                        "3": 2043,
+                        "4": 463
+                    },
+                    "sleep_total_ms": 17659.077999999998,
+                    "integrity_pass_all_runs": true,
+                    "exhausted_wilson95": [
+                        0.0024636990981918147,
+                        0.0064880686601925
+                    ]
+                },
+                "per_round": [
+                    {
+                        "round": 1,
+                        "immediate_exhausted_pct": 13,
+                        "hybrid_exhausted_pct": 0.5,
+                        "abs_pp": 12.5,
+                        "rel": 0.9615384615384615,
+                        "c1_win": true,
+                        "immediate_goodput": 119.50467373163646,
+                        "hybrid_goodput": 89.42150353495785,
+                        "immediate_p95_ms": 70.092,
+                        "hybrid_p95_ms": 131.516,
+                        "immediate_first": true
+                    },
+                    {
+                        "round": 2,
+                        "immediate_exhausted_pct": 16.75,
+                        "hybrid_exhausted_pct": 0.5,
+                        "abs_pp": 16.25,
+                        "rel": 0.9701492537313433,
+                        "c1_win": true,
+                        "immediate_goodput": 105.38448246725012,
+                        "hybrid_goodput": 125.42109028112603,
+                        "immediate_p95_ms": 94.309,
+                        "hybrid_p95_ms": 77.969,
+                        "immediate_first": false
+                    },
+                    {
+                        "round": 3,
+                        "immediate_exhausted_pct": 13.25,
+                        "hybrid_exhausted_pct": 0,
+                        "abs_pp": 13.25,
+                        "rel": 1,
+                        "c1_win": true,
+                        "immediate_goodput": 138.45309193285306,
+                        "hybrid_goodput": 134.7898726977047,
+                        "immediate_p95_ms": 57.604,
+                        "hybrid_p95_ms": 69.184,
+                        "immediate_first": true
+                    },
+                    {
+                        "round": 4,
+                        "immediate_exhausted_pct": 14.000000000000002,
+                        "hybrid_exhausted_pct": 0,
+                        "abs_pp": 14.000000000000002,
+                        "rel": 1,
+                        "c1_win": true,
+                        "immediate_goodput": 117.09573972340216,
+                        "hybrid_goodput": 129.50008757443422,
+                        "immediate_p95_ms": 84.768,
+                        "hybrid_p95_ms": 67.099,
+                        "immediate_first": false
+                    },
+                    {
+                        "round": 5,
+                        "immediate_exhausted_pct": 9.5,
+                        "hybrid_exhausted_pct": 0.5,
+                        "abs_pp": 9,
+                        "rel": 0.9473684210526315,
+                        "c1_win": true,
+                        "immediate_goodput": 18.835335255439404,
+                        "hybrid_goodput": 98.45256318032452,
+                        "immediate_p95_ms": 682.415,
+                        "hybrid_p95_ms": 109.238,
+                        "immediate_first": true
+                    },
+                    {
+                        "round": 6,
+                        "immediate_exhausted_pct": 13.5,
+                        "hybrid_exhausted_pct": 0,
+                        "abs_pp": 13.5,
+                        "rel": 1,
+                        "c1_win": true,
+                        "immediate_goodput": 114.63911705349638,
+                        "hybrid_goodput": 119.61032153347608,
+                        "immediate_p95_ms": 71.319,
+                        "hybrid_p95_ms": 78.039,
+                        "immediate_first": false
+                    },
+                    {
+                        "round": 7,
+                        "immediate_exhausted_pct": 13.5,
+                        "hybrid_exhausted_pct": 0,
+                        "abs_pp": 13.5,
+                        "rel": 1,
+                        "c1_win": true,
+                        "immediate_goodput": 110.93669041866097,
+                        "hybrid_goodput": 108.09125171561084,
+                        "immediate_p95_ms": 79.007,
+                        "hybrid_p95_ms": 86.612,
+                        "immediate_first": true
+                    },
+                    {
+                        "round": 8,
+                        "immediate_exhausted_pct": 10.25,
+                        "hybrid_exhausted_pct": 1,
+                        "abs_pp": 9.25,
+                        "rel": 0.9024390243902439,
+                        "c1_win": true,
+                        "immediate_goodput": 116.80338736330506,
+                        "hybrid_goodput": 124.84319725950267,
+                        "immediate_p95_ms": 77.326,
+                        "hybrid_p95_ms": 79.716,
+                        "immediate_first": false
+                    },
+                    {
+                        "round": 9,
+                        "immediate_exhausted_pct": 17.5,
+                        "hybrid_exhausted_pct": 0.25,
+                        "abs_pp": 17.25,
+                        "rel": 0.9857142857142857,
+                        "c1_win": true,
+                        "immediate_goodput": 81.74548913528135,
+                        "hybrid_goodput": 113.26018447500924,
+                        "immediate_p95_ms": 127.514,
+                        "hybrid_p95_ms": 86.949,
+                        "immediate_first": true
+                    },
+                    {
+                        "round": 10,
+                        "immediate_exhausted_pct": 16.5,
+                        "hybrid_exhausted_pct": 1.25,
+                        "abs_pp": 15.25,
+                        "rel": 0.9242424242424242,
+                        "c1_win": true,
+                        "immediate_goodput": 96.6167364486349,
+                        "hybrid_goodput": 102.10599429395513,
+                        "immediate_p95_ms": 117.155,
+                        "hybrid_p95_ms": 98.216,
+                        "immediate_first": false
+                    }
+                ],
+                "c1_exhausted": {
+                    "pooled_abs_pp": 13.375,
+                    "pooled_rel": 0.9709618874773139,
+                    "pooled_pass": true,
+                    "rounds_pass": true,
+                    "diff_hybrid_minus_immediate_ci95_pp": [
+                        -14.488481056776143,
+                        -12.312147592278144
+                    ],
+                    "ci_excludes_zero": true,
+                    "pass": true
+                },
+                "c2_throughput": {
+                    "goodput_ratio_hybrid_over_immediate": 1.550987868368687,
+                    "completed_ratio_hybrid_over_immediate": 1.3427101300209843,
+                    "pass": true
+                },
+                "c3_p95": {
+                    "immediate_us": 272277,
+                    "hybrid_us": 90259,
+                    "delta_us": -182018,
+                    "allowance_us": 27227.7,
+                    "pass": true
+                },
+                "c4_guarantees": {
+                    "pass": true
+                },
+                "host_noisy_runs": 20
+            },
+            "decision": {
+                "verdict": "INCONCLUSIVE",
+                "reason": "20 run(s) of this cell overlapped foreign host load (load.json); latency/throughput acceptance is EVIDENCE REQUIRED (rule outcome would have been HYBRID)"
+            }
+        }
+    }
+}

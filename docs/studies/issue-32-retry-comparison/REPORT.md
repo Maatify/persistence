@@ -9,9 +9,10 @@ Study only. No change to `src/`, the public API, contracts or production-behavio
 | `results/run-1-initial` | first version (no per-attempt SQLSTATE, no harness hash; manifest reconstructed afterwards) | earlier replication; analysed with `--allow-legacy=1`; unchanged by the stricter analyzer |
 | `results/run-2` | final (post-review) | replication; **a later part overlapped heavy load from another project on the same machine** — latency/throughput are unreliable, exhaustion counts are not affected in direction (§6) |
 | **`results/run-3`** | final (post-review) | **primary evidence for the full design**; its quiet-host gate timed out (the host was never quiet) so it started under residual load, although none of its 20 decision-cell runs is flagged by the (load-average) criterion |
-| **`results/run-4-decision-cell`** | final + fail-closed gate and CPU-based noise flags (review F41-05) | **targeted, controlled repeat of the 8-connection decision cell only** (plus a probed replicate); the quiet-host gate **passed** and **0 of 40 runs are flagged noisy** |
+| `results/run-4-decision-cell` | final + fail-closed gate and CPU-based noise flags (review F41-05) | targeted repeat of the 8-connection decision cell (plus a probed replicate). Gate passed and 0/40 runs flagged — **but with the superseded name-based attribution of foreign CPU (`host-quiet` v1), which the third review (F41-08) showed can hide other projects' load. Its host cleanliness is therefore not certified**; kept unchanged, analysed with `--allow-legacy=1` |
+| **`results/run-5-decision-cell`** | final + process-tree attribution (`host-quiet` v2, F41-07/08) | corrected targeted repeat of the decision cell (plus probed replicate). Gate passed at start, **but the host became busy during the runs: 34 of 40 runs are flagged noisy (14 of 20 in the decision cell, 20 of 20 probed)**, so the analyzer marks both cells `EVIDENCE REQUIRED` for latency/throughput |
 
-Numbers below are run-3 unless stated; run-4 is §1a. All analyses validated their input fail-closed (run-3: 220 declared files; run-4: 40).
+Numbers below are run-3 unless stated; run-4 and run-5 are §1a. All analyses validated their input fail-closed (run-3: 220 declared files; run-4 and run-5: 40 each).
 
 ## 1. Recommendation
 
@@ -32,22 +33,32 @@ All four criteria pass in all three runs (exhausted Immediate → Hybrid: run-1 
 
 The same direction holds at 16 connections (32.75 % → 1.43 %, goodput ×1.226).
 
-### 1a. Controlled repeat of the decision cell (run-4, review F41-05)
+### 1a. Targeted repeats of the decision cell (run-4 and run-5, reviews F41-05 / F41-07 / F41-08)
 
-Same cell, same pre-registered rule, run behind a **fail-closed quiet-host gate** (passed: 15 consecutive samples with foreign CPU < 200 % of one core; last sample 112 %), foreign CPU sampled every ~2 s during the runs (`host-load.log`, `LOAD.md`), balanced order, fresh empty MySQL 8.0.46:
+**Performance acceptance is `EVIDENCE REQUIRED`; the exhaustion result is not in doubt.**
 
-| `sequential-wave`, 8 connections, 10 rounds × 400 | Immediate | Hybrid |
-|---|---:|---:|
-| Exhausted | **537 / 4000 (13.43 %)** | **15 / 4000 (0.38 %)** |
-| Rounds won on exhaustion | — | **10 / 10**; CI of Δ [−14.15, −12.00] pp |
-| Goodput | 142.4 | 145.6 (ratio **1.022**) |
-| P95, all ops | 62.23 ms | 64.42 ms (Δ **+2.19 ms**) |
-| Runs flagged noisy | 0 of 20 | |
-| Rule outcome | **HYBRID** (C1–C4 pass) | |
+Exhaustion, 8 connections, synchronized waves, 10 rounds × 400 operations per candidate — five independent measurements, all 10/10 rounds won by Hybrid:
 
-So the verdict at the decision cell holds under the controlled gate, and its cost side is smaller there than in run-3 (+2.2 ms, ratio 1.022). Caveat: the laptop was not isolated (foreign CPU ≈ 100–130 % before and during), and absolute figures in run-4 are slower than in run-1/run-3 (goodput ~145 vs ~190 ops/s); only the paired comparison is meaningful.
+| Run | Immediate exhausted | Hybrid exhausted | CI of Δ (Hybrid − Immediate) |
+|---|---:|---:|---|
+| run-1 | 616 | 10 | — |
+| run-2 | 503 | 12 | [−13.35, −11.26] pp |
+| run-3 | 542 | 5 | [−14.52, −12.39] pp |
+| run-4 | 537 | 15 | [−14.15, −12.00] pp |
+| run-5 | 428 | 43 | [−10.66, −8.63] pp |
 
-**The P95 counter-signal is reproduced, not explained away.** The replicate with the server-side per-retry probe (`sequential-wave-probed`, 10 rounds, 0 of 20 runs noisy) shows the same exhaustion result (538 → 16, 10/10) and again a P95 cost above the tolerance: **+10.92 ms** (53.87 → 64.79 ms), rule outcome IMMEDIATE by C3. Both independent probed measurements (run-3 `integrity-verify` +10.31 ms; run-4 +10.92 ms) fail C3 by < 1 ms, whereas unprobed measurements give +2.1, +7.5 and +2.2 ms. The probe adds one `performance_schema` query before every retry on both candidates; the production runner has no such probe, so the unprobed cells are the representative ones — but the data do not show *why* the probe penalises Hybrid's P95 more than Immediate's, so the honest summary is: **Hybrid's P95 cost at 8 connections lies between about +2 ms and +11 ms depending on measurement conditions, straddling the 10 ms tolerance.** The recommendation's cost side therefore stays "small but close to the tolerance", not "comfortably inside".
+Latency/throughput acceptance (C2/C3), by run:
+
+| Run | goodput ratio | ΔP95 | Host evidence | Rule outcome |
+|---|---:|---:|---|---|
+| run-1 | 1.029 | +2.1 ms | load not recorded | HYBRID |
+| run-3 | 0.961 | +7.5 ms | load-average flag only; gate timed out | HYBRID |
+| run-4 | 1.022 | +2.2 ms | gate passed, 0/20 flagged **with name-based attribution (superseded)** | HYBRID, but host cleanliness not certified |
+| run-5 | 1.104 | −10.4 ms (both ≈ 330–340 ms) | process-tree attribution; **14/20 runs noisy**; goodput ≈ 62–68 ops/s vs ≈ 145–190 earlier | INCONCLUSIVE — rule outcome would have been HYBRID |
+
+What this means: the earlier "controlled" claim for run-4 cannot be kept. After the attribution fix the only run with trustworthy host evidence (run-5) shows the shared laptop was heavily loaded during the repeat (latencies roughly five times higher than in quiet runs), so its latency/throughput numbers cannot support or refute C2/C3. The decision-cell cost side (goodput ratio 0.96–1.10, ΔP95 between −10 and +8 ms across runs, +10.9 ms probed) is therefore **not established under controlled host load**. A clean confirmation needs an isolated host or a quiet window (command in README: `run-all.sh <dir> decision`; the gate is fail-closed and mid-run noise is flagged and downgrades the cell).
+
+**The P95 counter-signal remains.** Probed replicates (per-retry server-side probe on both candidates) give ΔP95 +10.31 ms (run-3 `integrity-verify`) and +10.92 ms (run-4), both just above the 10 ms tolerance, with the same exhaustion result; run-5's probed cell is noisy (20/20). Unprobed cells give +2.1, +7.5 and +2.2 ms (+ the unreliable run-5 value). The probe adds one `performance_schema` query before every retry on both candidates and the production runner has no such probe, so the unprobed cells are the representative ones — but the data do not show *why* the probe penalises Hybrid's P95 more, so the summary is: Hybrid's P95 cost at 8 connections lies between about +2 ms and +11 ms depending on measurement conditions, straddling the tolerance.
 
 ## 2. Reproduction of the Issue #32 scenario
 
@@ -90,8 +101,10 @@ Replication of the decision cell across runs:
 | run-1 (earlier harness) | 616 | 10 | 10/10 | 1.029 | +2.1 ms | HYBRID |
 | run-2 (final harness, **load-contaminated**) | 503 | 12 | 10/10 | 1.468 | −154 ms (unreliable) | HYBRID |
 | **run-3 (final harness, primary)** | **542** | **5** | **10/10** | **0.961** | **+7.5 ms** | **HYBRID** |
-| **run-4 (final harness, controlled gate, 0/20 noisy)** | **537** | **15** | **10/10** | **1.022** | **+2.2 ms** | **HYBRID** |
-| run-4 probed replicate (per-retry probe, 0/20 noisy) | 538 | 16 | 10/10 | 0.980 | +10.9 ms | IMMEDIATE (C3) |
+| run-4 (gate passed; superseded name-based host attribution) | 537 | 15 | 10/10 | 1.022 | +2.2 ms | HYBRID (host cleanliness not certified) |
+| run-4 probed replicate (same caveat) | 538 | 16 | 10/10 | 0.980 | +10.9 ms | IMMEDIATE (C3) |
+| run-5 (process-tree attribution; 14/20 noisy) | 428 | 43 | 10/10 | 1.104 | −10.4 ms | INCONCLUSIVE (EVIDENCE REQUIRED; would have been HYBRID) |
+| run-5 probed replicate (20/20 noisy) | 551 | 16 | 10/10 | 1.551 | −182 ms | INCONCLUSIVE (EVIDENCE REQUIRED) |
 
 Per-round tables, deadlock counts (original vs repeated), attempts-per-op, P50/P95/P99 and the attempts histogram for every cell are in `results/<run>/ANALYSIS.md`.
 
@@ -112,14 +125,15 @@ Per-round tables, deadlock counts (original vs repeated), attempts-per-op, P50/P
 - **Branch tests (F41-02):** `selftest.txt` covers `1213`+`40001` retried; `1213` with another SQLSTATE, `1205`, `1062` and non-PDO throwables not retried; transaction still active after a failure or before an attempt, and server-reported active transaction before a retry → `invalid` with no further attempt; exhaustion after exactly four attempts; Hybrid sleep bounds over 200 seeds. These use fakes only for the decision branches; the deadlock evidence is from real MySQL.
 - **Reproducibility from an empty database (F41-04):** `results/f41-04-fresh-database-proof.txt` records the RED failure (error 1146 at `SHOW CREATE TABLE` on an empty database, before the fix) and the GREEN runs of both the documented single-cell command and `run-all.sh smoke` from a dropped-and-recreated empty database on a fresh MySQL 8.0.46 container. The recorded results were not changed.
 - **Repository gates (F41-06):** `results/f41-06-local-gates.txt` — the full CONTRIBUTING.md sequence on the final tree (`composer install`, `validate --strict`, strict-PSR autoload, platform check, `audit`, `analyse`, unit 260, regression 51, integration 153 on MySQL 8.4.11 with `log_bin_trust_function_creators=1`, consumer, php-cs-fixer dry-run, `git diff --check`, actionlint) all exit 0; the two earlier attempts with wrong prerequisites are recorded there.
+- **Host-evidence integrity (F41-07/F41-08):** `analyze.php` re-computes the host classification from the raw `host-load.log` and the run summaries and rejects a `load.json` that is missing, malformed, incomplete, has undeclared/missing runs, or whose per-run samples/noisy flags/noisy list differ from the recomputation (10 negative self-tests). `host-quiet.sh` v2 attributes own processes by process **tree** (descendants of the run root), never by name, and counts other containers' CPU as foreign; self-tests show deliberately busy processes named `worker.php`/`study.php`/`bash` are foreign unless they descend from the study root. `selftest.txt` of run-5: 44/44.
 - **Evidence integrity (F41-01):** the analyzer refuses missing/extra/duplicated/inconsistent run files, mixed harness or MySQL versions, and reused output directories (negative tests in `selftest.txt`).
 
 ## 6. Limits of the measurement
 
 1. **Contention level decides the winner.** The verdict rests on the declared decision cell (8 simultaneous creators in a synchronised wave, 87.5 % no-retry failure) — a worst-case arrival pattern. With barrier-free streaming or shuffled placement at 8 connections Immediate exhausted only 24 and 8 of 4000 operations (below the pre-registered minimum of 30, so INCONCLUSIVE); Hybrid did at least as well but no significant benefit can be claimed. The benefit becomes clear again at 16 connections.
 2. **Hybrid is not free:** −27 % goodput at 4 synchronised connections (no exhaustion avoided), and at 8 connections the P95 cost is close to the tolerance (§3).
-3. **Host isolation is limited.** The run-4 gate is fail-closed and passed, and run-4 has per-run foreign-CPU records with no noisy run, but the machine is a developer laptop (foreign CPU ≈ 100–130 % of one core, 8 vCPUs, Docker-Desktop VM), not an isolated host; a truly isolated benchmark host was not available. Performance acceptance is therefore established only to that level. (Run-3's gate was not fail-closed and timed out; see item 4.)
-4. **Run-2 was contaminated** by another project's test suite running on the same machine (host load average ≈ 45–55 on 8 vCPUs, observed afterwards; rounds 8–10 of the 8-connection cell are ~3× slower for *both* candidates). Run-2's exhaustion counts and the 10/10 round pattern are consistent with run-1/run-3, but its throughput/latency criteria (e.g. its 16-connection P95 failure, its ratio 1.468) are not interpretable. Run-2 is kept, flagged, not edited. Load was not recorded for run-1/run-2. Run-3's quiet-host gate **timed out after 30 min** (`quiet_samples=0`) and the run proceeded; its load-average flag (allowance connections + 2 + 6 = 16 at 8 connections) was too permissive to prove isolation (decision-cell load average 7.5–13.5), which is why the gate was made fail-closed, noise is now measured as foreign CPU, and run-4 repeats the decision cell under that gate. Run-1…run-3 are unchanged and kept.
+3. **Host isolation was not achieved.** The measurement host is a shared developer laptop (Docker-Desktop VM, 8 vCPUs). Run-4's "0 of 40 noisy" used a foreign-CPU attribution that excluded processes by *name* (`worker.php`, `bash`, …) and the whole Docker VM, which can hide other projects' load; the process-tree attribution (v2) that replaced it was applied in run-5, where the gate passed at start (foreign CPU 147 %) but 34 of 40 runs overlapped heavy foreign load. Performance acceptance (C2/C3) is therefore `EVIDENCE REQUIRED`, not "clean". Only an isolated host or a verified quiet window can settle it.
+4. **Run-2 was contaminated** by another project's test suite running on the same machine (host load average ≈ 45–55 on 8 vCPUs, observed afterwards; rounds 8–10 of the 8-connection cell are ~3× slower for *both* candidates). Run-2's exhaustion counts and the 10/10 round pattern are consistent with run-1/run-3, but its throughput/latency criteria (e.g. its 16-connection P95 failure, its ratio 1.468) are not interpretable. Run-2 is kept, flagged, not edited. Load was not recorded for run-1/run-2. Run-3's quiet-host gate **timed out after 30 min** (`quiet_samples=0`) and the run proceeded; its load-average flag (allowance connections + 2 + 6 = 16 at 8 connections) was too permissive to prove isolation (decision-cell load average 7.5–13.5), which is why the gate was made fail-closed and noise is measured as foreign CPU; see items 3 and §1a for run-4/run-5. Run-1…run-5 are unchanged and kept.
 5. **One lock pattern** (the Issue's), not the whole php-product workload.
 6. **Environment:** one Docker-Desktop VM on macOS (linuxkit), 8 vCPUs shared by MySQL and up to 16 PHP processes, default durability on virtualised storage. Absolute figures do not transfer; the paired comparison does. MariaDB and other MySQL versions were not measured.
 7. **Metrics:** waves exclude a constant 3 ms release lead from the throughput denominator; goodput was fixed as the throughput criterion after a smoke run (METHODOLOGY §6); "4 of 5 rounds" scaled to 8 of 10; P99 of 400 samples is coarse (pooled P99 over 4000 reported).
@@ -130,5 +144,5 @@ Per-round tables, deadlock counts (original vs repeated), attempts-per-op, P50/P
 
 - Supported by the data: in a burst where ≥ 8 runner-owned transactions contend for the same gap, an immediate-only policy leaves 14–33 % of operations failing after four attempts, while Hybrid leaves 0.1–1.4 %, at a small cost in P95 and goodput that sits close to the pre-registered tolerances.
 - Not supported by the data: a universal default. For the Issue's own two-Product case one immediate retry suffices (both policies identical); at moderate synchronised contention (4 connections) Hybrid costs ~27 % goodput with nothing to rescue; under less synchronised loads at 8 connections the evidence is insufficient either way.
-- Controlled-gate evidence for the decision cell exists (§1a); performance acceptance on an isolated host does not (§6.3).
+- The exhaustion reduction is established (five runs, 10/10 rounds each); latency/throughput acceptance under controlled host load is not (§1a, §6.3) and stays `EVIDENCE REQUIRED`.
 - The owner must decide how to trade moderate-load cost against burst protection (for example whether jitter should be opt-in, or configurable) before approving production semantics. This study makes no such decision and authorises no implementation.

@@ -1,0 +1,32 @@
+{
+    "cells": {
+        "sequential-wave": {
+            "levels": [
+                8
+            ],
+            "rounds": 10,
+            "ops": 400,
+            "placement": "sequential",
+            "mode": "wave",
+            "policies": [
+                "immediate",
+                "hybrid"
+            ],
+            "verify": false
+        },
+        "sequential-wave-probed": {
+            "levels": [
+                8
+            ],
+            "rounds": 10,
+            "ops": 400,
+            "placement": "sequential",
+            "mode": "wave",
+            "policies": [
+                "immediate",
+                "hybrid"
+            ],
+            "verify": true
+        }
+    }
+}

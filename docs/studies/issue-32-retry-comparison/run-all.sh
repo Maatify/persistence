@@ -17,8 +17,10 @@ PROFILE="${2:-full}"
 [ -e "$OUT/manifest.json" ] && { echo "refusing to reuse $OUT" >&2; exit 2; }
 mkdir -p "$OUT"
 ROOT="$(cd .. && pwd)"
+# Process-tree attribution of host load (host-quiet.sh v2): everything below this shell is the study, the rest is foreign.
+export STUDY_ROOT_PID=$$
 
-# Quiet-host gate (fail-closed): foreign CPU (host-quiet.sh) below 200% of one core (25% of the 8 vCPUs) for 15
+# Quiet-host gate (fail-closed): foreign CPU (host-quiet.sh v2, process-tree attribution) below 200% of one core (25% of the 8 vCPUs) for 15
 # consecutive samples, within 40 minutes. Otherwise nothing is started (exit 3) unless ALLOW_NOISY=1.
 if [ "${QUIET_GATE:-on}" = "off" ] && [ "$PROFILE" = "smoke" ]; then
   echo "host quiet gate: OFF (smoke profile)" | tee "$OUT/quiet-gate.txt"
@@ -46,7 +48,7 @@ SAMPLER=$!
 trap 'kill $SAMPLER 2>/dev/null || true; pkill -P $SAMPLER 2>/dev/null || true' EXIT
 
 php study.php env --out="$OUT"
-php selftest.php --with-db=1 | tee "$OUT/selftest.txt"
+php selftest.php --with-db=1 --with-host=1 | tee "$OUT/selftest.txt"
 
 case "$PROFILE" in
   smoke)
