@@ -164,7 +164,6 @@ final class PdoDeadlockRetryRunnerIntegrationTest extends DeadlockRetryIntegrati
         self::assertSame(['ACQUIRED'], $this->partnerReports());
     }
 
-
     /**
      * Review F44-02, the reviewer's counterexample on real MySQL: the callback
      * commits the runner-owned transaction itself, then a GENUINE deadlock is
@@ -192,7 +191,7 @@ final class PdoDeadlockRetryRunnerIntegrationTest extends DeadlockRetryIntegrati
             },
         );
 
-        self::assertInstanceOf(PDOException::class, $raised);
+        self::assertInstanceOf(PDOException::class, $thrown);
         self::assertSame($raised, $thrown);
         self::assertSame(1, $calls);
         self::assertSame(['committed-by-callback'], $this->committedPayloads(), 'Committed once, never replayed.');

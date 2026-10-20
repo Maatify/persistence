@@ -159,12 +159,19 @@ $transactions = new PdoDeadlockRetryTransactionRunner($pdo, maxDeadlockRetries: 
 > **The whole callback runs again on every replay.** Keep effects that a
 > `ROLLBACK` cannot undo (e-mails, HTTP calls, queues, files, other connections)
 > outside the callback, after `run()` returns, or make them idempotent. Never
-> begin, commit, or roll back the runner-owned transaction inside the callback.
+> begin, commit, or roll back the runner-owned transaction inside the callback,
+> and never commit it implicitly (DDL). A transaction the callback already ended
+> is not replayed when the connection is outside a transaction at the deadlock;
+> if the callback ended it and started another one that then deadlocks, the
+> runner cannot tell and would replay (see the
+> [Package Reference](PERSISTENCE_PACKAGE_REFERENCE.md)).
 
 Nothing else is retried: not lock wait timeouts (`1205`) or other errors, not
 `BEGIN`/`COMMIT` failures, and never a caller-owned transaction or savepoint (a
 deadlock has already rolled the whole caller transaction back; the caller
-decides). The value `3` matches the configuration measured in the
+decides). A `BEGIN` or `COMMIT` that fails without throwing (PDO returns
+`false`) raises `TransactionExecutionException`: the callback never runs
+without the transaction, and an uncommitted result is never returned. The value `3` matches the configuration measured in the
 [Issue #32 study](docs/studies/issue-32-retry-comparison/ISSUE-42-REPORT.md),
 which covers one synchronized 8-connection workload, not every load. This
 capability is Unreleased and not part of the stable `v1.4.0`.
@@ -308,7 +315,8 @@ for that condition.
 * Participates in an existing transaction without changing its ownership.
 * Preserves the callback return value.
 * Rethrows the original callback `Throwable` after attempting to roll back an owned transaction.
-* With `maxDeadlockRetries` `1` to `3`, replays an owned transaction after a deadlock (`1213`, SQLSTATE `40001`) as described above; rethrows the exact final `PDOException` after the last attempt. Never replays a caller-owned transaction, a `1205`, or a `BEGIN`/`COMMIT` failure. A value outside `0` to `3` throws `InvalidTransactionConfigurationException` from the constructor.
+* With `maxDeadlockRetries` `1` to `3`, replays an owned transaction after a deadlock (`1213`, SQLSTATE `40001`) as described above; rethrows the exact final `PDOException` after the last attempt. Never replays a caller-owned transaction, a `1205`, a `BEGIN`/`COMMIT` failure, or a transaction that already ended before the deadlock. A value outside `0` to `3` throws `InvalidTransactionConfigurationException` from the constructor.
+* Throws `TransactionExecutionException` when `beginTransaction()` or `commit()` returns `false` instead of throwing (the deprecated runner ignored these return values).
 
 **`PdoDeadlockRetrySavepointTransactionRunner`:**
 * no-active-transaction path uses normal owned transaction behavior, including the optional deadlock replay

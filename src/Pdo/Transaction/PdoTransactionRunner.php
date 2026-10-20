@@ -12,8 +12,9 @@ use Throwable;
  * not already inside a transaction.
  *
  * @deprecated Use PdoDeadlockRetryTransactionRunner, which has the same
- * ownership and participation behavior (and no deadlock replay with its default
- * configuration). This class stays public, loadable and behavior-compatible in
+ * ownership and participation behavior (no deadlock replay with its default
+ * configuration) and additionally fails closed when BEGIN or COMMIT returns
+ * false. This class stays public, loadable and behavior-compatible in
  * the 1.x line; it is not removed before a future Major release.
  */
 final readonly class PdoTransactionRunner implements TransactionRunnerInterface

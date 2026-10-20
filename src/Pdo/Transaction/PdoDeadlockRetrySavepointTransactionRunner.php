@@ -18,8 +18,10 @@ use Throwable;
  * - No active transaction: the same owned-transaction behavior as
  *   PdoDeadlockRetryTransactionRunner, including the optional replay of the
  *   whole owned transaction after a MySQL deadlock (SQLSTATE 40001, driver code
- *   1213), at most $maxDeadlockRetries times, after the server is proven to have
- *   ended it. No savepoint SQL is issued on this path.
+ *   1213), at most $maxDeadlockRetries times, when the end of the transaction is
+ *   attributed to that deadlock, and the same fail-closed handling of a BEGIN or
+ *   COMMIT that returns false (TransactionExecutionException). No savepoint SQL
+ *   is issued on this path.
  * - Active caller-owned transaction: creates an operation-local savepoint
  *   (maatify_persistence_sp_<32 lowercase hex>), releases it on success and
  *   rolls back to it (best effort) on failure. It never commits, fully rolls
@@ -30,7 +32,8 @@ use Throwable;
  * Replay re-executes the WHOLE callback of an owned transaction. Its effects
  * outside this PDO connection are not rolled back and would be repeated; keep
  * them outside the callback or make them idempotent. The callback must not
- * begin, commit or roll back the runner-owned transaction itself.
+ * begin, commit or roll back the runner-owned transaction itself, or commit it
+ * implicitly (see ADR 0004 for the residual limit).
  */
 final readonly class PdoDeadlockRetrySavepointTransactionRunner implements SavepointTransactionRunnerInterface
 {

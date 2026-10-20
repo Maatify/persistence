@@ -14,8 +14,9 @@ use Throwable;
  * when no transaction is active.
  *
  * @deprecated Use PdoDeadlockRetrySavepointTransactionRunner, which has the
- * same savepoint and ownership behavior (and no deadlock replay with its
- * default configuration). This class stays public, loadable and
+ * same savepoint and ownership behavior (no deadlock replay with its default
+ * configuration) and additionally fails closed when BEGIN or COMMIT returns
+ * false. This class stays public, loadable and
  * behavior-compatible in the 1.x line; it is not removed before a future Major
  * release.
  */

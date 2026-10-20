@@ -109,7 +109,7 @@ Decision: [ADR 0004](../adr/0004-deadlock-retry-transaction-runner-generation.md
 - `InvalidTransactionConfigurationException` for an invalid retry limit.
 - One internal mechanism (`Internal\OwnedTransactionExecutor`, `@internal`, not public API) implements the owned transaction and its replay for both runners; the deprecated runners do not use it and are unchanged.
 
-Constructor of both: `__construct(PDO $pdo, int $maxDeadlockRetries = 0)`, range `0` to `3`, default `0`. With `0` both behave exactly like the runner they replace.
+Constructor of both: `__construct(PDO $pdo, int $maxDeadlockRetries = 0)`, range `0` to `3`, default `0`. With `0` both behave like the runner they replace, except that a `BEGIN` or `COMMIT` that fails without throwing (PDO returns `false`) raises `TransactionExecutionException` instead of being ignored (the callback does not run without a transaction, and an uncommitted result is never returned).
 
 ### Roles
 
@@ -118,11 +118,12 @@ Constructor of both: `__construct(PDO $pdo, int $maxDeadlockRetries = 0)`, range
 
 ### Owned-transaction replay
 
-Applies only to a transaction the runner begins itself. One attempt is: fresh `BEGIN`, callback, `COMMIT`. A failed attempt is replayed only when:
+Applies only to a transaction the runner begins itself. One attempt is: fresh `BEGIN`, callback, `COMMIT`. Transaction control is fail-closed: `beginTransaction()` returning `false` stops before the callback, and `commit()` returning `false` is never reported as success (best-effort rollback, then `TransactionExecutionException`, no replay). A failed attempt is replayed only when:
 
 1. the **callback** threw a `PDOException` whose `errorInfo` is SQLSTATE `40001` with driver code `1213` (a `BEGIN` or `COMMIT` failure is never replayed);
 2. a replay is left (at most `$maxDeadlockRetries`, so at most `$maxDeadlockRetries + 1` attempts);
-3. the server is proven to have ended the transaction: a no-op probe (`DO 0`) succeeds and the connection then reports no active transaction. InnoDB rolls back the whole transaction of a deadlock victim, but `pdo_mysql` refreshes `inTransaction()` only from successful server replies, so the deadlock's error reply alone does not prove it. A failing probe, or a transaction that is still active (for example a `1213` raised by another connection used inside the callback), is not a proven clean boundary.
+3. the driver still reports the transaction as active when the deadlock arrives. `pdo_mysql` derives `inTransaction()` from the last successful server reply, so for a victim on this connection it still reports the runner's transaction (the deadlock came as an error reply). If it already reports none, the transaction ended before the deadlock (for example the callback committed it and another connection raised the `1213`), the end cannot be attributed to the deadlock, and the attempt is not replayed;
+4. a no-op statement (`DO 0`) then succeeds and the connection reports no active transaction any more (InnoDB rolled back the whole victim transaction). A failing probe, or a transaction that is still active (for example a `1213` raised by another connection while the runner's transaction is open), is not attributed to the deadlock either.
 
 Otherwise the attempt ends like a non-retrying owned transaction: rollback if still active (best effort), original `Throwable` rethrown unchanged.
 
@@ -139,10 +140,13 @@ Failure precedence: after the last attempt the exact final `PDOException` is ret
 
 ### Callback replay contract
 
-When replay is enabled the whole callback may run several times. Only its work on the runner's PDO connection inside the owned transaction is undone between attempts; external effects (e-mail, HTTP, queues, files, other connections, in-memory state) are not and must stay outside the callback or be idempotent. The callback must not begin, commit, or roll back the runner-owned transaction; a manually ended transaction followed by a later deadlock is not detectable by the runner. All participants must use the same PDO connection.
+When replay is enabled the whole callback may run several times. Only its work on the runner's PDO connection inside the owned transaction is undone between attempts; external effects (e-mail, HTTP, queues, files, other connections, in-memory state) are not and must stay outside the callback or be idempotent. The callback must not begin, commit, or roll back the runner-owned transaction, or commit it implicitly (DDL and other implicit-commit statements). All participants must use the same PDO connection.
+
+**Residual limit (not detectable without privileged server introspection):** a callback that ends the runner-owned transaction and leaves the same connection inside another transaction when a deadlock hits it (an explicit new `BEGIN`, or an implicit commit followed by an implicit transaction under `autocommit = 0`) produces the same driver state and session counters as a genuine victim; its already committed work would be replayed. Handling of this contract violation is an open Owner decision recorded in [ADR 0004](../adr/0004-deadlock-retry-transaction-runner-generation.md#open-owner-decision-residual-limit-of-replay-attribution).
 
 ### Verification boundary
 
 - Real InnoDB deadlocks (`1213`/`40001`) against a second process on MySQL 8.4 (integration suite and `examples/deadlock-retry`, also executed by the Consumer Verification Harness from a clean Composer project): owned replay and single commit, exhaustion with the exact final `PDOException`, no replay by default, no replay in caller-owned transactions and savepoints, nested replay of the whole owned transaction.
 - Unit decision tests for every non-replayable branch, the probe, the delay schedule and bounds, and the range validation; parity tests run the complete v1.4.0 savepoint unit and integration cases against the new savepoint runner configured with `3`.
+- Fail-closed control on real MySQL: a `COMMIT` that returns `false` (`ERRMODE_SILENT`, session ended before `COMMIT`) raises `TransactionExecutionException` with nothing committed; a callback that commits the runner-owned transaction before another connection raises a genuine `1213` is not replayed (committed once), while a genuine victim on the runner's connection still is.
 - The value `3` and the delay schedule are supported by the Issue #32 study only for one synchronized 8-connection workload; they are opt-in, not a default.

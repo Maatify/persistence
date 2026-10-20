@@ -64,6 +64,23 @@ final class DeadlockRetryDocumentationTest extends TestCase
         self::assertStringContainsString('Unreleased, not part of the stable `v1.4.0`', $reference);
     }
 
+    public function testFailClosedControlAndTheResidualReplayLimitAreDocumented(): void
+    {
+        $reference = $this->flattened('PERSISTENCE_PACKAGE_REFERENCE.md');
+        self::assertStringContainsString('**Non-throwing control failures (fail-closed)**', $reference);
+        self::assertStringContainsString('**Residual limit (not detectable)**', $reference);
+        self::assertStringContainsString('the end cannot be attributed to the deadlock, and nothing is replayed', $reference);
+
+        $readme = $this->flattened('README.md');
+        self::assertStringContainsString('raises `TransactionExecutionException`', $readme);
+        self::assertStringContainsString('the runner cannot tell and would replay', $readme);
+
+        $adr = $this->flattened(self::ADR);
+        self::assertStringContainsString('## Open Owner decision: residual limit of replay attribution', $adr);
+        self::assertStringNotContainsString('server is proven', $adr);
+        self::assertStringNotContainsString('server is proven', $this->flattened('docs/architecture/PDO_TRANSACTION_ARCHITECTURE.md'));
+    }
+
     public function testDeprecationIsRecordedWithoutRewritingHistory(): void
     {
         $readme = $this->flattened('README.md');
