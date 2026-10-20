@@ -13,8 +13,10 @@ declare(strict_types=1);
  *   3. getNextPosition() under READ COMMITTED: no older snapshot, so it is fresh.
  *
  * The first scenario shows the hazard on purpose; the table has a plain
- * (non-unique) index so the duplicate is observable. Use a UNIQUE index in real
- * schemas so such a mistake becomes an error instead of silent duplicates.
+ * (non-unique) index so the duplicate is observable. A UNIQUE index would turn
+ * such a mistake into an error, but it is only suitable for tables whose rows are
+ * never moved with moveWithinScope(): that method is not compatible with a
+ * UNIQUE (scope, order) index (ordinary moves fail with 1062).
  *
  * Run: php examples/next-position/03_stale_snapshot_vs_plain_read.php
  */

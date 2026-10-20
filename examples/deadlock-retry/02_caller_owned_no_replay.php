@@ -19,7 +19,10 @@ declare(strict_types=1);
  *     WHOLE caller transaction, never only the failed operation.
  *   - pdo_mysql may keep reporting inTransaction() === true right after the
  *     deadlock (it updates that flag from successful server replies); after the
- *     next successful statement it reports false.
+ *     next successful statement it reports false. Never rely on that flag, and
+ *     never continue in the transaction after a deadlock: later statements may
+ *     run in autocommit mode and commit immediately. A savepoint does not cover
+ *     a deadlock either (it disappears with the transaction).
  *
  * Run: php examples/deadlock-retry/02_caller_owned_no_replay.php
  */

@@ -67,9 +67,10 @@ If no outer transaction is active, `PdoSavepointTransactionRunner` preserves nor
 If an outer transaction is active, the runner establishes an operation-local boundary:
 - Creates an operation-local savepoint before executing the callback.
 - Releases the savepoint on success.
-- Rolls back to the savepoint on operation failure.
+- Rolls back to the savepoint on a statement-level operation failure.
 - The outer transaction remains active.
 - No commit or full rollback of the caller-owned transaction occurs.
+- **Limit:** a deadlock (`1213`) is not a statement-level failure. InnoDB rolls back the whole transaction, the savepoint disappears with it, and the outer transaction cannot be continued (see [Deadlock `1213` and caller-owned transactions](#deadlock-1213-and-caller-owned-transactions)).
 
 ### Savepoint Contracts
 
@@ -135,8 +136,20 @@ Failure precedence: after the last attempt the exact final `PDOException` is ret
 
 - With an active transaction, `PdoDeadlockRetryTransactionRunner` only participates: no `BEGIN`, `COMMIT`, rollback, or replay.
 - `PdoDeadlockRetrySavepointTransactionRunner` uses an operation-local savepoint with the unchanged v1.4.0 contract (naming, release, rollback-to, failure precedence) and never replays the savepoint or the caller's transaction.
-- A deadlock inside a caller-owned transaction has already rolled back the whole caller transaction on the server; the runner propagates the original `PDOException`, and the caller decides whether to re-run its whole transaction.
+- A deadlock inside a caller-owned transaction has already rolled back the whole caller transaction on the server; the runner propagates the original `PDOException`, and the caller decides whether to re-run its whole transaction (see the next section).
 - Nested composition: a deadlock in a savepoint inside an owned, replay-enabled transaction replays the whole owned transaction, never only the savepoint.
+
+### Deadlock `1213` and caller-owned transactions
+
+`1213` is fatal to an externally owned MySQL/MariaDB transaction and is not covered by a savepoint.
+
+- InnoDB rolls back the **entire** victim transaction on the server, including work done before the runner was called. The operation-local savepoint no longer exists afterwards (`ROLLBACK TO SAVEPOINT` fails).
+- `pdo_mysql` can keep reporting `inTransaction() === true` until the next successful server reply, so that flag does not show whether the work survived. Statements issued after the deadlock may run in autocommit mode and commit immediately; under `autocommit = 0` a later `commit()` can silently persist only the post-deadlock statements.
+- The caller must never continue in that transaction. This document does not claim that `DO 0` (or any probe) prevents later writes: the runners use `DO 0` solely so that a transaction **they own** can tell a deadlock victim apart for replay; it cannot stop caller code.
+- Recovery means re-running the whole outer unit of work from a fresh `BEGIN` at the code that owns the transaction, when safe. A retry wraps the whole runner-owned transaction (`maxDeadlockRetries > 0`), never only a savepoint or a single operation.
+- Around a savepoint runner catch expected errors by code (`1062`, `1205`, package exceptions); do not catch `Throwable`/`PDOException` generically and carry on.
+
+Evidence (MySQL 8.4.10 and, for the probe, MariaDB 11.8.9 only): [DG-03 assessment](https://github.com/Maatify/persistence/blob/3b5b71f2868cd6c1451691f036473a870d135c2b/docs/studies/full-fresh-review/DG03-ASSESSMENT.md) and [follow-up](https://github.com/Maatify/persistence/blob/3b5b71f2868cd6c1451691f036473a870d135c2b/docs/studies/full-fresh-review/ADDENDUM-2-F45-RESPONSE.md) on PR #45. Reference summary: [Package Reference](../../PERSISTENCE_PACKAGE_REFERENCE.md#deadlock-1213-and-caller-owned-transactions).
 
 ### Callback replay contract
 

@@ -19,8 +19,10 @@ of truth for exact semantics, lock footprint, and exceptions.
 > `getNextPosition()` with the caveats below. `getNextPosition()` is unchanged
 > and remains supported.
 
-Everything in the examples below, except the `getNextPositionForUpdate()` calls,
-works on `v1.4.0`.
+The examples also use `PdoDeadlockRetryTransactionRunner` (Unreleased, same
+status). On `v1.4.0`, the equivalent runner is `PdoTransactionRunner`, and only
+`getNextPosition()` is available for allocation. The scripts under
+`examples/next-position/` therefore require the code on `main`, not `v1.4.0`.
 
 ## What the examples cover
 
@@ -158,7 +160,11 @@ committed state, and serializes concurrent allocators on the last row.
 A locking read of an empty scope has no row to lock, so concurrent first
 inserts are **not** serialized by the package. You must serialize them, for
 example by locking a parent row first, and/or rely on a `UNIQUE (scope, order)`
-index so a duplicate becomes an error. Example 04 demonstrates both: a competing
+index so a duplicate becomes an error. A `UNIQUE (scope, order)` index suits
+tables you only *insert* into; `moveWithinScope()` is **not compatible** with it
+(ordinary moves fail with `1062`, see the
+[Package Reference](../../PERSISTENCE_PACKAGE_REFERENCE.md#ordering-and-unique-indexes)),
+so do not add it to a table whose rows you also reorder with that method. Example 04 demonstrates both: a competing
 writer waits on the parent-row lock, and without it the `UNIQUE` index rejects
 the second writer with error 1062. (Under `REPEATABLE READ` that unserialized
 race typically surfaces as a deadlock or lock wait timeout instead; it is an
@@ -184,6 +190,8 @@ error either way.)
   and therefore holds locks on every tail it read.
 * Writers that do not use locking reads are not serialized. Route every
   position-allocating insert and every reorder through the locking APIs.
+* Under `REPEATABLE READ`, a call queued behind a transaction that then inserts
+  above the locked row typically fails with a deadlock rather than resuming.
 
 The exact footprint and limits are specified in the
 [Package Reference](../../PERSISTENCE_PACKAGE_REFERENCE.md); do not rely on
@@ -205,8 +213,11 @@ replays the whole callback of a transaction **it owns** after a 1213 deadlock
 still applies to lock wait timeouts, to caller-owned transactions, and to the
 safety of whatever the replayed callback does. This feature is Unreleased.
 
-* A deadlock rolls back the whole transaction. A lock wait timeout rolls back
-  only the failed statement by default, so always end the transaction yourself.
+* A deadlock (`1213`) rolls back the **whole** transaction on the server, and
+  `inTransaction()` can still report `true` afterwards. Never catch it and keep
+  executing statements in that transaction (they may run in autocommit and
+  commit immediately). A lock wait timeout rolls back only the failed statement
+  by default, so always end the transaction yourself.
 * Retry the **entire unit of work in a new transaction**. Never reuse the stale
   allocation or continue in the failed transaction.
 * Bound the attempts and retry only 1205 and 1213; let every other error
@@ -226,15 +237,15 @@ everything it did:
   the retry returns, that is, after `COMMIT`, so they happen once even when two
   attempts ran. Example 05 section 6 shows this.
 * Only retry in a transaction you own. If an outer caller owns the transaction,
-  a deadlock has already rolled back the whole of it, and a lock wait timeout
-  leaves it half-done; do not retry inside it. Propagate the error to the
-  owner, which decides. The example helper refuses to run in that situation.
+  a deadlock has already rolled back the whole of it (a savepoint does not
+  help), and a lock wait timeout leaves it half-done; do not retry inside it and
+  do not continue in it. Propagate the error to the owner, which decides and
+  re-runs the whole outer unit of work. The example helper refuses to run in that
+  situation.
 
 The example policy is host-owned illustration code, not a package feature.
 Apart from the opt-in deadlock replay of `PdoDeadlockRetryTransactionRunner`
 for transactions it owns, the package performs no retries.
-* Under `REPEATABLE READ`, a call queued behind a transaction that then inserts
-  above the locked row typically fails with a deadlock rather than resuming.
 
 ## Coverage and limits of this guide
 
@@ -262,7 +273,9 @@ Deliberately not demonstrated by the examples:
 * **Soft-delete lock footprint and index-less scans.** Described above and in
   the Package Reference, not benchmarked.
 * **MariaDB, SQLite, and other isolation levels** (`READ UNCOMMITTED`,
-  `SERIALIZABLE`). Not part of this repository's verified matrix.
+  `SERIALIZABLE`). Not part of this repository's verified matrix. (MariaDB 11.8's
+  default snapshot isolation can raise `1020` in locking reads; tracked in
+  [Issue #47](https://github.com/Maatify/persistence/issues/47).)
 * **The `v1.4.0` release itself.** The examples that call
   `getNextPositionForUpdate()` require the Unreleased code on `main`.
 
