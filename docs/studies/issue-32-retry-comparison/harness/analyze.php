@@ -359,8 +359,11 @@ function validateLoadEvidence(string $dir, array $expectedRuns, bool $allowLegac
             $problems[] = "load.json record for $name is malformed (samples/noisy)";
             continue;
         }
-        if ($r['samples'] !== $c['samples'] || $r['noisy'] !== $c['noisy']) {
+        if ($r['samples'] !== $c['samples'] || $r['noisy'] !== $c['noisy'] || ($r['invalid_samples'] ?? 0) !== $c['invalid_samples']) {
             $problems[] = "load.json record for $name (samples={$r['samples']}, noisy=" . json_encode($r['noisy']) . ") does not match the host-load.log recomputation (samples={$c['samples']}, noisy=" . json_encode($c['noisy']) . ')';
+        }
+        if ($c['invalid_samples'] > 0 && !$allowLegacy) {
+            $problems[] = "host sensor failed during run $name ({$c['invalid_samples']} INVALID sample(s)): host conditions unknown";
         }
         if ($c['samples'] === 0 && !$allowLegacy) {
             $problems[] = "no host sample overlaps run $name";

@@ -23,10 +23,10 @@ function computeLoadReport(string $dir): array
     $format = 'none';
     $attribution = 'none';
     foreach (is_file($dir . '/host-load.log') ? (file($dir . '/host-load.log', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) ?: []) : [] as $line) {
-        if (preg_match('/^(\S+) foreign=([\d.]+) load1=([\d.]+) v=2$/', $line, $m) === 1) {
+        if (preg_match('/^(\S+) foreign=(INVALID|[\d.]+) load1=([\d.]+) v=2$/', $line, $m) === 1) {
             $format = 'cpu';
             $attribution = 'process-tree-v2';
-            $samples[] = [strtotime($m[1]), (float) $m[2]];
+            $samples[] = [strtotime($m[1]), $m[2] === 'INVALID' ? null : (float) $m[2]];
         } elseif (preg_match('/^(\S+) foreign=([\d.]+) load1=([\d.]+)$/', $line, $m) === 1) {
             $format = 'cpu';
             $attribution = 'process-name-v1';
@@ -49,15 +49,18 @@ function computeLoadReport(string $dir): array
         $end = strtotime($s['started_at']);   // written when the run finished
         $start = $end - (int) ceil($s['wall_us'] / 1e6) - 2;
         $slack = $format === 'cpu' ? 2 : 1;
-        $f = array_column(array_filter($samples, static fn(array $x): bool => $x[0] >= $start && $x[0] <= $end + $slack), 1);
-        $noisy = $f === [];
-        if ($f !== []) {
+        $window = array_column(array_filter($samples, static fn(array $x): bool => $x[0] >= $start && $x[0] <= $end + $slack), 1);
+        $invalid = count(array_filter($window, static fn($v): bool => $v === null));
+        $f = array_values(array_filter($window, static fn($v): bool => $v !== null));
+        // Unknown is never clean: no sample, or any failed-sensor sample overlapping the run, makes it noisy.
+        $noisy = $window === [] || $invalid > 0;
+        if (!$noisy) {
             $noisy = $format === 'cpu'
                 ? (array_sum($f) / count($f) > LOAD_NOISY_MEAN_CPU || max($f) > LOAD_NOISY_PEAK_CPU)
                 : max($f) > $s['connections'] + 2 + LOAD_NOISY_EXCESS_LOAD;
         }
         $rows[basename($file, '.jsonl.gz')] = [
-            'samples' => count($f), 'mean' => $f ? array_sum($f) / count($f) : null, 'max' => $f ? max($f) : null,
+            'samples' => count($window), 'invalid_samples' => $invalid, 'mean' => $f ? array_sum($f) / count($f) : null, 'max' => $f ? max($f) : null,
             'noisy' => $noisy, 'tag' => $s['tag'], 'connections' => $s['connections'], 'round' => $s['round'], 'policy' => $s['policy'],
         ];
     }

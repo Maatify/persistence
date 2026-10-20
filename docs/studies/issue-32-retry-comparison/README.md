@@ -14,7 +14,7 @@ Study-only material for [Issue #32](https://github.com/Maatify/persistence/issue
 | `harness/selftest.php` | Negative tests of the harness itself (retry classification, ownership, evidence validation, reuse guard, observer sensitivity) |
 | `schema/php-product-schema.sql` | Verbatim `maatify/php-product` schema (see METHODOLOGY §3) |
 | `run-all.sh` | `full` / `decision` / `smoke` profile into a fresh directory; fail-closed quiet-host gate; works from an empty database |
-| `host-quiet.sh` (v2), `host-load.sh`, `load-report.php`, `harness/loadlib.php` | Foreign-CPU measurement (process-tree attribution) for the gate and the per-run noisy-host flags; classification shared with the analyzer |
+| `host-quiet.sh` (v3), `host-gate.sh`, `host-load.sh`, `load-report.php`, `harness/loadlib.php` | Fail-closed foreign-CPU measurement (process-tree attribution; a failed sensor is `INVALID`, never 0 %), the quiet-host gate and the per-run noisy-host flags; classification shared with the analyzer |
 | `results/run-1-initial/` | First complete run (earlier harness version, legacy format; reconstructed manifest) |
 | `results/run-2/` | Re-run with the final harness; a later part overlapped heavy load from another project on the same host (see REPORT §6) |
 | `results/run-3/` | Re-run with the final harness (primary for the full design; its quiet gate timed out, see REPORT §6) |
@@ -47,14 +47,22 @@ QUIET_GATE=off ./run-all.sh ../results/smoke smoke                              
 
 The connection can be changed with `STUDY_MYSQL_DSN`, `STUDY_MYSQL_USER`, `STUDY_MYSQL_PASSWORD` (the user needs `DROP/CREATE DATABASE` and read access to `performance_schema` and `information_schema`; the harness **drops and recreates the database named in the DSN** on every run — point it only at a disposable server).
 
-Single cells:
+Single cell **with the host evidence the analyzer requires** (collection only is not enough: `analyze.php` refuses evidence without a verified `host-load.log`/`load.json`):
 
 ```bash
-cd docs/studies/issue-32-retry-comparison/harness
-php selftest.php --with-db=1                      # harness self-tests (needs the study MySQL)
-php study.php run --out=../results/try --tag=sequential-wave --levels=8 --rounds=2 --ops=400
-php analyze.php --dir=../results/try                # refuses incomplete/inconsistent evidence (exit 3)
+cd docs/studies/issue-32-retry-comparison
+export STUDY_ROOT_PID=$$ STUDY_DOCKER_CONTAINER=maatify-i32-mysql      # host attribution by process tree
+OUT=results/try                                                         # fresh directory
+mkdir -p "$OUT" && ./host-gate.sh 2400 200 15 | tee "$OUT/quiet-gate.txt"   # fail-closed; exit 3 = not quiet / sensor failed
+./host-load.sh > "$OUT/host-load.log" & SAMPLER=$!
+(cd harness && php study.php run --out="../$OUT" --tag=sequential-wave --levels=8 --rounds=2 --ops=400)
+kill $SAMPLER
+php load-report.php "$OUT"                                              # writes load.json / LOAD.md
+php harness/analyze.php --dir="$OUT"                                    # refuses incomplete/inconsistent evidence (exit 3)
+php harness/selftest.php --with-db=1 --with-host=1                      # harness self-tests (--with-db needs the study MySQL)
 ```
+
+Collection-only (no host evidence, for debugging the harness; `analyze.php` will refuse it unless `--allow-legacy=1`, and its numbers must not be used for performance claims): `cd harness && php study.php run --out=../results/try --tag=sequential-wave --levels=8 --rounds=2 --ops=400`. `run-all.sh <dir> decision` does all of the above in one command.
 
 Absolute timings depend on the host; the pass/fail pattern of the paired comparison is what should reproduce. Re-analysis of committed raw data needs no database: `php harness/analyze.php --dir=results/run-5-decision-cell` (run-1…run-4 predate parts of the evidence format or host attribution and need `--allow-legacy=1`).
 

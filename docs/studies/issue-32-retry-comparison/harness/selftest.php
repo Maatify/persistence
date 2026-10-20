@@ -290,6 +290,85 @@ $dir = makeSet(['1immediate' => ['ops' => static function (array $lines): array 
 }]]);
 t('analyzer: legacy attempt records (no SQLSTATE) are rejected unless --allow-legacy=1', $has(validateEvidence($dir, false), 'no SQLSTATE') && !$has(validateEvidence($dir, true), 'no SQLSTATE'));
 
+// ---- sensor failure paths (F41-10): a broken sensor must never read as 0 % / clean ----
+$root = dirname(__DIR__);
+$tmp = sys_get_temp_dir() . '/i32-sensor-' . bin2hex(random_bytes(3));
+mkdir($tmp);
+$write = static function (string $name, string $body) use ($tmp): string {
+    file_put_contents($tmp . '/' . $name, "#!/usr/bin/env bash\n" . $body . "\n");
+    chmod($tmp . '/' . $name, 0755);
+
+    return $tmp . '/' . $name;
+};
+$table = "Processes: 1 total\nPID    COMMAND          %CPU\n1 a 0.0\n2 b 0.0\n3 c 0.0\n4 d 0.0\n5 e 0.0\nPID    COMMAND          %CPU\n900 com.apple.Virtualiz 300.0\n901 unrelated 50.0\n902 x 0.0\n903 y 0.0\n904 z 0.0\n905 w 0.0\n";
+$topOk = $write('top-ok', "cat <<'EOT'\n$table\nEOT");
+$topFail = $write('top-fail', 'exit 1');
+$topEmpty = $write('top-empty', 'exit 0');
+$topGarbage = $write('top-garbage', "echo 'Processes: nothing useful'; echo 'PID COMMAND %CPU'");
+$dockerFail = $write('docker-fail', 'exit 1');
+$dockerEmpty = $write('docker-empty', 'exit 0');
+$dockerNoStudy = $write('docker-nostudy', "echo 'other 10.00%'");
+$dockerNonNumeric = $write('docker-nonnumeric', "echo 'study N/A'; echo 'other 5.00%'");
+$dockerOk = $write('docker-ok', "echo 'study 80.00%'; echo 'other 5.00%'");
+$hq = static function (string $top, string $docker) use ($root): array {
+    $cmd = 'STUDY_ROOT_PID=' . getmypid() . ' STUDY_DOCKER_CONTAINER=study HOST_QUIET_TOP_CMD=' . escapeshellarg($top) . ' HOST_QUIET_DOCKER_CMD=' . escapeshellarg($docker) . ' ' . escapeshellarg($root . '/host-quiet.sh') . ' 2>/dev/null';
+    exec($cmd, $out, $rc);
+
+    return [trim(implode("\n", $out)), $rc];
+};
+foreach (['top exits non-zero' => $topFail, 'top prints nothing' => $topEmpty, 'top prints no usable second table' => $topGarbage] as $label => $top) {
+    [$out, $rc] = $hq($top, $dockerOk);
+    t("sensor: $label => INVALID, exit 1, never a number", $out === 'INVALID' && $rc === 1);
+}
+[$out, $rc] = $hq($topOk, $dockerOk);
+t('sensor: valid top + valid docker stats => VM suppressed, foreign = 50 + other containers 5 (got ' . $out . ')', $rc === 0 && $out === '55');
+foreach (['docker stats fails' => $dockerFail, 'docker stats prints nothing (exit 0)' => $dockerEmpty, 'docker stats lacks the study container' => $dockerNoStudy, 'docker stats value not numeric' => $dockerNonNumeric] as $label => $docker) {
+    [$out, $rc] = $hq($topOk, $docker);
+    t("sensor: $label => the Docker VM's 300 % is counted as foreign, not hidden (got $out, expected 350)", $rc === 0 && $out === '350');
+}
+$failing = $write('hq-fail', 'echo INVALID; exit 1');
+$garbage = $write('hq-garbage', 'echo oops; exit 0');
+foreach (['exits 1' => $failing, 'prints a non-number with exit 0' => $garbage] as $label => $bin) {
+    $line = trim((string) shell_exec('HOST_QUIET_BIN=' . escapeshellarg($bin) . ' HOST_LOAD_ONCE=1 ' . escapeshellarg($root . '/host-load.sh') . ' 2>/dev/null'));
+    t("sampler: a sensor that $label is logged as foreign=INVALID, never foreign=0", str_contains($line, 'foreign=INVALID') && !str_contains($line, 'foreign=0 '));
+}
+exec('HOST_QUIET_BIN=' . escapeshellarg($failing) . ' ' . escapeshellarg($root . '/host-gate.sh') . ' 8 200 3 2>&1', $o1, $rc1);
+t('gate: a permanently failing sensor never passes (exit 3, invalid_samples reported)', $rc1 === 3 && str_contains(implode(' ', $o1), 'FAILED') && !str_contains(implode(' ', $o1), 'invalid_samples=0'));
+$counter = $tmp . '/n';
+file_put_contents($counter, '0');
+$flaky = $write('hq-flaky', 'n=$(cat ' . escapeshellarg($counter) . '); n=$((n+1)); echo $n > ' . escapeshellarg($counter) . '; if [ $((n % 3)) -eq 0 ]; then echo INVALID; exit 1; fi; echo 10');
+exec('HOST_QUIET_BIN=' . escapeshellarg($flaky) . ' ' . escapeshellarg($root . '/host-gate.sh') . ' 14 200 3 2>&1', $o2, $rc2);
+t('gate: an INVALID sample resets the consecutive-quiet count (10,10,INVALID,… never reaches 3)', $rc2 === 3);
+$steady = $write('hq-steady', 'echo 10');
+exec('HOST_QUIET_BIN=' . escapeshellarg($steady) . ' ' . escapeshellarg($root . '/host-gate.sh') . ' 30 200 3 2>&1', $o3, $rc3);
+t('gate: valid quiet samples pass (control)', $rc3 === 0 && str_contains(implode(' ', $o3), 'PASSED'));
+$loud = $write('hq-loud', 'echo 900');
+exec('HOST_QUIET_BIN=' . escapeshellarg($loud) . ' ' . escapeshellarg($root . '/host-gate.sh') . ' 8 200 3 2>&1', $o4, $rc4);
+t('gate: valid but loud samples do not pass (control)', $rc4 === 3);
+
+// host evidence containing a failed-sensor sample
+$dir = makeSet();
+$lines = file($dir . '/host-load.log', FILE_IGNORE_NEW_LINES);
+$lines[40] = preg_replace('/foreign=\d+/', 'foreign=INVALID', $lines[40]);   // inside run 2's window
+file_put_contents($dir . '/host-load.log', implode("\n", $lines) . "\n");
+writeLoadJson($dir);
+$v = validateEvidence($dir, false);
+$j = json_decode((string) file_get_contents($dir . '/load.json'), true);
+$flagged = array_filter($j['runs'], static fn(array $r): bool => $r['invalid_samples'] > 0);
+t('host evidence: a run overlapping an INVALID sensor sample is classified noisy (unknown is never clean)', $flagged !== [] && count(array_filter($flagged, static fn(array $r): bool => !$r['noisy'])) === 0);
+t('host evidence: new evidence with a failed sensor sample is rejected as unknown host conditions', $has($v, 'host sensor failed'));
+foreach ($j['runs'] as &$rec) {
+    $rec['noisy'] = false;
+}
+unset($rec);
+$j['noisy_runs'] = [];
+file_put_contents($dir . '/load.json', json_encode($j));
+t('host evidence: load.json that calls a run clean despite an INVALID sample is rejected', $has(validateEvidence($dir, false), 'does not match the host-load.log recomputation'));
+foreach (glob($tmp . '/*') ?: [] as $f) {
+    unlink($f);
+}
+rmdir($tmp);
+
 // ---- host-CPU attribution sensitivity (F41-08): needs real processes ----
 if (in_array('--with-host=1', $argv, true)) {
     $hq = realpath(__DIR__ . '/../host-quiet.sh');

@@ -2,7 +2,7 @@
 
 Study only. No change to `src/`, the public API, contracts or production-behaviour documentation; no Retry feature is implemented. Design and decision rule: [`METHODOLOGY.md`](METHODOLOGY.md) (rule committed before the main runs, `18cf99e`; post-review amendments in its §8 do not change the rule). Re-run: [`README.md`](README.md).
 
-**Evidence sets.** The study was run three times on MySQL 8.0.46:
+**Evidence sets.** The study was run **five times** on MySQL 8.0.46 (three full/partial runs, then two targeted repeats of the 8-connection decision cell):
 
 | Run | Harness | Role |
 |---|---|---|
@@ -29,7 +29,7 @@ Decision cell (8 connections, sequential placement, barrier waves, 10 rounds × 
 | P95 latency, all ops | 40.30 ms | 47.79 ms (Δ **+7.49 ms**, allowance 10 ms) |
 | Transaction guarantees | pass | pass |
 
-All four criteria pass in all three runs (exhausted Immediate → Hybrid: run-1 616 → 10, run-2 503 → 12, run-3 542 → 5; 10/10 rounds each time). **The margins on C2 and C3 are thin in run-3** (goodput −3.9 % against a 5 % limit; P95 +7.5 ms against 10 ms), and one replicate cell fails C3 by 0.3 ms (§3). The exhaustion effect is large and stable; the cost side is small but close to the pre-registered tolerances.
+All four criteria pass in run-1, run-2 (latency/throughput unreliable, §6) and run-3 (exhausted Immediate → Hybrid: 616 → 10, 503 → 12, 542 → 5; 10/10 rounds each time); run-4 and run-5 add 537 → 15 and 428 → 43, also 10/10, but their latency/throughput acceptance is `EVIDENCE REQUIRED` (§1a). **The margins on C2 and C3 are thin in run-3** (goodput −3.9 % against a 5 % limit; P95 +7.5 ms against 10 ms), and one replicate cell fails C3 by 0.3 ms (§3). The exhaustion effect is large and stable; the cost side is small but close to the pre-registered tolerances.
 
 The same direction holds at 16 connections (32.75 % → 1.43 %, goodput ×1.226).
 
@@ -125,7 +125,7 @@ Per-round tables, deadlock counts (original vs repeated), attempts-per-op, P50/P
 - **Branch tests (F41-02):** `selftest.txt` covers `1213`+`40001` retried; `1213` with another SQLSTATE, `1205`, `1062` and non-PDO throwables not retried; transaction still active after a failure or before an attempt, and server-reported active transaction before a retry → `invalid` with no further attempt; exhaustion after exactly four attempts; Hybrid sleep bounds over 200 seeds. These use fakes only for the decision branches; the deadlock evidence is from real MySQL.
 - **Reproducibility from an empty database (F41-04):** `results/f41-04-fresh-database-proof.txt` records the RED failure (error 1146 at `SHOW CREATE TABLE` on an empty database, before the fix) and the GREEN runs of both the documented single-cell command and `run-all.sh smoke` from a dropped-and-recreated empty database on a fresh MySQL 8.0.46 container. The recorded results were not changed.
 - **Repository gates (F41-06):** `results/f41-06-local-gates.txt` — the full CONTRIBUTING.md sequence on the final tree (`composer install`, `validate --strict`, strict-PSR autoload, platform check, `audit`, `analyse`, unit 260, regression 51, integration 153 on MySQL 8.4.11 with `log_bin_trust_function_creators=1`, consumer, php-cs-fixer dry-run, `git diff --check`, actionlint) all exit 0; the two earlier attempts with wrong prerequisites are recorded there.
-- **Host-evidence integrity (F41-07/F41-08):** `analyze.php` re-computes the host classification from the raw `host-load.log` and the run summaries and rejects a `load.json` that is missing, malformed, incomplete, has undeclared/missing runs, or whose per-run samples/noisy flags/noisy list differ from the recomputation (10 negative self-tests). `host-quiet.sh` v2 attributes own processes by process **tree** (descendants of the run root), never by name, and counts other containers' CPU as foreign; self-tests show deliberately busy processes named `worker.php`/`study.php`/`bash` are foreign unless they descend from the study root. `selftest.txt` of run-5: 44/44.
+- **Host-evidence integrity (F41-07/F41-08):** `analyze.php` re-computes the host classification from the raw `host-load.log` and the run summaries and rejects a `load.json` that is missing, malformed, incomplete, has undeclared/missing runs, or whose per-run samples/noisy flags/noisy list differ from the recomputation (10 negative self-tests). `host-quiet.sh` (v3, fail-closed: a failed `top`/`docker stats` yields `INVALID`, never 0 %; Docker-stats failure counts the whole VM as foreign) attributes own processes by process **tree** (descendants of the run root), never by name, and counts other containers' CPU as foreign; self-tests show deliberately busy processes named `worker.php`/`study.php`/`bash` are foreign unless they descend from the study root. `selftest.txt` of run-5: 44/44 (run-5 predates the v3 sensor fail-closed change; its host log therefore contains only valid samples, which the analyzer verified). The F41-10 sensor-failure tests (forced `top`/`docker stats` failure, empty and non-numeric output, flaky gate) are in the current `harness/selftest.php`: 50/50 without a database.
 - **Evidence integrity (F41-01):** the analyzer refuses missing/extra/duplicated/inconsistent run files, mixed harness or MySQL versions, and reused output directories (negative tests in `selftest.txt`).
 
 ## 6. Limits of the measurement
@@ -137,7 +137,7 @@ Per-round tables, deadlock counts (original vs repeated), attempts-per-op, P50/P
 5. **One lock pattern** (the Issue's), not the whole php-product workload.
 6. **Environment:** one Docker-Desktop VM on macOS (linuxkit), 8 vCPUs shared by MySQL and up to 16 PHP processes, default durability on virtualised storage. Absolute figures do not transfer; the paired comparison does. MariaDB and other MySQL versions were not measured.
 7. **Metrics:** waves exclude a constant 3 ms release lead from the throughput denominator; goodput was fixed as the throughput criterion after a smoke run (METHODOLOGY §6); "4 of 5 rounds" scaled to 8 of 10; P99 of 400 samples is coarse (pooled P99 over 4000 reported).
-8. **Statistics:** operations within a wave are not independent, so the Newcombe interval understates uncertainty; the 10/10 round consistency across three runs is the stronger evidence. No multiple-comparison correction on the sensitivity cells (they carry no verdict).
+8. **Statistics:** operations within a wave are not independent, so the Newcombe interval understates uncertainty; the 10/10 round consistency across five runs is the stronger evidence. No multiple-comparison correction on the sensitivity cells (they carry no verdict).
 9. **Out of scope by design:** `1205`, caller-owned transactions and savepoints (no retry there), more than three retries, and any API design.
 
 ## 7. For the architectural decision (owner)

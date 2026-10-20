@@ -20,26 +20,21 @@ ROOT="$(cd .. && pwd)"
 # Process-tree attribution of host load (host-quiet.sh v2): everything below this shell is the study, the rest is foreign.
 export STUDY_ROOT_PID=$$
 
-# Quiet-host gate (fail-closed): foreign CPU (host-quiet.sh v2, process-tree attribution) below 200% of one core (25% of the 8 vCPUs) for 15
-# consecutive samples, within 40 minutes. Otherwise nothing is started (exit 3) unless ALLOW_NOISY=1.
+# Quiet-host gate (fail-closed, host-gate.sh): foreign CPU (host-quiet.sh v3, process-tree attribution) below 200% of one core
+# (25% of the 8 vCPUs) for 15 consecutive VALID samples, within 40 minutes; a failing sensor never passes. Otherwise nothing
+# is started (exit 3) unless ALLOW_NOISY=1.
 if [ "${QUIET_GATE:-on}" = "off" ] && [ "$PROFILE" = "smoke" ]; then
   echo "host quiet gate: OFF (smoke profile)" | tee "$OUT/quiet-gate.txt"
 else
-  quiet=0; waited=0
-  while [ "$quiet" -lt 15 ] && [ "$waited" -lt 2400 ]; do
-    f=$("$ROOT/host-quiet.sh")
-    if [ "${f:-99999}" -lt 200 ]; then quiet=$((quiet+1)); else quiet=0; fi
-    waited=$((waited+2))
-  done
-  if [ "$quiet" -lt 15 ]; then
-    echo "host quiet gate: FAILED quiet_samples=$quiet waited~${waited}s foreign_cpu_last=${f}% load1=$(sysctl -n vm.loadavg)" | tee "$OUT/quiet-gate.txt"
+  grc=0
+  gate=$("$ROOT/host-gate.sh" "${GATE_MAX_WAIT:-2400}" 200 15) || grc=$?
+  echo "host quiet gate: $gate load1=$(sysctl -n vm.loadavg)" | tee "$OUT/quiet-gate.txt"
+  if [ "$grc" -ne 0 ]; then
     if [ "${ALLOW_NOISY:-0}" != "1" ]; then
-      echo "host never became quiet: not starting (set ALLOW_NOISY=1 to override)" >&2
+      echo "host never became quiet (or the sensor failed): not starting (set ALLOW_NOISY=1 to override)" >&2
       exit 3
     fi
     echo "OVERRIDDEN by ALLOW_NOISY=1" | tee -a "$OUT/quiet-gate.txt"
-  else
-    echo "host quiet gate: PASSED quiet_samples=$quiet foreign_cpu_last=${f}% load1=$(sysctl -n vm.loadavg)" | tee "$OUT/quiet-gate.txt"
   fi
 fi
 
