@@ -9,16 +9,23 @@ use PDOException;
 use Throwable;
 
 /**
- * Scriptable PDO double for the deadlock-retry runners. Each beginTransaction()
- * and commit() call consumes the next scripted failure (null = succeed), each
- * exec() call the next scripted result (default 0) and records the statement,
- * and endTransactionOnServer() simulates InnoDB rolling back the whole
- * transaction of a deadlock victim. inTransaction() reports that server state
- * directly; a real pdo_mysql connection reports it only after its next
- * successful statement, which is why the runners probe with a no-op statement.
- * Like PDO, it refuses to begin inside an active transaction and to commit
- * without one. Test-only: it proves decision branches, never deadlock behavior
- * (that evidence comes from the real-MySQL integration suite).
+ * Scriptable PDO double for the deadlock-retry runners that models how
+ * pdo_mysql reports transaction state (observed on MySQL 8.4 / mysqlnd):
+ * inTransaction() reflects the server state carried by the last SUCCESSFUL
+ * reply, so after the error reply of a deadlock victim it still reports the
+ * transaction as active until the next successful statement.
+ *
+ * - beginTransaction() / commit(): each call consumes the next scripted
+ *   outcome: null = succeed, false = non-throwing failure (state unchanged),
+ *   Throwable = thrown. Like PDO, it refuses to begin inside an active
+ *   transaction and to commit without one.
+ * - exec(): consumes the next scripted result (default 0) and records the
+ *   statement; a successful result refreshes the reported state from the server.
+ * - endTransactionOnServer(): InnoDB rolls back the whole transaction of a
+ *   deadlock victim; the reported state stays stale.
+ *
+ * Test-only: it proves decision branches, never deadlock behavior (that
+ * evidence comes from the real-MySQL integration suite).
  */
 final class RetryTransactionPdo extends PDO
 {
@@ -31,18 +38,20 @@ final class RetryTransactionPdo extends PDO
     /** @var list<string> */
     public array $executedStatements = [];
 
-    /** @var list<Throwable|null> */
-    private array $beginFailures;
+    private bool $serverTransactionActive;
 
-    /** @var list<Throwable|null> */
-    private array $commitFailures;
+    /** @var list<Throwable|false|null> */
+    private array $beginOutcomes;
+
+    /** @var list<Throwable|false|null> */
+    private array $commitOutcomes;
 
     /** @var list<int|false|Throwable> */
     private array $execResults;
 
     /**
-     * @param list<Throwable|null>       $beginFailures
-     * @param list<Throwable|null>       $commitFailures
+     * @param list<Throwable|false|null> $beginFailures
+     * @param list<Throwable|false|null> $commitFailures
      * @param list<int|false|Throwable>  $execResults
      */
     public function __construct(
@@ -52,11 +61,13 @@ final class RetryTransactionPdo extends PDO
         private ?Throwable $rollbackFailure = null,
         array $execResults = [],
     ) {
-        $this->beginFailures = $beginFailures;
-        $this->commitFailures = $commitFailures;
+        $this->serverTransactionActive = $transactionActive;
+        $this->beginOutcomes = $beginFailures;
+        $this->commitOutcomes = $commitFailures;
         $this->execResults = $execResults;
     }
 
+    /** The state carried by the last successful reply (stale after an error reply). */
     public function inTransaction(): bool
     {
         return $this->transactionActive;
@@ -66,16 +77,20 @@ final class RetryTransactionPdo extends PDO
     {
         $this->beginTransactionCalls++;
 
-        $failure = array_shift($this->beginFailures);
-        if ($failure !== null) {
-            throw $failure;
+        $outcome = array_shift($this->beginOutcomes);
+        if ($outcome instanceof Throwable) {
+            throw $outcome;
+        }
+
+        if ($outcome === false) {
+            return false;
         }
 
         if ($this->transactionActive) {
             throw new PDOException('There is already an active transaction');
         }
 
-        $this->transactionActive = true;
+        $this->setBothStates(true);
 
         return true;
     }
@@ -84,16 +99,20 @@ final class RetryTransactionPdo extends PDO
     {
         $this->commitCalls++;
 
-        $failure = array_shift($this->commitFailures);
-        if ($failure !== null) {
-            throw $failure;
+        $outcome = array_shift($this->commitOutcomes);
+        if ($outcome instanceof Throwable) {
+            throw $outcome;
+        }
+
+        if ($outcome === false) {
+            return false;
         }
 
         if (!$this->transactionActive) {
             throw new PDOException('There is no active transaction');
         }
 
-        $this->transactionActive = false;
+        $this->setBothStates(false);
 
         return true;
     }
@@ -106,7 +125,7 @@ final class RetryTransactionPdo extends PDO
             throw $this->rollbackFailure;
         }
 
-        $this->transactionActive = false;
+        $this->setBothStates(false);
 
         return true;
     }
@@ -120,12 +139,31 @@ final class RetryTransactionPdo extends PDO
             throw $result;
         }
 
+        if ($result !== false) {
+            $this->transactionActive = $this->serverTransactionActive;
+        }
+
         return $result;
     }
 
-    /** Simulates InnoDB rolling back the whole transaction of a deadlock victim. */
+    /**
+     * Simulates InnoDB rolling back the whole transaction of a deadlock victim:
+     * the server has no transaction any more, but the reported state stays
+     * stale until the next successful statement, as with pdo_mysql.
+     */
     public function endTransactionOnServer(): void
     {
-        $this->transactionActive = false;
+        $this->serverTransactionActive = false;
+    }
+
+    public function isTransactionActiveOnServer(): bool
+    {
+        return $this->serverTransactionActive;
+    }
+
+    private function setBothStates(bool $active): void
+    {
+        $this->transactionActive = $active;
+        $this->serverTransactionActive = $active;
     }
 }

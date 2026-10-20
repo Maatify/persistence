@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace Maatify\Persistence\Tests\Integration\Pdo\Transaction;
 
+use Maatify\Persistence\Exception\TransactionExecutionException;
 use Maatify\Persistence\Pdo\Transaction\PdoDeadlockRetrySavepointTransactionRunner;
 use Maatify\Persistence\Pdo\Transaction\PdoDeadlockRetryTransactionRunner;
 use Maatify\Persistence\Pdo\Transaction\PdoTransactionRunner;
 use Maatify\Persistence\Pdo\Transaction\TransactionRunnerInterface;
 use Maatify\Persistence\Tests\Support\MySql\DeadlockRetryIntegrationTestCase;
+use PDO;
 use PDOException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Throwable;
@@ -160,6 +162,71 @@ final class PdoDeadlockRetryRunnerIntegrationTest extends DeadlockRetryIntegrati
         self::assertFalse($this->pdo()->inTransaction(), 'After a successful statement no transaction is reported.');
         self::assertSame([], $this->committedPayloads());
         self::assertSame(['ACQUIRED'], $this->partnerReports());
+    }
+
+
+    /**
+     * Review F44-02, the reviewer's counterexample on real MySQL: the callback
+     * commits the runner-owned transaction itself, then a GENUINE deadlock is
+     * raised by a different connection. The committed work must never be replayed.
+     *
+     * @param callable(\PDO): TransactionRunnerInterface $runnerFactory
+     */
+    #[DataProvider('retryingRunners')]
+    public function testManuallyCommittedTransactionFollowedByAnotherConnectionsDeadlockIsNeverReplayed(callable $runnerFactory): void
+    {
+        $other = $this->newConnection();
+        $calls = 0;
+        $raised = null;
+
+        $thrown = $this->runCatching(
+            $runnerFactory($this->pdo()),
+            function () use ($other, &$calls, &$raised): never {
+                $calls++;
+                $this->insert('committed-by-callback');
+                $this->pdo()->commit(); // contract violation: the runner-owned transaction is now committed
+
+                $other->beginTransaction();
+
+                throw $raised = $this->provokeDeadlockAsVictim($other); // genuine 1213 / 40001, other connection
+            },
+        );
+
+        self::assertInstanceOf(PDOException::class, $raised);
+        self::assertSame($raised, $thrown);
+        self::assertSame(1, $calls);
+        self::assertSame(['committed-by-callback'], $this->committedPayloads(), 'Committed once, never replayed.');
+        self::assertSame(['ACQUIRED'], $this->partnerReports());
+    }
+
+    /**
+     * Review F44-01 on real MySQL: in ERRMODE_SILENT, COMMIT on a session that the
+     * server has ended returns false instead of throwing. The runner must not
+     * report the callback result as committed, and must not replay it.
+     *
+     * @param callable(\PDO): TransactionRunnerInterface $runnerFactory
+     */
+    #[DataProvider('retryingRunners')]
+    public function testCommitThatFailsWithoutThrowingIsNotReportedAsSuccess(callable $runnerFactory): void
+    {
+        $silent = $this->newConnection();
+        $silent->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_SILENT);
+        $calls = 0;
+
+        $thrown = $this->runCatching(
+            $runnerFactory($silent),
+            function () use ($silent, &$calls): string {
+                $calls++;
+                $this->insertOn($silent, 'must-not-be-reported-as-committed');
+                $this->killConnection($silent); // the server session ends before COMMIT
+
+                return 'reported as committed';
+            },
+        );
+
+        self::assertInstanceOf(TransactionExecutionException::class, $thrown);
+        self::assertSame(1, $calls);
+        self::assertSame([], $this->committedPayloads());
     }
 
     public function testNestedSavepointDeadlockReplaysTheWholeOwnedTransaction(): void

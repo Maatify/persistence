@@ -183,7 +183,7 @@ final class PdoDeadlockRetryTransactionRunnerTest extends TestCase
         self::assertSame($deadlock, $thrown);
         self::assertSame(1, $calls);
         self::assertSame(1, $pdo->beginTransactionCalls);
-        self::assertSame(0, $pdo->rollBackCalls);
+        self::assertSame(1, $pdo->rollBackCalls, 'pdo_mysql still reports the deadlocked transaction as active, so the runner sends one final best-effort ROLLBACK (a no-op on the server).');
     }
 
     public function testOwnedDeadlockIsReplayedFromAFreshTransactionAndThenCommits(): void
@@ -245,7 +245,7 @@ final class PdoDeadlockRetryTransactionRunnerTest extends TestCase
             'One server-state probe per replay decision; none at the default and none after the last attempt.',
         );
         self::assertSame(0, $pdo->commitCalls);
-        self::assertSame(0, $pdo->rollBackCalls);
+        self::assertSame(1, $pdo->rollBackCalls, 'pdo_mysql still reports the deadlocked transaction as active, so the runner sends one final best-effort ROLLBACK (a no-op on the server).');
         self::assertFalse($pdo->inTransaction());
     }
 

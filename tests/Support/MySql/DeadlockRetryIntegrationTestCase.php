@@ -76,26 +76,28 @@ abstract class DeadlockRetryIntegrationTestCase extends TestCase
     }
 
     /**
-     * Inside the current transaction of the connection under test: lock row 1,
-     * let a heavier partner (holding row 2) queue for row 1, then request row 2.
-     * InnoDB detects the cycle and rolls back the lighter transaction of the
-     * connection under test. Returns the genuine PDOException that MySQL raised.
+     * Inside the current transaction of the victim connection (default: the
+     * connection under test): lock row 1, let a heavier partner (holding row 2)
+     * queue for row 1, then request row 2. InnoDB detects the cycle and rolls
+     * back the victim's lighter transaction. Returns the genuine PDOException
+     * that MySQL raised.
      */
-    protected function provokeDeadlockAsVictim(): PDOException
+    protected function provokeDeadlockAsVictim(?PDO $victim = null): PDOException
     {
+        $victim ??= self::$pdo;
         [$process, $pipes] = $this->startPartner();
         $this->partners[] = [$process, $pipes];
 
         $ready = $this->readPartnerLine($pipes);
         self::assertStringStartsWith('READY ', $ready);
 
-        $this->lockRow(self::$pdo, 1);
+        $this->lockRow($victim, 1);
         fwrite($pipes[0], "go\n");
         fflush($pipes[0]);
         $this->awaitBlockedLockingRead(substr($ready, strlen('READY ')));
 
         try {
-            $this->lockRow(self::$pdo, 2);
+            $this->lockRow($victim, 2);
         } catch (PDOException $exception) {
             self::assertSame(self::DEADLOCK_SQLSTATE, $exception->errorInfo[0] ?? null, $exception->getMessage());
             self::assertSame(self::DEADLOCK_DRIVER_CODE, $exception->errorInfo[1] ?? null, $exception->getMessage());
@@ -103,7 +105,27 @@ abstract class DeadlockRetryIntegrationTestCase extends TestCase
             return $exception;
         }
 
-        self::fail('The connection under test was expected to be chosen as the deadlock victim.');
+        self::fail('The victim connection was expected to be chosen as the deadlock victim.');
+    }
+
+    /** A new, separate MySQL connection (exception mode), closed when the test object is released. */
+    protected function newConnection(): PDO
+    {
+        $pdo = (new MySqlConnectionFactory())->create();
+        $pdo->exec('SET SESSION innodb_lock_wait_timeout = 20');
+
+        return $pdo;
+    }
+
+    /** Kills the server session of the given connection from the control connection (same MySQL user). */
+    protected function killConnection(PDO $pdo): void
+    {
+        $id = $pdo->query('SELECT CONNECTION_ID()');
+        self::assertInstanceOf(PDOStatement::class, $id);
+        $connectionId = $id->fetchColumn();
+        self::assertTrue(is_int($connectionId) || is_string($connectionId));
+        self::$controlPdo->exec('KILL ' . (int) $connectionId);
+        usleep(200_000);
     }
 
     protected function insert(string $payload): void
@@ -171,7 +193,7 @@ abstract class DeadlockRetryIntegrationTestCase extends TestCase
         return $this->partnerReports;
     }
 
-    private function insertOn(PDO $pdo, string $payload): void
+    protected function insertOn(PDO $pdo, string $payload): void
     {
         $statement = $pdo->prepare(
             'INSERT INTO `' . DeadlockRetrySchemaManager::TABLE . '` (`payload`) VALUES (:payload)',
