@@ -1,0 +1,311 @@
+== 2026-10-20T07:38:11Z load1=4.13 power="Battery Power" battery=68%;discharging; lowpowermode=0
+407    1     WindowServer     40.5
+709    656   Claude Helper    11.2
+2671   1     com.apple.Virtua 9.7
+860    656   Claude Helper (R 9.7
+2629   2610  com.docker.backe 8.9
+0      0     kernel_task      6.9
+11433  11400 top              4.4
+== 2026-10-20T07:38:21Z load1=3.73 power="Battery Power" battery=68%;discharging; lowpowermode=0
+407    1     WindowServer     37.5
+709    656   Claude Helper    11.5
+2671   1     com.apple.Virtua 11.2
+2629   2610  com.docker.backe 10.9
+0      0     kernel_task      7.7
+11504  11400 top              7.0
+1      0     launchd          4.3
+860    656   Claude Helper (R 4.0
+== 2026-10-20T07:38:31Z load1=3.47 power="Battery Power" battery=68%;discharging; lowpowermode=0
+407    1     WindowServer     16.0
+2629   2610  com.docker.backe 12.6
+2671   1     com.apple.Virtua 11.0
+573    1     mds_stores       10.8
+11583  11400 top              7.1
+709    656   Claude Helper    6.2
+0      0     kernel_task      4.7
+860    656   Claude Helper (R 3.5
+== 2026-10-20T07:38:42Z load1=3.32 power="Battery Power" battery=68%;discharging; lowpowermode=0
+407    1     WindowServer     39.5
+709    656   Claude Helper    12.4
+0      0     kernel_task      7.1
+2671   1     com.apple.Virtua 4.5
+860    656   Claude Helper (R 4.3
+11660  11400 top              4.2
+== 2026-10-20T07:38:52Z load1=3.11 power="Battery Power" battery=68%;discharging; lowpowermode=0
+407    1     WindowServer     17.3
+2697   2666  Docker Desktop H 8.0
+11751  11400 top              7.0
+0      0     kernel_task      5.6
+709    656   Claude Helper    4.5
+2671   1     com.apple.Virtua 3.6
+1      0     launchd          3.0
+== 2026-10-20T07:39:03Z load1=2.87 power="Battery Power" battery=68%;discharging; lowpowermode=0
+407    1     WindowServer     33.1
+2671   1     com.apple.Virtua 27.6
+0      0     kernel_task      8.4
+2697   2666  Docker Desktop H 6.6
+709    656   Claude Helper    6.3
+11816  11400 top              4.3
+2629   2610  com.docker.backe 4.0
+== 2026-10-20T07:39:13Z load1=2.66 power="Battery Power" battery=68%;discharging; lowpowermode=0
+689    1     corespotlightd   42.5
+705    1     WallpaperAerials 30.0
+407    1     WindowServer     25.1
+2697   2666  Docker Desktop H 22.1
+0      0     kernel_task      9.3
+12153  11400 top              6.9
+732    1     VTDecoderXPCServ 6.6
+2671   1     com.apple.Virtua 5.0
+== 2026-10-20T07:39:23Z load1=2.88 power="Battery Power" battery=68%;discharging; lowpowermode=0
+12227  12217 php              86.1
+12228  12217 bash             86.0
+12226  12217 php              85.4
+2697   2666  Docker Desktop H 35.0
+407    1     WindowServer     15.0
+705    1     WallpaperAerials 13.8
+2671   1     com.apple.Virtua 7.3
+732    1     VTDecoderXPCServ 5.1
+0      0     kernel_task      5.1
+12335  11400 top              4.6
+2629   2610  com.docker.backe 3.2
+== 2026-10-20T07:39:34Z load1=3.77 power="Battery Power" battery=67%;discharging; lowpowermode=0
+12226  12217 php              84.6
+12228  12217 bash             84.4
+12227  12217 php              84.3
+407    1     WindowServer     42.7
+2697   2666  Docker Desktop H 13.0
+0      0     kernel_task      7.8
+12468  11400 top              5.4
+705    1     WallpaperAerials 5.0
+2671   1     com.apple.Virtua 4.8
+709    656   Claude Helper    3.3
+== 2026-10-20T07:39:44Z load1=4.03 power="Battery Power" battery=67%;discharging; lowpowermode=0
+12226  12217 php              81.3
+12227  12217 php              81.3
+12228  12217 bash             81.1
+407    1     WindowServer     26.8
+662    1     WhatsApp         7.2
+0      0     kernel_task      5.2
+12605  11400 top              4.3
+2671   1     com.apple.Virtua 3.9
+== 2026-10-20T07:39:54Z load1=3.95 power="Battery Power" battery=67%;discharging; lowpowermode=0
+12226  12217 php              85.3
+12227  12217 php              85.3
+12228  12217 bash             85.3
+407    1     WindowServer     32.3
+0      0     kernel_task      5.6
+12744  11400 top              4.5
+2671   1     com.apple.Virtua 3.4
+== 2026-10-20T07:40:05Z load1=4.11 power="Battery Power" battery=67%;discharging; lowpowermode=0
+12226  12217 php              85.8
+12227  12217 php              85.4
+12228  12217 bash             85.3
+407    1     WindowServer     17.0
+12870  11400 top              4.5
+0      0     kernel_task      4.3
+== 2026-10-20T07:40:15Z load1=4.18 power="Battery Power" battery=67%;discharging; lowpowermode=0
+12226  12217 php              85.2
+12227  12217 php              85.2
+12228  12217 bash             85.2
+407    1     WindowServer     34.4
+1456   1455  claude           8.4
+0      0     kernel_task      5.5
+421    1     airportd         5.5
+12995  11400 top              4.9
+668    1     ControlCenter    3.6
+2671   1     com.apple.Virtua 3.4
+== 2026-10-20T07:40:25Z load1=4.07 power="Battery Power" battery=67%;discharging; lowpowermode=0
+12227  12217 php              85.0
+12228  12217 bash             85.0
+12226  12217 php              85.0
+407    1     WindowServer     12.4
+342    1     systemstats      6.1
+2671   1     com.apple.Virtua 4.6
+13120  11400 top              4.6
+2629   2610  com.docker.backe 4.5
+0      0     kernel_task      4.0
+== 2026-10-20T07:40:36Z load1=4.05 power="Battery Power" battery=67%;discharging; lowpowermode=0
+12226  12217 php              85.6
+12228  12217 bash             85.3
+12227  12217 php              84.8
+407    1     WindowServer     30.4
+342    1     systemstats      6.5
+0      0     kernel_task      5.1
+13246  11400 top              4.6
+2671   1     com.apple.Virtua 4.4
+709    656   Claude Helper    3.0
+== 2026-10-20T07:40:46Z load1=4.44 power="Battery Power" battery=67%;discharging; lowpowermode=0
+12226  12217 php              85.6
+12227  12217 php              85.6
+12228  12217 bash             85.5
+407    1     WindowServer     18.3
+342    1     systemstats      6.4
+13368  11400 top              4.7
+0      0     kernel_task      4.3
+2671   1     com.apple.Virtua 4.2
+== 2026-10-20T07:40:56Z load1=4.45 power="Battery Power" battery=66%;discharging; lowpowermode=0
+12227  12217 php              83.1
+12226  12217 php              82.6
+12228  12217 bash             82.3
+407    1     WindowServer     31.1
+342    1     systemstats      6.6
+2671   1     com.apple.Virtua 5.1
+0      0     kernel_task      5.0
+13494  11400 top              4.5
+709    656   Claude Helper    3.0
+== 2026-10-20T07:41:07Z load1=4.54 power="Battery Power" battery=66%;discharging; lowpowermode=0
+12226  12217 php              85.1
+12227  12217 php              85.1
+12228  12217 bash             85.1
+407    1     WindowServer     21.4
+13634  11400 top              4.7
+0      0     kernel_task      4.4
+== 2026-10-20T07:41:17Z load1=4.46 power="Battery Power" battery=66%;discharging; lowpowermode=0
+407    1     WindowServer     27.8
+2671   1     com.apple.Virtua 24.4
+0      0     kernel_task      10.5
+709    656   Claude Helper    8.4
+13759  11400 top              7.5
+== 2026-10-20T07:41:27Z load1=4.48 power="Battery Power" battery=66%;discharging; lowpowermode=0
+2671   1     com.apple.Virtua 127.8
+2629   2610  com.docker.backe 30.9
+407    1     WindowServer     23.3
+0      0     kernel_task      16.5
+709    656   Claude Helper    5.0
+13889  11400 top              4.9
+421    1     airportd         3.5
+== 2026-10-20T07:41:38Z load1=4.56 power="Battery Power" battery=66%;discharging; lowpowermode=0
+2671   1     com.apple.Virtua 246.5
+2629   2610  com.docker.backe 69.0
+0      0     kernel_task      34.7
+407    1     WindowServer     17.0
+14003  13841 php              9.7
+14005  13841 php              9.5
+14004  13841 php              9.5
+14002  13841 php              9.4
+14000  13841 php              9.4
+14001  13841 php              9.3
+14006  13841 php              8.7
+14007  13841 php              7.8
+== 2026-10-20T07:41:48Z load1=5.28 power="Battery Power" battery=66%;discharging; lowpowermode=0
+2671   1     com.apple.Virtua 250.7
+2629   2610  com.docker.backe 69.8
+0      0     kernel_task      36.1
+407    1     WindowServer     26.0
+14099  13841 php              9.9
+14098  13841 php              9.8
+14097  13841 php              9.6
+14096  13841 php              9.4
+14100  13841 php              9.2
+14101  13841 php              8.8
+14102  13841 php              8.8
+14103  13841 php              7.4
+== 2026-10-20T07:41:59Z load1=5.83 power="Battery Power" battery=66%;discharging; lowpowermode=0
+2671   1     com.apple.Virtua 61.6
+0      0     kernel_task      13.4
+407    1     WindowServer     12.9
+2629   2610  com.docker.backe 12.8
+14245  11400 top              5.0
+== 2026-10-20T07:42:09Z load1=6.05 power="Battery Power" battery=66%;discharging; lowpowermode=0
+2671   1     com.apple.Virtua 197.3
+2629   2610  com.docker.backe 54.6
+0      0     kernel_task      27.9
+407    1     WindowServer     25.8
+14350  13841 php              7.9
+14348  13841 php              7.8
+14346  13841 php              7.8
+14349  13841 php              7.8
+14345  13841 php              7.7
+14351  13841 php              7.6
+14347  13841 php              7.6
+14352  13841 php              6.4
+== 2026-10-20T07:42:19Z load1=5.52 power="Battery Power" battery=65%;discharging; lowpowermode=0
+2671   1     com.apple.Virtua 193.6
+2629   2610  com.docker.backe 54.4
+0      0     kernel_task      27.0
+407    1     WindowServer     11.4
+14447  13841 php              7.7
+14446  13841 php              7.6
+14445  13841 php              7.5
+14450  13841 php              7.3
+14449  13841 php              7.3
+14444  13841 php              7.3
+14448  13841 php              7.2
+14451  13841 php              5.8
+== 2026-10-20T07:42:30Z load1=6.08 power="Battery Power" battery=65%;discharging; lowpowermode=0
+2671   1     com.apple.Virtua 190.2
+2629   2610  com.docker.backe 53.1
+0      0     kernel_task      28.8
+407    1     WindowServer     27.7
+14560  14550 php              7.5
+14562  14550 php              6.8
+14565  14550 php              6.8
+14566  14550 php              6.8
+14564  14550 php              6.7
+14561  14550 php              6.7
+14563  14550 php              6.7
+14567  14550 php              5.9
+== 2026-10-20T07:42:40Z load1=5.83 power="Battery Power" battery=65%;discharging; lowpowermode=0
+2671   1     com.apple.Virtua 61.3
+0      0     kernel_task      13.6
+2629   2610  com.docker.backe 12.6
+407    1     WindowServer     12.0
+14694  11400 top              5.6
+== 2026-10-20T07:42:51Z load1=5.48 power="Battery Power" battery=65%;discharging; lowpowermode=0
+2671   1     com.apple.Virtua 170.4
+2629   2610  com.docker.backe 46.1
+407    1     WindowServer     25.6
+0      0     kernel_task      20.8
+709    656   Claude Helper    5.4
+14807  11400 top              4.9
+== 2026-10-20T07:43:01Z load1=5.74 power="Battery Power" battery=65%;discharging; lowpowermode=0
+2671   1     com.apple.Virtua 203.3
+2629   2610  com.docker.backe 63.0
+0      0     kernel_task      28.0
+407    1     WindowServer     16.2
+14909  14550 php              7.9
+14911  14550 php              7.6
+14910  14550 php              7.5
+14907  14550 php              7.4
+14913  14550 php              7.4
+14908  14550 php              7.3
+14912  14550 php              7.3
+14914  14550 php              6.2
+== 2026-10-20T07:43:11Z load1=5.98 power="Battery Power" battery=65%;discharging; lowpowermode=0
+2671   1     com.apple.Virtua 210.0
+2629   2610  com.docker.backe 64.4
+0      0     kernel_task      29.4
+407    1     WindowServer     22.9
+15021  14550 php              7.5
+15022  14550 php              7.4
+15024  14550 php              7.4
+15025  14550 php              7.4
+15020  14550 php              7.2
+15023  14550 php              7.2
+15026  14550 php              6.8
+15027  14550 php              6.7
+== 2026-10-20T07:43:22Z load1=5.60 power="Battery Power" battery=65%;discharging; lowpowermode=0
+2671   1     com.apple.Virtua 55.7
+407    1     WindowServer     22.2
+2629   2610  com.docker.backe 20.9
+0      0     kernel_task      14.2
+664    1     firefox          6.3
+15157  11400 top              5.2
+709    656   Claude Helper    4.1
+1      0     launchd          3.2
+== 2026-10-20T07:43:32Z load1=5.44 power="Battery Power" battery=65%;discharging; lowpowermode=0
+407    1     WindowServer     27.7
+2697   2666  Docker Desktop H 6.7
+0      0     kernel_task      5.9
+2671   1     com.apple.Virtua 5.6
+15272  11400 top              5.5
+709    656   Claude Helper    4.2
+== 2026-10-20T07:43:42Z load1=4.76 power="Battery Power" battery=64%;discharging; lowpowermode=0
+407    1     WindowServer     28.7
+1456   1455  claude           21.6
+860    656   Claude Helper (R 17.5
+2697   2666  Docker Desktop H 15.0
+0      0     kernel_task      8.0
+15315  1     top              7.5
+709    656   Claude Helper    7.4
+2671   1     com.apple.Virtua 4.1

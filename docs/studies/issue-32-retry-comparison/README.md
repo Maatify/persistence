@@ -21,6 +21,10 @@ Study-only material for [Issue #32](https://github.com/Maatify/persistence/issue
 | `results/run-4-decision-cell/` | Targeted repeat of the 8-connection decision cell (name-based host attribution, superseded; legacy host evidence) |
 | `results/run-5-decision-cell/` | Corrected targeted repeat (process-tree attribution); the host became busy, 34/40 runs flagged → performance `EVIDENCE REQUIRED` |
 | `results/f41-04-fresh-database-proof.txt`, `results/f41-06-local-gates.txt` | Review evidence: run from an empty database; full local repository gates |
+| [`ISSUE-42-REPORT.md`](ISSUE-42-REPORT.md), [`ISSUE-42-PLAN.md`](ISSUE-42-PLAN.md) | Issue #42 isolated-host C2/C3 confirmation: report and the plan frozen before measuring |
+| `results/i42-phase-a-independent-mac/` | Issue #42 Phase A: host identity/qualification, real-container sensor attribution control, self-tests, smoke and sensor-under-load checks (no C2/C3 data) |
+| `results/run-6-i42-decision-a/`, `results/run-7-i42-decision-b/` | Issue #42: the two pre-planned `decision` profile runs on the qualified independent Mac; 0/40 runs noisy each |
+| `host-processes.sh`, `raw-recheck.php`, `results/i42-raw-recheck.txt`, `results/i42-local-gates.txt` | Issue #42 side evidence (per-process foreign-CPU and power log, outside the harness hash), analyzer-independent raw re-check, repository gates |
 
 Each results directory holds `runs/*.jsonl.gz`, `manifest.json`, `environment.json`, `preflight/`, `diagnosis.json`, `analysis.json`, `ANALYSIS.md`, `run.log` (run-2/3 also `selftest.txt`; run-3 `host-load.log`, `LOAD.md`, `quiet-gate.txt`).
 

@@ -1,0 +1,1 @@
+host quiet gate: PASSED quiet_samples=15 invalid_samples=0 foreign_cpu_last=66% load1={ 2.87 4.25 7.20 }
