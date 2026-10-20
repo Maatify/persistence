@@ -37,9 +37,11 @@ MySQL/MariaDB-compatible SQL through direct PDO. Repository integration and
 Consumer verification run against real MySQL, with MySQL 8.4.10 as the current
 CI baseline; MariaDB is not independently verified by the current CI matrix.
 MariaDB 11.8 enables snapshot isolation by default (`innodb_snapshot_isolation`),
-which can raise error `1020` in the locking reads of the ordering APIs; that is
-tracked separately in [Issue #47](https://github.com/Maatify/persistence/issues/47)
-and is not resolved or generalized here.
+and with that setting `ON` the stale-snapshot ordering calls inside a caller-owned
+transaction raise error `1020`, which ends the caller's whole transaction. The
+guarantee boundaries and the consumer options are in
+[Ordering Guarantees and MariaDB `innodb_snapshot_isolation`](#ordering-guarantees-and-mariadb-innodb_snapshot_isolation)
+(evidence: [Issue #47 study](docs/studies/issue-47-mariadb-snapshot/REPORT.md)).
 The package-level schema notes are in [schema/README.md](schema/README.md).
 
 ## Public API Inventory
@@ -106,6 +108,7 @@ The package-level schema notes are in [schema/README.md](schema/README.md).
     * May throw `InvalidOrderingOperationException` for inconsistent scope usage.
     * External PDO/database throwables, including lock wait timeout and deadlock errors, may propagate unchanged; retrying is the caller's responsibility. Under `REPEATABLE READ`, a call queued behind a transaction that then inserts above the locked row typically fails with a deadlock instead of resuming.
     * Guarantee: on a non-empty scope, callers that also use locking reads (this method, `moveWithinScope()`) are serialized on the scope's last active row.
+    * Engine condition: the "latest committed state inside an older `REPEATABLE READ` snapshot" result holds on MySQL 8.0/8.4 and on MariaDB with `innodb_snapshot_isolation=OFF` (tested). On MariaDB with the setting `ON` (the 11.8 default), a call that visits a row changed after the snapshot throws the engine's `PDOException` with driver code `1020`, unchanged, and the server has already rolled back the caller's **whole** transaction; the caller must not catch it and continue, and must restart the unit of work. See [Ordering Guarantees and MariaDB `innodb_snapshot_isolation`](#ordering-guarantees-and-mariadb-innodb_snapshot_isolation).
     * Limits: an empty scope has no row to lock, so the caller must serialize the first insert. Lock footprint depends on the access plan (an index usable for `(scope, order)` stops at the last active row but also locks soft-deleted rows above it; without one, every table row is scanned and locked). Under `REPEATABLE READ` the gap above the last scanned row, possibly belonging to another scope, is locked; under `READ COMMITTED` it is not. Writers that do not use locking reads are not serialized. Locks taken by earlier reads of a repeated call are kept until the transaction ends, so a call that repeats holds locks on every tail it read (the earlier tail and the newer one), which slightly widens the lock footprint and the contention and deadlock surface compared with a single read.
   * `public function rowExistsInScope(\PDO $pdo, ScopedOrderingConfig $config, int|string|null $scopeValue, int $id): bool`
     * Returns `false` for `id <= 0`.
@@ -126,6 +129,7 @@ The package-level schema notes are in [schema/README.md](schema/README.md).
     * Returns `false` if the target is missing.
     * Clamps above-maximum order to the maximum read by the scope lock (see above); gaps are not normalized, so the maximum is the highest active order value.
     * Returns `true` for an already satisfied/clamped no-op.
+    * Engine condition (also in the stable `v1.4.0`, for the caller-owned case): in a caller-owned `REPEATABLE READ` transaction with an older snapshot, the scope lock needs a current read. On MariaDB with `innodb_snapshot_isolation=ON` it throws the engine's `PDOException` with driver code `1020`, unchanged, after the server has rolled back the caller's **whole** transaction; do not catch it and continue. A call that owns its transaction (none active) is unaffected. See [Ordering Guarantees and MariaDB `innodb_snapshot_isolation`](#ordering-guarantees-and-mariadb-innodb_snapshot_isolation).
     * Shifts only the affected range.
     * When `updatedAtColumn` is configured, `$updatedAtValue` is written with the target order in the same update and transaction.
     * Does not globally normalize pre-existing gaps.
@@ -486,7 +490,9 @@ and not part of the stable `v1.4.0`.
   sees the latest committed maximum and serializes lock-using allocation and
   reordering on a non-empty scope until the caller commits or rolls back.
   Serializing the first insert into an empty scope remains the caller's
-  responsibility.
+  responsibility. That current-read guarantee is engine-conditional: on MariaDB
+  with `innodb_snapshot_isolation=ON` it raises `1020` and ends the whole
+  transaction (see [Ordering Guarantees and MariaDB `innodb_snapshot_isolation`](#ordering-guarantees-and-mariadb-innodb_snapshot_isolation)).
 * `moveWithinScope()` locks the applicable active ordering scope with
   `SELECT ... FOR UPDATE` inside the transaction it owns or joins, and derives
   its clamp maximum from the rows that locking read returns. In a caller-owned
@@ -494,7 +500,11 @@ and not part of the stable `v1.4.0`.
   follows the latest committed rows the locking read observed, not the
   snapshot. The locks are held until the owning transaction ends; it never
   commits or rolls back a caller-owned transaction. This is not a guarantee
-  about later concurrent inserts in any isolation level.
+  about later concurrent inserts in any isolation level. On MariaDB with
+  `innodb_snapshot_isolation=ON`, that locking read in a caller-owned
+  transaction with an older snapshot raises `1020` and ends the whole
+  transaction, in the stable `v1.4.0` as well (see
+  [Ordering Guarantees and MariaDB `innodb_snapshot_isolation`](#ordering-guarantees-and-mariadb-innodb_snapshot_isolation)).
 
 ### Rollback Ownership
 
@@ -539,6 +549,104 @@ runner therefore does not cover `1213`.
 Evidence is limited to MySQL 8.4.10 and (for the probe behavior) MariaDB 11.8.9:
 [DG-03 assessment](https://github.com/Maatify/persistence/blob/3b5b71f2868cd6c1451691f036473a870d135c2b/docs/studies/full-fresh-review/DG03-ASSESSMENT.md) and its
 [follow-up](https://github.com/Maatify/persistence/blob/3b5b71f2868cd6c1451691f036473a870d135c2b/docs/studies/full-fresh-review/ADDENDUM-2-F45-RESPONSE.md) on PR #45.
+
+### Ordering Guarantees and MariaDB `innodb_snapshot_isolation`
+
+Evidence: [Issue #47 study](docs/studies/issue-47-mariadb-snapshot/REPORT.md)
+(MySQL 8.0.46, 8.4.10; MariaDB 10.11.18, 11.4.7, 11.8.9; `REPEATABLE READ`;
+PHP 8.4.4 with `pdo_mysql`). Anything outside those cells is **untested**: other
+MariaDB versions (including which version introduced the variable or flipped its
+default), `SERIALIZABLE`, MySQL 5.7/9.x, and proxy or cluster layers.
+
+**What is guaranteed, and where.** Inside a caller-owned transaction whose
+`REPEATABLE READ` snapshot is older than another connection's commit,
+`getNextPositionForUpdate()` and the `moveWithinScope()` clamp (Issue #33) rely
+on a *current read*: a locking statement that acts on the latest committed rows
+instead of the snapshot. That guarantee holds only where the engine performs
+current reads for locking statements:
+
+| Engine / setting | Stale-snapshot ordering calls inside a caller-owned transaction |
+|---|---|
+| MySQL 8.0 / 8.4 (variable does not exist) | Supported; the guarantee above holds (tested) |
+| MariaDB with `innodb_snapshot_isolation=OFF` (the default on 10.11.18 and 11.4.7; 11.8.9 with the setting turned off) | Same results as MySQL (tested) |
+| MariaDB with `innodb_snapshot_isolation=ON` (the default on 11.8.9; also 10.11.18 and 11.4.7 once enabled) | **Not available.** The call raises the engine's `PDOException`, driver code `1020` (SQLSTATE `HY000`), unchanged |
+
+The setting decides, not the server version. The error appears only when the
+locking statement visits a row that changed after the transaction's snapshot,
+which is exactly the case where the Issue #33 behavior matters; with no
+concurrent change, or a change confined to another scope, nothing fails. The
+package does not read, set, or override `innodb_snapshot_isolation`.
+
+**What is not affected.** A *package-owned* `moveWithinScope()` (called with no
+active transaction) begins its own transaction, so its locking read is the first
+statement and no older snapshot exists. A caller that takes its serialization
+lock before the transaction's first plain read creates no stale snapshot either.
+The shipped `v1.4.0` `moveWithinScope()` is affected in the caller-owned case
+(its scope lock is the same locking read); `getNextPositionForUpdate()` and the
+Issue #33 clamp are Unreleased.
+
+**`1020` ends the caller's whole transaction.** The server rolls back the
+**entire** transaction, including the caller's writes made before the failing
+call, and releases its locks. `PDO::inTransaction()` can still report `true`.
+What happens to the statements issued after the error depends on the server
+version: on MariaDB 10.11.18 and 11.8.9 they run in autocommit and survive a
+later `PDO::rollBack()`; on 11.4.7 a new implicit transaction is open, so a
+later `commit()` would persist only post-error work. In both shapes atomicity is
+silently lost if the caller catches the exception and continues.
+
+* **Never catch `1020` and continue** in that transaction. Treat it like `1213`
+  (see [Deadlock `1213` and Caller-Owned Transactions](#deadlock-1213-and-caller-owned-transactions)):
+  propagate it to the code that owns the whole transaction, which restarts the
+  entire unit of work from a fresh `BEGIN`.
+* The package propagates the original `PDOException` unchanged, also through
+  `PdoSavepointTransactionRunner` (its cleanup `ROLLBACK TO SAVEPOINT` cannot
+  succeed and is swallowed, the original exception is rethrown). A
+  runner-owned transaction is closed and the exception rethrown.
+  `PdoDeadlockRetryTransactionRunner` does **not** replay `1020` (one attempt).
+  In every `1020` trace recorded by the study, the failing call returned no
+  position and made no clamp decision. That describes exception propagation on
+  the tested traces; it is **not** transaction safety and not a guarantee for
+  untested engines, versions or schedules.
+* A savepoint does not help: the savepoint is gone with the transaction.
+* The package does not retry `1020`. Restarting is possible only for whoever
+  owns the transaction; the package cannot restart a caller-owned one.
+
+**Consumer options** (the remedy belongs to the consumer; ordered by preference
+for the allocating transaction, with the limits of each):
+
+1. **Serialize first.** Take the caller's serialization lock (for example a lock
+   on a parent row that every competing writer takes) before the transaction's
+   first plain read. No stale snapshot exists, so no `1020`. This needs a
+   consumer-owned lock row; the package cannot create one, and an empty scope
+   still needs it.
+2. **Run the allocating or moving transaction under `READ COMMITTED`**
+   (`SET TRANSACTION ISOLATION LEVEL READ COMMITTED` before `BEGIN`). Results
+   were correct on MariaDB 11.8.9. Every read in that transaction becomes
+   non-repeatable, and MariaDB requires a `ROW` or `MIXED` binlog format for it
+   (not tested here).
+3. **Set `innodb_snapshot_isolation=OFF`** for the connection (session, global or
+   pool initialization), if the consumer accepts the trade. It disables the
+   engine's lost-update protection for **all** statements on that connection,
+   not only the ordering calls.
+4. **Restart on `1020`** (always required, in addition to one of the above when
+   the situation can arise): the transaction is already gone, so the owner
+   restarts the whole unit of work. This alone does not make a repeated
+   stale-snapshot attempt succeed; it only avoids continuing after the failure.
+
+The package deliberately does not apply any of these itself. It does not issue
+`SET SESSION innodb_snapshot_isolation=OFF` (it would alter a connection the
+caller owns and the variable does not exist on MySQL), does not switch isolation
+levels mid-transaction (not possible), does not catch `1020` and retry (no
+transaction exists afterwards), does not read the latest state on a second
+connection, and does not replay caller-owned work. A MariaDB-only,
+statement-scoped override (`SET STATEMENT innodb_snapshot_isolation=OFF FOR …`)
+was evaluated and is not provided; it would silently override a host safety
+setting and still leave the caller's own later statements engine-dependent.
+
+MariaDB is still not an independent CI verification target (see
+[Issue #51](https://github.com/Maatify/persistence/issues/51) for the separate
+MariaDB integration-suite gaps); the table above is evidence from the study, not
+a supported-matrix claim.
 
 ### Ordering and Unique Indexes
 

@@ -55,7 +55,7 @@
 
 **Database behavior:**
 * The package behavior is designed and verified against MySQL.
-* SQL is MySQL/MariaDB-compatible in profile, but MariaDB is not verified by this repository's CI matrix. MariaDB 11.8 defaults to snapshot isolation (`innodb_snapshot_isolation`), which can raise error `1020` in the locking reads of the ordering APIs; this is tracked separately in [Issue #47](https://github.com/Maatify/persistence/issues/47).
+* SQL is MySQL/MariaDB-compatible in profile, but MariaDB is not verified by this repository's CI matrix. MariaDB 11.8 defaults to `innodb_snapshot_isolation=ON`; with that setting the stale-snapshot ordering calls inside a caller-owned transaction raise error `1020` and the server rolls back the caller's whole transaction. See [Ordering Guarantees on MariaDB](#ordering-guarantees-on-mariadb-innodb_snapshot_isolation) (evidence: [Issue #47 study](docs/studies/issue-47-mariadb-snapshot/REPORT.md)).
 
 ## 📦 Installation
 
@@ -79,6 +79,11 @@ The first rows list API *availability* in `v1.4.0` only. A method present in
 `v1.4.0` can still behave differently from `main` when a later fix is listed as
 Unreleased (for example `moveWithinScope()`'s clamp), and the guides and examples
 describe `main`.
+
+One engine caveat applies to the released API too: on MariaDB with
+`innodb_snapshot_isolation=ON`, a caller-owned `moveWithinScope()` in `v1.4.0`
+can raise `1020` and lose the caller's whole transaction. See
+[Ordering Guarantees on MariaDB](#ordering-guarantees-on-mariadb-innodb_snapshot_isolation).
 
 *Unreleased* means merged to `main` but not tagged. A class that exists on
 `main` cannot be installed with `composer require maatify/persistence` until a
@@ -214,6 +219,12 @@ $transactions->run(function () use ($pdo, $ordering, $config): void {
     // Insert the new row at $nextPosition using the same PDO connection.
 });
 ```
+
+On MariaDB with `innodb_snapshot_isolation=ON` this call can raise `1020` when
+your transaction's snapshot is older than a concurrent commit. The server has
+then already rolled back the whole transaction: let the exception reach the code
+that owns it and restart the unit of work; never catch it and keep writing. See
+[Ordering Guarantees on MariaDB](#ordering-guarantees-on-mariadb-innodb_snapshot_isolation).
 
 ### Composing PDO Mutations in One Transaction
 
@@ -473,6 +484,8 @@ for that condition.
 * Guarantee: on a non-empty scope, callers that also use locking reads (`getNextPositionForUpdate()`, `moveWithinScope()`) are serialized on the scope's last active row.
 * Limits: an empty scope has no row to lock, so the host application must still serialize the first insert (for example by locking a parent row, or by using a `UNIQUE` constraint as a safety net that turns a duplicate insert into an error; see the `moveWithinScope()` incompatibility below). Lock footprint, gap locking, repeated-read lock retention, and lock wait timeouts or deadlocks (retry is the caller's responsibility, except the opt-in deadlock replay of an owning `PdoDeadlockRetryTransactionRunner`) are detailed in the [Package Reference](PERSISTENCE_PACKAGE_REFERENCE.md).
 
+**Engine condition for both locking ordering calls:** see [Ordering Guarantees on MariaDB](#ordering-guarantees-on-mariadb-innodb_snapshot_isolation).
+
 **`moveWithinScope()`:**
 * Rejects inconsistent scope usage.
 * Rejects `id <= 0`.
@@ -494,6 +507,25 @@ for that condition.
 * In a transaction it owns: rolls back and returns `false` if the final target update reports no affected row, and rolls back on any Throwable after starting the transaction, so no partial shift survives.
 * In a caller-owned transaction: it never rolls back. Rows it already shifted stay in the caller's transaction when it returns `false` after the shifts or throws; the caller decides on a full rollback. It creates no savepoint, so there is no savepoint-rollback guarantee.
 * Rethrows the original Throwable without arbitrary wrapping.
+
+### Ordering Guarantees on MariaDB (`innodb_snapshot_isolation`)
+
+Tested cells: MySQL 8.0.46 and 8.4.10; MariaDB 10.11.18, 11.4.7 and 11.8.9; `REPEATABLE READ`. Everything else is untested ([study](docs/studies/issue-47-mariadb-snapshot/REPORT.md)).
+
+Inside a **caller-owned** transaction whose `REPEATABLE READ` snapshot is older than another connection's commit, `getNextPositionForUpdate()` (Unreleased) and the `moveWithinScope()` clamp need a *current read*. That is guaranteed only where the engine performs one for locking statements:
+
+| Engine / setting | Result |
+|---|---|
+| MySQL 8.0 / 8.4 | Works (tested) |
+| MariaDB, `innodb_snapshot_isolation=OFF` (default on 10.11.18 and 11.4.7) | Works, same as MySQL (tested) |
+| MariaDB, `innodb_snapshot_isolation=ON` (default on 11.8.9) | Raises the engine's `PDOException`, driver code `1020`, unchanged |
+
+* **`1020` is fatal to the caller's transaction.** The server rolls back the **whole** transaction (including your earlier writes) and frees its locks, while `inTransaction()` may still say `true`. Statements issued afterwards may run in autocommit, or in a fresh implicit transaction depending on the server version, so swallowing the exception silently breaks atomicity. **Never catch `1020` and continue**: propagate it to the code that owns the transaction and restart the whole unit of work from a fresh `BEGIN`. A savepoint does not help. The package does not retry `1020`; `PdoDeadlockRetryTransactionRunner` does not replay it.
+* **Not affected:** a package-owned `moveWithinScope()` (no active transaction), and a caller that takes its serialization lock before the transaction's first plain read. The error appears only when the locking statement visits a row changed after the snapshot.
+* **Safe consumer options** (the package changes none of these for you): (1) take your serialization lock before the first plain read; (2) run that transaction under `READ COMMITTED` (non-repeatable reads for the whole transaction; MariaDB needs a `ROW`/`MIXED` binlog format, not tested here); (3) set `innodb_snapshot_isolation=OFF` for the connection, which disables the engine's lost-update protection for all of its statements; and in every case (4) restart the whole unit of work on `1020`.
+* **Released vs Unreleased:** `getNextPositionForUpdate()` and the Issue #33 clamp are Unreleased. The `moveWithinScope()` caller-owned scope lock exists in `v1.4.0` and raises `1020` there too on MariaDB 11.8.9 default. This document change does not alter any behavior.
+
+Details, propagation through the runners, and rejected package-side alternatives: [Package Reference](PERSISTENCE_PACKAGE_REFERENCE.md#ordering-guarantees-and-mariadb-innodb_snapshot_isolation).
 
 ### Unique Indexes and `moveWithinScope()`
 

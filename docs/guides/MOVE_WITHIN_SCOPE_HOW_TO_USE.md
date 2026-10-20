@@ -148,6 +148,29 @@ back (as the `catch` above does) instead of committing it.
   index record, which may belong to another scope. Which rows and gaps are
   locked depends on the access plan of your schema and indexes.
 
+## MariaDB: `innodb_snapshot_isolation=ON` fails with `1020`
+
+The clamp fix relies on the scope lock acting as a *current read* inside your
+older `REPEATABLE READ` snapshot. MySQL 8.0/8.4 and MariaDB with
+`innodb_snapshot_isolation=OFF` do that (tested). MariaDB with the setting `ON`
+(the 11.8 default) raises `PDOException` with driver code `1020` instead, and it
+does so for the stable `v1.4.0` as well (the scope lock is the same locking
+read); it appears only when a row of the scope changed after your snapshot.
+
+* **`1020` ends your whole transaction**: the server has rolled back everything,
+  your earlier writes included, and released the locks, while `inTransaction()`
+  may still say `true`. Never catch it and keep going; later statements may
+  autocommit and survive your `rollBack()`. Propagate it to the owner of the
+  transaction and restart the whole unit of work. A savepoint does not help.
+* A call that owns its transaction (no active transaction) is not affected, and
+  neither is a caller that takes its serialization lock before the first plain
+  read.
+* Safe options: serialization lock first; `READ COMMITTED` for that transaction;
+  or `innodb_snapshot_isolation=OFF` for the connection (it disables the engine's
+  lost-update protection for all its statements). The package changes none of
+  these for you. Details and tested cells:
+  [Package Reference](../../PERSISTENCE_PACKAGE_REFERENCE.md#ordering-guarantees-and-mariadb-innodb_snapshot_isolation).
+
 ## Limits
 
 * **Do not use this method on a table with a `UNIQUE (scope, order)` index.** The

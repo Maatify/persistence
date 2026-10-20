@@ -31,6 +31,15 @@ use Throwable;
  * - newOrder is clamped to the maximum position read by that same locking read,
  *   so the clamp reflects the latest committed state even when the caller's
  *   REPEATABLE READ snapshot is older.
+ *
+ * Engine condition (documentation only; no runtime behavior depends on it):
+ * the current-read guarantee above holds on MySQL 8.0/8.4 and on MariaDB with
+ * innodb_snapshot_isolation=OFF. On MariaDB with the setting ON (the 11.8
+ * default) a locking statement that visits a row changed after the caller's
+ * snapshot fails with the engine's PDOException, driver code 1020, which
+ * propagates unchanged. The server has then rolled back the caller's whole
+ * transaction; see the Package Reference, "Ordering Guarantees and MariaDB
+ * innodb_snapshot_isolation".
  */
 final readonly class ScopedOrderingManager
 {
@@ -132,6 +141,20 @@ final readonly class ScopedOrderingManager
      *   transaction that then inserts above the locked row typically fails with
      *   a deadlock instead of resuming.
      *
+     * MariaDB innodb_snapshot_isolation: the locking read needs a current read
+     * inside the caller's older snapshot. With the setting ON (the 11.8 default)
+     * and a row of the scope changed after that snapshot, it throws the engine's
+     * PDOException with driver code 1020, unchanged. The server has already
+     * rolled back the caller's WHOLE transaction (earlier writes included) and
+     * released its locks, while PDO::inTransaction() may still report true. Never
+     * catch it and continue: later statements may autocommit. Propagate it to the
+     * code that owns the transaction and restart the whole unit of work. A
+     * savepoint does not help and the package never retries 1020. Consumer
+     * options: take the serialization lock before the first plain read, use
+     * READ COMMITTED for the transaction, or set innodb_snapshot_isolation=OFF
+     * for the connection (it disables lost-update protection for all of its
+     * statements). Unaffected on MySQL 8.0/8.4 and with the setting OFF.
+     *
      * @param int|string|null $scopeValue Required when config has a non-null scope column; null means global ordering or the configured nullable scope.
      *
      * @throws InvalidOrderingOperationException When no PDO transaction is active or scope usage is inconsistent.
@@ -205,6 +228,18 @@ final readonly class ScopedOrderingManager
      * - true when the move succeeds.
      * - true when the target row is already at the requested/clamped position.
      * - false when the target row does not exist in the given scope.
+     *
+     * MariaDB innodb_snapshot_isolation: inside a caller-owned REPEATABLE READ
+     * transaction with an older snapshot, the scope lock needs a current read
+     * (also in the stable v1.4.0). With the setting ON (the 11.8 default) and a
+     * row of the scope changed after that snapshot, it throws the engine's
+     * PDOException with driver code 1020, unchanged. The server has already
+     * rolled back the caller's WHOLE transaction and released its locks, while
+     * PDO::inTransaction() may still report true. Never catch it and continue;
+     * propagate it to the transaction's owner, which restarts the whole unit of
+     * work. A savepoint does not help and the package never retries 1020. A call
+     * that owns its transaction (none active) is unaffected. Consumer options as
+     * for getNextPositionForUpdate().
      *
      * @param int|string|null $scopeValue Required when config has a non-null scope column; null means global ordering or the configured nullable scope.
      * @param string|null $updatedAtValue Timestamp value bound to the target update when updatedAtColumn is configured.
