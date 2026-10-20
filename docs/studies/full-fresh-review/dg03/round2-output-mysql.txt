@@ -1,0 +1,34 @@
+
+== A default session (autocommit=1): DO 0 after the 1213
+  caught 1213; inTransaction() = true
+  after DO 0 inTransaction() = false
+  committed: []
+
+== A default session (autocommit=1): savepoint-based detection (no DO 0)
+  caught 1213; inTransaction() = true
+  ROLLBACK TO SAVEPOINT -> 1305 (savepoint gone: the transaction ended)
+  committed: []
+
+== B session autocommit=0: DO 0 after the 1213
+  caught 1213; inTransaction() = true
+  after DO 0 inTransaction() = false  <- a guard on this flag is FOOLED if true
+  committed: []
+
+== B session autocommit=0: savepoint-based detection (no DO 0)
+  caught 1213; inTransaction() = true
+  ROLLBACK TO SAVEPOINT -> 1305 (savepoint gone: the transaction ended)
+  committed: []
+
+== B session autocommit=0: DO 0 first, then the savepoint probe
+  caught 1213; inTransaction() = true
+  after DO 0 inTransaction() = false
+  ROLLBACK TO SAVEPOINT -> 1305 (savepoint gone: the transaction ended)
+  committed: []
+
+== D the refresh statement itself fails (connection killed right after the 1213)
+  caught 1213; inTransaction() = true
+  refresh failed with: PDOException 2006
+  the ORIGINAL exception object is untouched: code 1213, so a swallow-and-rethrow-original pattern preserves i
+  inTransaction() stays true (the refresh did not happen; a guard on this flag proves nothing)
+  committed: []
+  (scaffolding cleanup on the killed connection failed as expected: 2006)

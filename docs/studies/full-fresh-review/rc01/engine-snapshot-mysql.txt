@@ -1,0 +1,4 @@
+engine: 8.4.10
+innodb_snapshot_isolation: variable does not exis
+  snapshot_isolation=(default) moveWithinScope            -> true, rows {"1":5,"2":1,"3":2,"4":3,"5":4}
+  snapshot_isolation=(default) getNextPositionForUpdate   -> 6, rows {"1":1,"2":2,"3":3}

@@ -1,0 +1,15 @@
+== 1. successful move id1 -> 4, updatedAtColumn = updated_a
+  shipped (non-unique)               target final=4 updated_at=2030-01-01 00:00:00
+                                     audit events for the TARGET (InnoDB log): ["1:1->4"]  [total 4]
+                                     MyISAM log total: 4
+  B3+savepoint (UNIQUE)              target final=4 updated_at=2030-01-01 00:00:00
+                                     audit events for the TARGET (InnoDB log): ["1:1->7","1:7->4"]  [total 5]
+                                     MyISAM log total: 5
+
+== 2. move fails at the final write inside a caller-owned transaction, caller carries on and commits
+  shipped (non-unique)               target final=1 updated_at=NULL
+                                     audit events for the TARGET (InnoDB log): []  [total 3]
+                                     MyISAM log total: 3
+  B3+savepoint (UNIQUE)              target final=1 updated_at=NULL
+                                     audit events for the TARGET (InnoDB log): []  [total 0]
+                                     MyISAM log total: 4

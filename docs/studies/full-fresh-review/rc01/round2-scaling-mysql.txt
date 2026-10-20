@@ -1,0 +1,47 @@
+== lock counts held by the open transaction after one move (total / by mode)
+REPEATABLE READ n=6      non-unique  S0 shipped                               total 17     [["X",7],["X,GAP",4],["X,REC_NOT_GAP",6]]
+REPEATABLE READ n=6      non-unique  B3 park(locked max, all rows)+ORDER BY   total 18     [["X",7],["X,GAP",5],["X,REC_NOT_GAP",6]]
+REPEATABLE READ n=6      UNIQUE      B2 park(locked max)+ORDER BY             total 21     [["X",7],["X,GAP",5],["X,REC_NOT_GAP",9]]
+REPEATABLE READ n=6      UNIQUE      B3 park(locked max, all rows)+ORDER BY   total 21     [["X",7],["X,GAP",5],["X,REC_NOT_GAP",9]]
+REPEATABLE READ n=100    non-unique  S0 shipped                               total 101    [["X",101]]
+REPEATABLE READ n=100    non-unique  B3 park(locked max, all rows)+ORDER BY   total 104    [["X",103],["X,GAP",1]]
+REPEATABLE READ n=100    UNIQUE      B2 park(locked max)+ORDER BY             total 493    [["S,GAP",197],["X",101],["X,REC_NOT_GAP",195]]
+REPEATABLE READ n=100    UNIQUE      B3 park(locked max, all rows)+ORDER BY   total 495    [["S,GAP",196],["X",103],["X,GAP",1],["X,REC_NOT_GAP",195]]
+REPEATABLE READ n=1000   non-unique  S0 shipped                               total 1003   [["X",1003]]
+REPEATABLE READ n=1000   non-unique  B3 park(locked max, all rows)+ORDER BY   total 1006   [["X",1005],["X,GAP",1]]
+REPEATABLE READ n=1000   UNIQUE      B2 park(locked max)+ORDER BY             total 5000   [["S",3],["S,GAP",1997],["X",1005],["X,REC_NOT_GAP",1995]]
+REPEATABLE READ n=1000   UNIQUE      B3 park(locked max, all rows)+ORDER BY   total 5002   [["S",3],["S,GAP",1996],["X",1007],["X,GAP",1],["X,REC_NOT_GAP",1995]]
+REPEATABLE READ n=10000  non-unique  S0 shipped                               total 40053  [["X",10055],["X,GAP",19998],["X,REC_NOT_GAP",10000]]
+REPEATABLE READ n=10000  non-unique  B3 park(locked max, all rows)+ORDER BY   total 40074  [["X",10065],["X,GAP",20009],["X,REC_NOT_GAP",10000]]
+REPEATABLE READ n=10000  UNIQUE      B2 park(locked max)+ORDER BY             total 50071  [["X",10065],["X,GAP",20009],["X,REC_NOT_GAP",19997]]
+REPEATABLE READ n=10000  UNIQUE      B3 park(locked max, all rows)+ORDER BY   total 50071  [["X",10065],["X,GAP",20009],["X,REC_NOT_GAP",19997]]
+READ COMMITTED  n=6      non-unique  S0 shipped                               total 12     [["X,REC_NOT_GAP",12]]
+READ COMMITTED  n=6      non-unique  B3 park(locked max, all rows)+ORDER BY   total 12     [["X,REC_NOT_GAP",12]]
+READ COMMITTED  n=6      UNIQUE      B2 park(locked max)+ORDER BY             total 24     [["S,GAP",9],["X,REC_NOT_GAP",15]]
+READ COMMITTED  n=6      UNIQUE      B3 park(locked max, all rows)+ORDER BY   total 24     [["S,GAP",9],["X,REC_NOT_GAP",15]]
+READ COMMITTED  n=100    non-unique  S0 shipped                               total 100    [["X,REC_NOT_GAP",100]]
+READ COMMITTED  n=100    non-unique  B3 park(locked max, all rows)+ORDER BY   total 101    [["X,REC_NOT_GAP",101]]
+READ COMMITTED  n=100    UNIQUE      B2 park(locked max)+ORDER BY             total 492    [["S,GAP",197],["X,REC_NOT_GAP",295]]
+READ COMMITTED  n=100    UNIQUE      B3 park(locked max, all rows)+ORDER BY   total 493    [["S,GAP",197],["X,REC_NOT_GAP",296]]
+READ COMMITTED  n=1000   non-unique  S0 shipped                               total 1000   [["X,REC_NOT_GAP",1000]]
+READ COMMITTED  n=1000   non-unique  B3 park(locked max, all rows)+ORDER BY   total 1001   [["X,REC_NOT_GAP",1001]]
+READ COMMITTED  n=1000   UNIQUE      B2 park(locked max)+ORDER BY             total 4997   [["S",3],["S,GAP",1997],["X",2],["X,REC_NOT_GAP",2995]]
+READ COMMITTED  n=1000   UNIQUE      B3 park(locked max, all rows)+ORDER BY   total 4998   [["S",3],["S,GAP",1997],["X",2],["X,REC_NOT_GAP",2996]]
+READ COMMITTED  n=10000  non-unique  S0 shipped                               total 20000  [["X,REC_NOT_GAP",20000]]
+READ COMMITTED  n=10000  non-unique  B3 park(locked max, all rows)+ORDER BY   total 20000  [["X,REC_NOT_GAP",20000]]
+READ COMMITTED  n=10000  UNIQUE      B2 park(locked max)+ORDER BY             total 50047  [["S",22],["S,GAP",19977],["X",31],["X,GAP",20],["X,REC_NOT_GAP",29997]]
+READ COMMITTED  n=10000  UNIQUE      B3 park(locked max, all rows)+ORDER BY   total 50047  [["S",22],["S,GAP",19977],["X",31],["X,GAP",20],["X,REC_NOT_GAP",29997]]
+
+== latency (ms), median of 7 owned-transaction moves, single connection, row n-1 -> 2
+n=1000    non-unique  S0 shipped                               median      3.0 ms  (min 2.6, max 13.5)
+n=1000    non-unique  B3 park(locked max, all rows)+ORDER BY   median      2.9 ms  (min 2.5, max 12.9)
+n=1000    UNIQUE      B2 park(locked max)+ORDER BY             median      3.7 ms  (min 3.1, max 16.2)
+n=1000    UNIQUE      B3 park(locked max, all rows)+ORDER BY   median      3.0 ms  (min 2.5, max 16.6)
+n=10000   non-unique  S0 shipped                               median     13.3 ms  (min 11.4, max 86.3)
+n=10000   non-unique  B3 park(locked max, all rows)+ORDER BY   median     11.6 ms  (min 10.9, max 106.6)
+n=10000   UNIQUE      B2 park(locked max)+ORDER BY             median     12.3 ms  (min 10.7, max 162.8)
+n=10000   UNIQUE      B3 park(locked max, all rows)+ORDER BY   median     13.0 ms  (min 11.4, max 327.6)
+n=100000  non-unique  S0 shipped                               median     95.4 ms  (min 89.3, max 570.6)
+n=100000  non-unique  B3 park(locked max, all rows)+ORDER BY   median     91.7 ms  (min 88.8, max 620.8)
+n=100000  UNIQUE      B2 park(locked max)+ORDER BY             median     89.8 ms  (min 89.0, max 973.3)
+n=100000  UNIQUE      B3 park(locked max, all rows)+ORDER BY   median     95.5 ms  (min 92.1, max 1015.1)

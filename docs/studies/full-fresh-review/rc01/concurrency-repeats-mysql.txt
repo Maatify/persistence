@@ -1,0 +1,10 @@
+rep 1 | S0 shipped | nonunique | 1213 total of 400: 100 | invariant HOLDS
+rep 1 | BS3 B3+savepoint | unique | 1213 total of 400: 64 | invariant HOLDS
+rep 2 | S0 shipped | nonunique | 1213 total of 400: 68 | invariant HOLDS
+rep 2 | BS3 B3+savepoint | unique | 1213 total of 400: 47 | invariant HOLDS
+rep 3 | S0 shipped | nonunique | 1213 total of 400: 76 | invariant HOLDS
+rep 3 | BS3 B3+savepoint | unique | 1213 total of 400: 49 | invariant HOLDS
+rep 4 | S0 shipped | nonunique | 1213 total of 400: 63 | invariant HOLDS
+rep 4 | BS3 B3+savepoint | unique | 1213 total of 400: 63 | invariant HOLDS
+rep 5 | S0 shipped | nonunique | 1213 total of 400: 75 | invariant HOLDS
+rep 5 | BS3 B3+savepoint | unique | 1213 total of 400: 48 | invariant HOLDS

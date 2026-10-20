@@ -185,6 +185,11 @@ function rc_candidates(): array
 
         'BS2 B2+savepoint' => static fn (PDO $pdo, int $id, int $new): bool => (new PdoDeadlockRetrySavepointTransactionRunner($pdo))->run(static fn (): bool => rc_candidate_body($pdo, $id, $new, 'rc_algo_park_locked')),
 
+        // B3: park above the maximum of ALL rows of the scope (soft-deleted included), read with a locking read.
+        'B3 park(locked max, all rows)+ORDER BY' => static fn (PDO $pdo, int $id, int $new): bool => rc_tx($pdo, static fn (): bool => rc_candidate_body($pdo, $id, $new, 'rc_algo_park_all')),
+
+        'BS3 B3+savepoint' => static fn (PDO $pdo, int $id, int $new): bool => (new PdoDeadlockRetrySavepointTransactionRunner($pdo))->run(static fn (): bool => rc_candidate_body($pdo, $id, $new, 'rc_algo_park_all')),
+
         // D: negate the affected range, then a single CASE update back to positive (signed column only).
         'D  negate+CASE' => static fn (PDO $pdo, int $id, int $new): bool => rc_tx($pdo, static fn (): bool => rc_candidate_body($pdo, $id, $new, 'rc_algo_negate')),
     ];
@@ -203,6 +208,16 @@ function rc_algo_park(PDO $pdo, int $id, int $new, int $current, int $max = 0): 
 function rc_algo_park_locked(PDO $pdo, int $id, int $new, int $current, int $max = 0): bool
 {
     rc_set($pdo, $id, $max + 1);
+    rc_shift($pdo, $new, $current, true);
+    rc_set($pdo, $id, $new);
+
+    return true;
+}
+
+function rc_algo_park_all(PDO $pdo, int $id, int $new, int $current, int $max = 0): bool
+{
+    $top = $pdo->query('SELECT display_order FROM ' . RC_T . ' WHERE scope_id = 1 ORDER BY display_order DESC, id DESC LIMIT 1 FOR UPDATE')->fetchColumn();
+    rc_set($pdo, $id, ($top === false ? 0 : (int) $top) + 1);
     rc_shift($pdo, $new, $current, true);
     rc_set($pdo, $id, $new);
 

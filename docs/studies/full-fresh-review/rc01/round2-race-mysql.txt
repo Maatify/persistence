@@ -1,0 +1,8 @@
+== REPEATABLE READ: move transaction holds the top row (6); a plain writer inserts at 7
+  writer: error 1205
+  mover : parking write succeeded
+  state after: {"1":1,"2":2,"3":3,"4":4,"5":5,"6":6}
+== READ COMMITTED: move transaction holds the top row (6); a plain writer inserts at 7
+  writer: inserted
+  mover : parking write error 1062 (clean error, nothing parked)
+  state after: {"1":1,"2":2,"3":3,"4":4,"5":5,"6":6,"7":7}
