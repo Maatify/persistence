@@ -158,14 +158,18 @@ try {
 ```
 
 This is **error propagation in a transaction you own**, not a retry: the block
-always ends the transaction and rethrows the original exception unchanged, so a
-`PDOException` with driver code `1213` reaches your caller intact. Re-running the
+attempts a best-effort rollback and rethrows the original exception unchanged, so
+a `PDOException` with driver code `1213` reaches your caller intact. The rollback
+itself is not guaranteed (for example, a dead connection can make it fail; the
+server then discards the transaction when the session ends). Re-running the
 whole unit of work after `1213` is a separate, deliberate decision of the code
 that owns the transaction (see [Deadlock `1213` Is Fatal](#-deadlock-1213-is-fatal-to-the-surrounding-transaction));
 the package's own opt-in replay is Unreleased.
 
 ```php
 // 3. Move an existing row within its scope
+// Returns false when the row is missing or the final update changed nothing; in
+// a caller-owned transaction check it before commit() (see "Who rolls back").
 $success = $ordering->moveWithinScope(
     pdo: $pdo,
     config: $config,
@@ -230,7 +234,11 @@ $transactions->run(function () use ($pdo, $ordering, $config): void {
     $pdo->prepare('UPDATE `consumer_table` SET `status` = :status WHERE `id` = :id')
         ->execute(['status' => 'ready', 'id' => 10]);
 
-    $ordering->moveWithinScope($pdo, $config, 2, 15, 4);
+    // false (row missing, or the final update changed nothing) must not be
+    // ignored: throwing makes the runner roll back the whole owned transaction.
+    if ($ordering->moveWithinScope($pdo, $config, 2, 15, 4) === false) {
+        throw new RuntimeException('moveWithinScope() returned false.');
+    }
 });
 ```
 

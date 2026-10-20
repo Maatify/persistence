@@ -90,7 +90,15 @@ Move inside a transaction you own:
 $pdo->beginTransaction();
 try {
     // ... your own reads and writes on the same connection ...
-    $ordering->moveWithinScope($pdo, $config, $playlistId, $itemId, 5);
+    $moved = $ordering->moveWithinScope($pdo, $config, $playlistId, $itemId, 5);
+
+    // false means the row is missing or the final update changed nothing. In a
+    // transaction you own, rows it already shifted are still pending: never
+    // commit them, end the transaction (the catch below rolls it back).
+    if ($moved === false) {
+        throw new RuntimeException('moveWithinScope() returned false; rolling back.');
+    }
+
     $pdo->commit();
 } catch (Throwable $throwable) {
     // Best effort: after a deadlock (1213) the server has already rolled back,
