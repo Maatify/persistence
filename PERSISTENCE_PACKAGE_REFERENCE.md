@@ -12,6 +12,19 @@
   * `maatify/exceptions` (`^1.0`)
 * **Boundaries**: Framework-agnostic and host-agnostic. No HTTP API, no generic application repository, no ORM, no container bindings.
 * **Note**: PDO Pagination was introduced in v1.1.0.
+* **Release status**: `composer require maatify/persistence` installs the latest
+  tagged release, `v1.4.0`. Items marked *Unreleased* in this Reference exist on
+  `main` only; no later version number has been assigned. Unreleased items:
+  `ScopedOrderingManager::getNextPositionForUpdate()`, the `moveWithinScope()`
+  stale-snapshot clamp fix (Issue #33), `PdoDeadlockRetryTransactionRunner`,
+  `PdoDeadlockRetrySavepointTransactionRunner`,
+  `InvalidTransactionConfigurationException`, and the deprecation of
+  `PdoTransactionRunner` / `PdoSavepointTransactionRunner`. The other public
+  classes and methods listed in this Reference are present in `v1.4.0`; this
+  states API availability only. Behavior, fixes and examples described here
+  reflect `main` and may differ from the tagged release (for example, the
+  `moveWithinScope()` clamp fix above), so do not assume that every behavior in
+  this document is in `v1.4.0`.
 
 ## Persistence and Schema Ownership
 
@@ -23,6 +36,10 @@ foreign keys, or joins to Host tables. The persistence profile is
 MySQL/MariaDB-compatible SQL through direct PDO. Repository integration and
 Consumer verification run against real MySQL, with MySQL 8.4.10 as the current
 CI baseline; MariaDB is not independently verified by the current CI matrix.
+MariaDB 11.8 enables snapshot isolation by default (`innodb_snapshot_isolation`),
+which can raise error `1020` in the locking reads of the ordering APIs; that is
+tracked separately in [Issue #47](https://github.com/Maatify/persistence/issues/47)
+and is not resolved or generalized here.
 The package-level schema notes are in [schema/README.md](schema/README.md).
 
 ## Public API Inventory
@@ -82,7 +99,7 @@ The package-level schema notes are in [schema/README.md](schema/README.md).
     * External PDO/database throwables may propagate unchanged.
     * Concurrency note: concurrent inserts need caller-side serialization, such as a lock held by the caller's transaction.
     * Snapshot rule: under `REPEATABLE READ` the plain read uses the snapshot created by the transaction's first non-locking read, and locking reads do not refresh it. After a later commit by another connection it can return a stale maximum even if the caller locked the scope or a parent row afterwards, and repeating it in the same transaction returns the same stale value; use `getNextPositionForUpdate()` or retry in a new transaction.
-  * `public function getNextPositionForUpdate(\PDO $pdo, ScopedOrderingConfig $config, int|string|null $scopeValue = null): int`
+  * `public function getNextPositionForUpdate(\PDO $pdo, ScopedOrderingConfig $config, int|string|null $scopeValue = null): int` (**Unreleased**, not part of the stable `v1.4.0`)
     * Returns `MAX(order) + 1` from the latest committed state (`1` for an empty applicable scope); soft-deleted rows are ignored when soft-delete filtering is configured.
     * Requires an active PDO transaction on the connection; throws `InvalidOrderingOperationException` when none is active. Never begins, commits, or rolls back a transaction.
     * Performs `SELECT order ... ORDER BY order DESC, id DESC LIMIT 1 FOR UPDATE` (configured order and id columns); the lock is held until the caller ends the transaction. The locking read is repeated until two consecutive reads return the same order value, so every call issues at least two locking reads (also for an empty scope), and a call that waited for the lock on the previous tail follows a higher tail committed meanwhile (observable under `READ COMMITTED`). The repeat continues only while the tail keeps changing, and each repeated read can itself wait for a lock or fail with a lock wait timeout or deadlock.
@@ -102,6 +119,7 @@ The package-level schema notes are in [schema/README.md](schema/README.md).
     * Throws `InvalidOrderingOperationException` for `newOrder <= 0`.
     * Owns a transaction when PDO has no active transaction.
     * Participates in an active caller-owned PDO transaction without beginning, committing, or rolling it back.
+    * **Incompatible with a `UNIQUE (scope, order)` index**: see [Ordering and Unique Indexes](#ordering-and-unique-indexes).
     * Locks the applicable active scope with `SELECT ... FOR UPDATE` and takes the clamp maximum from the order values of the rows that same locking read returns (0 for an empty scope), not from a separate non-locking read. Under `REPEATABLE READ` this means that, inside a caller-owned transaction whose consistent-read snapshot is older than another connection's commit, the clamp follows the latest committed active rows the locking read observed. Scope and soft-delete filtering of that read are the same as for the movement itself. This is not a guarantee that rows inserted later are serialized (no all-isolation phantom-free guarantee; for example InnoDB generally takes no gap locks under `READ COMMITTED`), and an empty scope has no row to lock. Unreleased; not part of the stable `v1.4.0`.
     * A configured nullable scope uses `scopeColumn IS NULL` when `$scopeValue` is null.
     * Reads the target order inside the transaction.
@@ -111,13 +129,13 @@ The package-level schema notes are in [schema/README.md](schema/README.md).
     * Shifts only the affected range.
     * When `updatedAtColumn` is configured, `$updatedAtValue` is written with the target order in the same update and transaction.
     * Does not globally normalize pre-existing gaps.
-    * Returns `false` and rolls back if the final target update reports no affected row.
-    * Rolls back an owned transaction when a throwable occurs after transaction startup.
+    * Returns `false` if the final target update reports no affected row. In a transaction the method owns, it rolls that transaction back first; in a caller-owned transaction it does **not** roll back, and rows already shifted stay in the caller's transaction (see [Rollback Ownership](#rollback-ownership)).
+    * Rolls back an owned transaction when a throwable occurs after transaction startup. In a caller-owned transaction a throwable leaves the already executed shifts in place; the caller decides on a full rollback. There is no savepoint and no savepoint-rollback guarantee in this method.
     * Rethrows the same original throwable.
     * Does not universally wrap PDO failures as package exceptions.
 
 ### `Maatify\Persistence\Pdo\Transaction\TransactionRunnerInterface`
-* **Status**: `interface`
+* **Status**: `interface` (released in `v1.3.0`)
 * **Public Method**:
   ```php
   public function run(callable $callback): mixed
@@ -130,6 +148,9 @@ The package-level schema notes are in [schema/README.md](schema/README.md).
   * When a transaction is already active, the implementation participates in it
     and does not begin, commit, or roll it back.
   * The original callback `Throwable` is propagated.
+  * When a transaction the runner owns fails, the whole transaction is rolled
+    back. When the transaction is caller-owned, nothing is rolled back by the
+    runner (see [Rollback Ownership](#rollback-ownership)).
   * The interface itself is unchanged and not deprecated. An implementation may
     replay an owned transaction only when explicitly configured to
     (`PdoDeadlockRetryTransactionRunner`, `PdoDeadlockRetrySavepointTransactionRunner`);
@@ -254,6 +275,8 @@ The package-level schema notes are in [schema/README.md](schema/README.md).
     committed or fully rolled back by the runner. **The savepoint path never
     replays anything**, including after a deadlock; a deadlock has already
     rolled back the whole caller-owned transaction, and the caller decides.
+    The savepoint isolates statement-level failures only; see
+    [Deadlock `1213` and Caller-Owned Transactions](#deadlock-1213-and-caller-owned-transactions).
 * **Failure Precedence**: unchanged from the savepoint contract in the
   [PDO Transaction Architecture](docs/architecture/PDO_TRANSACTION_ARCHITECTURE.md):
   the callback `Throwable` (or the `RELEASE` failure of a successful callback)
@@ -424,7 +447,7 @@ It is a separate path from position allocation: `moveWithinScope()` does not cal
 `getNextPositionForUpdate()`, and the `examples/next-position` scripts do not
 cover movement. The movement fix is Unreleased and not part of the stable `v1.4.0`.
 
-For the optional deadlock replay, the scripts in
+For the optional deadlock replay (Unreleased), the scripts in
 [`examples/deadlock-retry`](examples/deadlock-retry) produce a real InnoDB
 deadlock with a second process: an owned transaction replayed and committed once
 (with its external side effect after commit, once), and a caller-owned
@@ -439,13 +462,17 @@ and not part of the stable `v1.4.0`.
 
 ## Transaction Composition
 
-* `PdoDeadlockRetryTransactionRunner` (and the owned path of
+* `PdoTransactionRunner` (released) and, Unreleased,
+  `PdoDeadlockRetryTransactionRunner` (and the owned path of
   `PdoDeadlockRetrySavepointTransactionRunner`) owns `beginTransaction()`,
   `commit()`, and `rollBack()` only when it starts the transaction, and may
-  replay only that transaction after a deadlock when configured to.
+  replay only that transaction after a deadlock when configured to (the replay is
+  Unreleased; `PdoTransactionRunner` never replays).
 * When the supplied PDO already has an active transaction, the runner and
   `moveWithinScope()` participate in it without committing or rolling it back.
 * The caller owns the final commit or rollback for an active outer transaction.
+  A failure inside a caller-owned transaction does not undo the participant's
+  earlier changes automatically (see [Rollback Ownership](#rollback-ownership)).
 * Atomic composition is supported only when ordinary PDO mutations and all
   package participants use the same PDO connection.
 * `getNextPosition()` does not start a transaction or lock its scope. The
@@ -454,7 +481,7 @@ and not part of the stable `v1.4.0`.
   the transaction's first non-locking read, otherwise the plain read can
   return a stale maximum. Use `getNextPositionForUpdate()` to allocate a
   position inside a caller-owned transaction.
-* `getNextPositionForUpdate()` requires an active PDO transaction, never starts
+* `getNextPositionForUpdate()` (Unreleased) requires an active PDO transaction, never starts
   one, and reads the scope's last active row with `SELECT ... FOR UPDATE`, so it
   sees the latest committed maximum and serializes lock-using allocation and
   reordering on a non-empty scope until the caller commits or rolls back.
@@ -468,6 +495,81 @@ and not part of the stable `v1.4.0`.
   snapshot. The locks are held until the owning transaction ends; it never
   commits or rolls back a caller-owned transaction. This is not a guarantee
   about later concurrent inserts in any isolation level.
+
+### Rollback Ownership
+
+| Situation | Who rolls back | What happens to partial work |
+|---|---|---|
+| No transaction active; a runner or `moveWithinScope()` begins one | The runner / `moveWithinScope()` | The whole owned transaction is rolled back (`moveWithinScope()` also rolls back before returning `false`). Nothing partial remains. |
+| Transaction already active (caller-owned); a runner or `moveWithinScope()` participates | The caller | Not rolled back by the package. Changes already executed in the caller's transaction (for `moveWithinScope()`: rows already shifted) remain until the caller rolls back, and a caller `commit()` makes them permanent. |
+| Caller-owned transaction + savepoint runner (`PdoSavepointTransactionRunner`; Unreleased: `PdoDeadlockRetrySavepointTransactionRunner`) | The runner, to its own savepoint only | Statement-level failures are rolled back to the operation savepoint; the outer transaction stays active and the caller still owns the final outcome. Not applicable to `1213`. |
+
+`moveWithinScope()` creates no savepoint. Wrapping it in a savepoint runner is
+possible for statement-level errors but is the caller's choice and not part of
+the ordering API contract; the package gives no savepoint-rollback guarantee for
+ordering calls.
+
+### Deadlock `1213` and Caller-Owned Transactions
+
+A deadlock (`PDOException`, SQLSTATE `40001`, driver code `1213`) is fatal to an
+externally owned MySQL/MariaDB transaction: InnoDB has already rolled back the
+**whole** transaction, including the caller's work before the package call, and
+a savepoint is gone with it (a later `ROLLBACK TO SAVEPOINT` fails). A savepoint
+runner therefore does not cover `1213`.
+
+* The caller must **not continue** in that transaction. `pdo_mysql` may keep
+  reporting `inTransaction() === true` until the next successful server reply,
+  so the flag is not proof that the work survived. Statements issued afterwards
+  may run in autocommit mode and be committed immediately; under
+  `autocommit = 0` a later `commit()` can silently make only the post-deadlock
+  statements permanent.
+* Neither the package nor a `DO 0` statement prevents caller code from writing
+  after the deadlock. The Unreleased runners issue `DO 0` only to decide whether a
+  failure of a transaction **they own** was a deadlock victim; it is not a
+  protection for caller-owned transactions.
+* Handle `1213` at the level that owns the whole transaction: rethrow it, and
+  re-run the entire unit of work from a fresh `BEGIN` when that is safe
+  (idempotent, no un-rollbackable side effects). A retry must wrap the whole
+  runner-owned transaction (Unreleased: `maxDeadlockRetries` greater than `0`),
+  never a savepoint or a single operation inside a surviving-looking outer
+  transaction.
+* Catch only expected error codes (`1062`, `1205`, package exceptions) around a
+  savepoint runner; do not catch `Throwable` generically and continue.
+
+Evidence is limited to MySQL 8.4.10 and (for the probe behavior) MariaDB 11.8.9:
+[DG-03 assessment](https://github.com/Maatify/persistence/blob/3b5b71f2868cd6c1451691f036473a870d135c2b/docs/studies/full-fresh-review/DG03-ASSESSMENT.md) and its
+[follow-up](https://github.com/Maatify/persistence/blob/3b5b71f2868cd6c1451691f036473a870d135c2b/docs/studies/full-fresh-review/ADDENDUM-2-F45-RESPONSE.md) on PR #45.
+
+### Ordering and Unique Indexes
+
+`moveWithinScope()` is **not compatible with a `UNIQUE (scope, order)` index**.
+It shifts the range between the old and the new position with one
+`UPDATE ... SET order = order ± 1` per direction, then writes the target row.
+InnoDB evaluates a unique index row by row during an `UPDATE`, so the
+intermediate state raises duplicate-key error `1062`; in the study, with
+sequential positions only no-op moves passed, and moves failed both in
+operation-owned and in caller-owned transactions. This applies to any unique
+index that spans the ordering column and scope, including one that keeps
+soft-deleted rows.
+
+* For a table whose rows are moved with `moveWithinScope()`, use a non-unique
+  `(scope, order)` index and serialize writers with the locking APIs (and, for
+  an empty scope, a parent-row lock).
+* A `UNIQUE (scope, order)` index remains a valid safety net for allocation
+  inserts (`getNextPosition()` / `getNextPositionForUpdate()` followed by an
+  `INSERT`). This is a limit of the current method; it is not general advice to
+  remove unique indexes.
+* **Candidate, not implemented.** The Issue #46 study identified a conditional
+  approach (*B3*: park the target at the maximum position over **all** rows read
+  with a locking read plus one, ordered shifts, final write, inside a savepoint).
+  Its stated conditions are a plain unique index without position-holding
+  soft-deleted rows or an "active-only" unique index on a generated column, a
+  position below the column type's maximum, acceptance that the temporary
+  position is visible to triggers/audit/CDC (and that non-transactional side
+  effects are not undone), range-proportional lock cost, and engine-specific
+  behavior. This package does **not** implement it: no API exists, nothing is
+  promised, and any such work needs its own issue and an owner decision. See the
+  [study addendum](https://github.com/Maatify/persistence/blob/3b5b71f2868cd6c1451691f036473a870d135c2b/docs/studies/full-fresh-review/ADDENDUM-2-F45-RESPONSE.md).
 
 ## Transaction Savepoint Orchestration Boundaries
 

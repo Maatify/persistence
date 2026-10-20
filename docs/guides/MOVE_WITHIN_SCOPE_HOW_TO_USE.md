@@ -15,7 +15,9 @@ of truth for exact semantics and exceptions.
 > `[Unreleased]` → Fixed), so it is **not part of the stable `v1.4.0`**
 > package. On `v1.4.0`, `moveWithinScope()` clamps against a separate
 > non-locking maximum, which is stale in the case below. The public API,
-> signature and transaction ownership are unchanged.
+> signature and transaction ownership are unchanged. The method itself (without
+> this fix) is part of `v1.4.0`; the runnable example exercises the Unreleased
+> behavior.
 
 ## What it does
 
@@ -88,25 +90,54 @@ Move inside a transaction you own:
 $pdo->beginTransaction();
 try {
     // ... your own reads and writes on the same connection ...
-    $ordering->moveWithinScope($pdo, $config, $playlistId, $itemId, 5);
+    $moved = $ordering->moveWithinScope($pdo, $config, $playlistId, $itemId, 5);
+
+    // false means the row is missing or the final update changed nothing. In a
+    // transaction you own, rows it already shifted are still pending: never
+    // commit them, end the transaction (the catch below rolls it back).
+    if ($moved === false) {
+        throw new RuntimeException('moveWithinScope() returned false; rolling back.');
+    }
+
     $pdo->commit();
 } catch (Throwable $throwable) {
-    if ($pdo->inTransaction()) {
-        $pdo->rollBack();
+    // Best effort: after a deadlock (1213) the server has already rolled back,
+    // inTransaction() may be stale and rollBack() may itself throw. Never let
+    // cleanup replace the original exception.
+    try {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+    } catch (Throwable) {
+        // ignored on purpose
     }
+
     throw $throwable;
 }
 ```
 
 Or call it without a transaction and the manager begins and commits one itself.
 
+If the call throws or returns `false` inside your own transaction, rows it has
+already shifted are still part of that transaction: roll the whole transaction
+back (as the `catch` above does) instead of committing it.
+
 ## Transaction ownership and lock boundaries
 
 * Without an active transaction the manager owns one: it begins it, commits on
-  success, and rolls back on any failure or when it returns `false`.
+  success, and rolls back on any failure or when it returns `false`, so no
+  partial shift survives.
 * With an active transaction it participates and never commits, rolls back, or
-  ends it; you own the final commit or rollback. Use the same PDO connection for
-  every participant.
+  ends it; you own the final commit or rollback. It does **not** undo its own
+  partial work there: if a failure (or `false` after the shifts) happens part-way,
+  the rows already shifted stay in your transaction until you roll back, and your
+  `commit()` would persist them. The ordering API creates no savepoint and gives
+  no savepoint-rollback guarantee. Use the same PDO connection for every
+  participant.
+* A deadlock (`1213`) rolls back your **entire** transaction on the server. Do not
+  catch it and continue in the same transaction, and do not expect a savepoint to
+  cover it; see the
+  [Package Reference](../../PERSISTENCE_PACKAGE_REFERENCE.md#deadlock-1213-and-caller-owned-transactions).
 * The locks (rows of the applicable scope, matched by scope value, with
   soft-deleted rows excluded when configured) are held until the owning
   transaction ends. Another `moveWithinScope()` or a
@@ -119,6 +150,13 @@ Or call it without a transaction and the manager begins and commits one itself.
 
 ## Limits
 
+* **Do not use this method on a table with a `UNIQUE (scope, order)` index.** The
+  shifting `UPDATE` is checked row by row, so ordinary moves fail with duplicate-key
+  error `1062` (a `UNIQUE` index is still fine as a safety net for allocation
+  inserts of tables you do not move with this method). Use a non-unique
+  `(scope, order)` index. A conditional approach for unique indexes was studied
+  (Issue #46, candidate *B3*) but is **not implemented** here; see the
+  [Package Reference](../../PERSISTENCE_PACKAGE_REFERENCE.md#ordering-and-unique-indexes).
 * The clamp reflects the rows the locking read observed. It is not a guarantee
   that rows inserted afterwards are serialized, in any isolation level; for
   example under `READ COMMITTED` InnoDB generally takes no gap locks.

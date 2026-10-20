@@ -18,6 +18,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * `InvalidTransactionConfigurationException` for a deadlock-retry runner constructed with `$maxDeadlockRetries` outside `0` to `3`.
 * Runnable real-deadlock examples (`examples/deadlock-retry/`), executed by an integration test and the Consumer Verification Harness, which also verifies the deprecated runners' compatibility from a clean Composer project.
 
+### Changed
+* Documentation corrections (Issue #46; documentation only, no `src/`, test or public API change): `moveWithinScope()` is documented as not compatible with a `UNIQUE (scope, order)` index (ordinary moves fail with `1062`), without advising unique indexes be dropped for allocation-only tables; rollback ownership is distinguished between operation-owned transactions (rolled back) and caller-owned transactions (partial work remains until the caller rolls back; no savepoint guarantee in the ordering API); a deadlock (`1213`) is documented as fatal to the surrounding transaction, not covered by a savepoint, and never to be continued; the README Quick Usage now uses only APIs of the released `v1.4.0`, with Unreleased APIs listed and labeled separately. A conditional approach for unique indexes found by the study (PR #45) is recorded as a not-implemented candidate only.
+
 ### Deprecated
 * `PdoTransactionRunner` and `PdoSavepointTransactionRunner`, in favor of `PdoDeadlockRetryTransactionRunner` and `PdoDeadlockRetrySavepointTransactionRunner`. Both remain public, autoloadable, and signature- and behavior-compatible throughout `1.x`; their interfaces are unchanged and not deprecated. `ScopedOrderingManager::moveWithinScope()` keeps its behavior and does not replay deadlocks.
 

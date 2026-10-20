@@ -9,7 +9,9 @@ declare(strict_types=1);
  *   B. An empty scope has no row to lock, so the host serializes the first insert,
  *      here by locking the parent row first (a second writer waits, then follows).
  *   C. Without such a lock, a UNIQUE index is the safety net: the loser fails with
- *      a duplicate-key error instead of silently duplicating a position.
+ *      a duplicate-key error instead of silently duplicating a position. This
+ *      suits insert-only tables: moveWithinScope() is not compatible with a
+ *      UNIQUE (scope, order) index, so do not add one if rows are moved.
  *   D. A caller-owned outer transaction: the runner participates and never commits;
  *      the caller's ROLLBACK undoes everything.
  *
