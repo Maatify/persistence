@@ -1,0 +1,52 @@
+{
+    "format": "cpu",
+    "attribution": "process-tree-v2",
+    "rule": "mean foreign CPU above 200% of one core (25% of the 8 vCPUs) or peak above 400%, or no samples",
+    "runs": {
+        "smoke_c02_r01_hybrid": {
+            "samples": 2,
+            "invalid_samples": 0,
+            "mean": 98.5,
+            "max": 129,
+            "noisy": false,
+            "tag": "smoke",
+            "connections": 2,
+            "round": 1,
+            "policy": "hybrid"
+        },
+        "smoke_c02_r01_immediate": {
+            "samples": 2,
+            "invalid_samples": 0,
+            "mean": 98.5,
+            "max": 129,
+            "noisy": false,
+            "tag": "smoke",
+            "connections": 2,
+            "round": 1,
+            "policy": "immediate"
+        },
+        "smoke_c08_r01_hybrid": {
+            "samples": 1,
+            "invalid_samples": 0,
+            "mean": 129,
+            "max": 129,
+            "noisy": false,
+            "tag": "smoke",
+            "connections": 8,
+            "round": 1,
+            "policy": "hybrid"
+        },
+        "smoke_c08_r01_immediate": {
+            "samples": 1,
+            "invalid_samples": 0,
+            "mean": 129,
+            "max": 129,
+            "noisy": false,
+            "tag": "smoke",
+            "connections": 8,
+            "round": 1,
+            "policy": "immediate"
+        }
+    },
+    "noisy_runs": []
+}

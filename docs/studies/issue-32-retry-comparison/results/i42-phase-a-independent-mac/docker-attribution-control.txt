@@ -1,0 +1,8 @@
+== 2026-10-20T07:22:23Z positive control: real Docker containers (median of 3 host-quiet samples, % of one core)
+baseline (study container idle): foreign=88  docker: maatify-i32-mysql 0.86% 
+2 burners INSIDE study container (expect ~no change): foreign=79  docker: maatify-i32-mysql 200.21% 
+after stopping in-container burners: foreign=77
+2 burners in a FOREIGN container (expect ~+200): foreign=265  docker: i32-foreign-burner 199.79% maatify-i32-mysql 201.06% 
+after removing foreign container: foreign=75  docker: maatify-i32-mysql 199.71% 
+study container name not listed by docker stats -> VM counted foreign (fail-closed): foreign=269
+cleanup: in-container burners killed via /proc (image has no pkill); docker stats after: maatify-i32-mysql 1.17%

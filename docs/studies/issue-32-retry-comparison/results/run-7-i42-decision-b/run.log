@@ -1,0 +1,200 @@
+host quiet gate: PASSED quiet_samples=15 invalid_samples=0 foreign_cpu_last=66% load1={ 2.87 4.25 7.20 }
+PASS 1213+40001 is retried until success
+PASS 1213 with SQLSTATE HY000 is NOT retried
+PASS 1205 lock wait timeout is NOT retried
+PASS 1062 duplicate key is NOT retried
+PASS non-PDO Throwable is NOT retried
+PASS transaction still active after a deadlock => invalid, no retry
+PASS transaction active before the first attempt => invalid, runner never called
+PASS server reports an ACTIVE transaction before a retry => invalid, no retry
+PASS Immediate exhausts after exactly 4 attempts, no sleeps
+PASS Hybrid: 4 attempts, retry1 immediate, retry2 in [0,10ms], retry3 in [0,20ms], none after exhaustion (200 seeds)
+PASS policy none: exactly one attempt
+PASS analyzer: a complete, matched, consistent set validates
+PASS analyzer: missing Hybrid file for a round is rejected
+PASS analyzer: undeclared extra / stale run file is rejected
+PASS analyzer: summary op count != raw / manifest is rejected
+PASS analyzer: summary outcome counts != raw outcomes are rejected
+PASS analyzer: duplicate operation ids are rejected
+PASS analyzer: file name / summary metadata mismatch (stale or duplicated run) is rejected
+PASS analyzer: client deadlock count != raw 1213 attempts is rejected
+PASS analyzer: runs from different harness versions are rejected
+PASS analyzer: missing load.json (host conditions not recorded) is rejected unless --allow-legacy=1
+PASS host evidence: a bare {"noisy_runs":[]} (no per-run records) is rejected as malformed
+PASS host evidence: a declared run without a load.json record is rejected
+PASS host evidence: a record for an undeclared run is rejected
+PASS host evidence: heavy foreign CPU overlapping a run is classified noisy by the recomputation
+PASS host evidence: load.json that hides noisy runs (all noisy=false) is rejected
+PASS host evidence: a wrong per-run sample count is rejected
+PASS host evidence: a noisy_runs list that differs from the recomputed set is rejected
+PASS host evidence: load.json without the raw host-load.log is rejected
+PASS host evidence: a log with no usable samples cannot validate (no sample overlaps the runs)
+PASS host evidence: v1 (process-name) attribution is rejected unless --allow-legacy=1
+PASS analyzer: missing manifest is rejected
+PASS analyzer: legacy attempt records (no SQLSTATE) are rejected unless --allow-legacy=1
+PASS sensor: top exits non-zero => INVALID, exit 1, never a number
+PASS sensor: top prints nothing => INVALID, exit 1, never a number
+PASS sensor: top prints no usable second table => INVALID, exit 1, never a number
+PASS sensor: valid top + valid docker stats => VM suppressed, foreign = 50 + other containers 5 (got 55)
+PASS sensor: docker stats fails => the Docker VM's 300 % is counted as foreign, not hidden (got 350, expected 350)
+PASS sensor: docker stats prints nothing (exit 0) => the Docker VM's 300 % is counted as foreign, not hidden (got 350, expected 350)
+PASS sensor: docker stats lacks the study container => the Docker VM's 300 % is counted as foreign, not hidden (got 350, expected 350)
+PASS sensor: docker stats value not numeric => the Docker VM's 300 % is counted as foreign, not hidden (got 350, expected 350)
+PASS sensor: docker stats has a malformed row for ANOTHER container (partial data) => the Docker VM's 300 % is counted as foreign, not hidden (got 350, expected 350)
+PASS sensor: docker stats has a row with a missing value => the Docker VM's 300 % is counted as foreign, not hidden (got 350, expected 350)
+PASS sampler: a sensor that exits 1 is logged as foreign=INVALID, never foreign=0
+PASS sampler: a sensor that prints a non-number with exit 0 is logged as foreign=INVALID, never foreign=0
+PASS gate: a permanently failing sensor never passes (exit 3, invalid_samples reported)
+PASS gate: an INVALID sample resets the consecutive-quiet count (10,10,INVALID,… never reaches 3)
+PASS gate: valid quiet samples pass (control)
+PASS gate: valid but loud samples do not pass (control)
+PASS host evidence: a run overlapping an INVALID sensor sample is classified noisy (unknown is never clean)
+PASS host evidence: new evidence with a failed sensor sample is rejected as unknown host conditions
+PASS host evidence: load.json that calls a run clean despite an INVALID sample is rejected
+PASS host attribution: the busy processes (3 of them, named worker.php/study.php/bash) are in the OWN set when descendants of the study root
+PASS host attribution: the same processes are NOT in the own set when they are not descendants of the study root (name collisions do not make them own)
+PASS host attribution: measured foreign CPU reflects it (median of 5 interleaved pairs: 324% as foreign vs 51% as own, difference 273%)
+PASS reuse guard: first run into a fresh directory succeeds
+PASS reuse guard: second run into the same directory/tag is refused
+PASS reuse guard: --resume=1 with the same configuration is accepted
+PASS reuse guard: same tag with different parameters is refused even with --resume=1
+PASS analyzer accepts the freshly produced real-MySQL evidence set
+PASS analyzer refuses the same set after a run file is deleted
+PASS observer sensitivity: preflight FAILS when events_transactions_current is disabled
+PASS observer sensitivity: preflight passes again once restored
+
+63 tests, 0 failed
+[sequential-wave c=8 r=1 immediate #1] ok=352 exhausted=48 err=0 deadlocks(client/server)=796/796 active=1.73s integrity=OK
+[sequential-wave c=8 r=1 hybrid    #2] ok=399 exhausted=1 err=0 deadlocks(client/server)=643/643 active=2.17s integrity=OK
+[sequential-wave c=8 r=2 hybrid    #1] ok=399 exhausted=1 err=0 deadlocks(client/server)=637/637 active=2.15s integrity=OK
+[sequential-wave c=8 r=2 immediate #2] ok=339 exhausted=61 err=0 deadlocks(client/server)=818/818 active=1.75s integrity=OK
+[sequential-wave c=8 r=3 immediate #1] ok=343 exhausted=57 err=0 deadlocks(client/server)=813/813 active=1.79s integrity=OK
+[sequential-wave c=8 r=3 hybrid    #2] ok=400 exhausted=0 err=0 deadlocks(client/server)=645/645 active=2.10s integrity=OK
+[sequential-wave c=8 r=4 hybrid    #1] ok=399 exhausted=1 err=0 deadlocks(client/server)=649/649 active=2.12s integrity=OK
+[sequential-wave c=8 r=4 immediate #2] ok=337 exhausted=63 err=0 deadlocks(client/server)=834/834 active=1.80s integrity=OK
+[sequential-wave c=8 r=5 immediate #1] ok=336 exhausted=64 err=0 deadlocks(client/server)=814/814 active=1.77s integrity=OK
+[sequential-wave c=8 r=5 hybrid    #2] ok=398 exhausted=2 err=0 deadlocks(client/server)=649/649 active=2.14s integrity=OK
+[sequential-wave c=8 r=6 hybrid    #1] ok=399 exhausted=1 err=0 deadlocks(client/server)=636/636 active=2.02s integrity=OK
+[sequential-wave c=8 r=6 immediate #2] ok=338 exhausted=62 err=0 deadlocks(client/server)=827/827 active=1.72s integrity=OK
+[sequential-wave c=8 r=7 immediate #1] ok=341 exhausted=59 err=0 deadlocks(client/server)=816/816 active=1.73s integrity=OK
+[sequential-wave c=8 r=7 hybrid    #2] ok=399 exhausted=1 err=0 deadlocks(client/server)=644/644 active=2.08s integrity=OK
+[sequential-wave c=8 r=8 hybrid    #1] ok=400 exhausted=0 err=0 deadlocks(client/server)=644/644 active=2.10s integrity=OK
+[sequential-wave c=8 r=8 immediate #2] ok=326 exhausted=74 err=0 deadlocks(client/server)=843/843 active=1.80s integrity=OK
+[sequential-wave c=8 r=9 immediate #1] ok=314 exhausted=86 err=0 deadlocks(client/server)=881/881 active=1.76s integrity=OK
+[sequential-wave c=8 r=9 hybrid    #2] ok=399 exhausted=1 err=0 deadlocks(client/server)=638/638 active=2.09s integrity=OK
+[sequential-wave c=8 r=10 hybrid    #1] ok=397 exhausted=3 err=0 deadlocks(client/server)=654/654 active=2.04s integrity=OK
+[sequential-wave c=8 r=10 immediate #2] ok=336 exhausted=64 err=0 deadlocks(client/server)=830/830 active=1.72s integrity=OK
+[sequential-wave-probed c=8 r=1 immediate #1] ok=349 exhausted=51 err=0 deadlocks(client/server)=794/794 active=1.85s integrity=OK
+[sequential-wave-probed c=8 r=1 hybrid    #2] ok=399 exhausted=1 err=0 deadlocks(client/server)=640/640 active=2.10s integrity=OK
+[sequential-wave-probed c=8 r=2 hybrid    #1] ok=399 exhausted=1 err=0 deadlocks(client/server)=658/658 active=2.29s integrity=OK
+[sequential-wave-probed c=8 r=2 immediate #2] ok=335 exhausted=65 err=0 deadlocks(client/server)=815/815 active=1.86s integrity=OK
+[sequential-wave-probed c=8 r=3 immediate #1] ok=316 exhausted=84 err=0 deadlocks(client/server)=867/867 active=1.88s integrity=OK
+[sequential-wave-probed c=8 r=3 hybrid    #2] ok=400 exhausted=0 err=0 deadlocks(client/server)=632/632 active=2.07s integrity=OK
+[sequential-wave-probed c=8 r=4 hybrid    #1] ok=399 exhausted=1 err=0 deadlocks(client/server)=652/652 active=2.20s integrity=OK
+[sequential-wave-probed c=8 r=4 immediate #2] ok=349 exhausted=51 err=0 deadlocks(client/server)=801/801 active=1.87s integrity=OK
+[sequential-wave-probed c=8 r=5 immediate #1] ok=335 exhausted=65 err=0 deadlocks(client/server)=833/833 active=1.82s integrity=OK
+[sequential-wave-probed c=8 r=5 hybrid    #2] ok=400 exhausted=0 err=0 deadlocks(client/server)=640/640 active=2.26s integrity=OK
+[sequential-wave-probed c=8 r=6 hybrid    #1] ok=399 exhausted=1 err=0 deadlocks(client/server)=642/642 active=2.28s integrity=OK
+[sequential-wave-probed c=8 r=6 immediate #2] ok=326 exhausted=74 err=0 deadlocks(client/server)=847/847 active=1.82s integrity=OK
+[sequential-wave-probed c=8 r=7 immediate #1] ok=327 exhausted=73 err=0 deadlocks(client/server)=847/847 active=1.80s integrity=OK
+[sequential-wave-probed c=8 r=7 hybrid    #2] ok=400 exhausted=0 err=0 deadlocks(client/server)=638/638 active=2.19s integrity=OK
+[sequential-wave-probed c=8 r=8 hybrid    #1] ok=400 exhausted=0 err=0 deadlocks(client/server)=629/629 active=2.11s integrity=OK
+[sequential-wave-probed c=8 r=8 immediate #2] ok=343 exhausted=57 err=0 deadlocks(client/server)=815/815 active=1.81s integrity=OK
+[sequential-wave-probed c=8 r=9 immediate #1] ok=334 exhausted=66 err=0 deadlocks(client/server)=841/841 active=1.87s integrity=OK
+[sequential-wave-probed c=8 r=9 hybrid    #2] ok=400 exhausted=0 err=0 deadlocks(client/server)=626/626 active=2.18s integrity=OK
+[sequential-wave-probed c=8 r=10 hybrid    #1] ok=399 exhausted=1 err=0 deadlocks(client/server)=647/647 active=2.22s integrity=OK
+[sequential-wave-probed c=8 r=10 immediate #2] ok=340 exhausted=60 err=0 deadlocks(client/server)=823/823 active=1.84s integrity=OK
+# Host conditions during the runs
+
+Log format: `cpu` (attribution: `process-tree-v2`). A run is flagged noisy when: mean foreign CPU above 200% of one core (25% of the 8 vCPUs) or peak above 400%, or no samples. 0 of 40 runs flagged.
+
+./run-all.sh: line 70: 11826 Terminated: 15          "$ROOT/host-load.sh" > "$OUT/host-load.log"
+# Analysis output — `run-7-i42-decision-b`
+
+Evidence validation: 40 declared run files present, matched and internally consistent.
+
+Generated by `harness/analyze.php`; all numbers derive from `runs/*.jsonl.gz`. Latencies in ms, throughput in successful ops per active second.
+
+## `sequential-wave` — 8 connections
+
+| metric (pooled over 10 rounds) | Immediate | Hybrid |
+|---|---:|---:|
+| operations | 4000 | 4000 |
+| succeeded | 3362 | 3989 |
+| exhausted (4 attempts all 1213) | 638 | 11 |
+| exhausted rate % | 15.95 | 0.27 |
+| exhausted rate 95% Wilson % | 14.85–17.12 | 0.15–0.49 |
+| original deadlocks (attempt 1) | 3500 | 3499 |
+| repeated deadlocks (attempt ≥ 2) | 4772 | 2940 |
+| attempts per op | 2.909 | 2.607 |
+| goodput ops/s | 191.3 | 189.8 |
+| completed ops/s | 227.6 | 190.3 |
+| latency P50 ms (all ops) | 28.26 | 28.90 |
+| latency P95 ms (all ops) | 39.32 | 47.15 |
+| latency P99 ms (all ops) | 44.31 | 59.29 |
+| latency P95 ms (succeeded only) | 37.91 | 46.43 |
+| total jitter sleep ms | 0 | 16351 |
+| succeeded by attempts used | {"1":500,"2":885,"3":1096,"4":881} | {"1":501,"2":890,"3":2289,"4":309} |
+| integrity / guarantees (all runs) | pass | pass |
+
+**Criteria** — C1 exhaustion: pooled Δ=15.68 pp (98.3% relative), 95% CI of (Hybrid−Immediate) = [-16.85, -14.55] pp, rounds passing 10/10 (need 8) → **pass**; C2 goodput ratio 0.992 (completed-ops ratio 0.836, informational) → **pass**; C3 P95 Δ=7.83 ms (allowance 10.00 ms) → **pass**; C4 guarantees → **pass**; sufficient sample: yes.
+
+Host conditions: 0 of 20 runs flagged noisy (load.json).
+
+**Rule outcome for this cell:** `HYBRID` — all pre-registered criteria C1-C4 pass.
+
+| round | first | Imm exh % | Hyb exh % | Δpp | rel | C1 | Imm goodput | Hyb goodput | Imm P95 | Hyb P95 |
+|---:|---|---:|---:|---:|---:|---|---:|---:|---:|---:|
+| 1 | I | 12.00 | 0.25 | 11.75 | 98% | win | 203.2 | 184.1 | 37.58 | 50.56 |
+| 2 | H | 15.25 | 0.25 | 15.00 | 98% | win | 193.5 | 185.7 | 38.93 | 52.18 |
+| 3 | I | 14.25 | 0.00 | 14.25 | 100% | win | 191.6 | 190.7 | 42.01 | 48.86 |
+| 4 | H | 15.75 | 0.25 | 15.50 | 98% | win | 187.1 | 187.9 | 40.12 | 48.22 |
+| 5 | I | 16.00 | 0.50 | 15.50 | 97% | win | 190.2 | 185.9 | 39.51 | 46.68 |
+| 6 | H | 15.50 | 0.25 | 15.25 | 98% | win | 196.2 | 197.1 | 38.23 | 43.44 |
+| 7 | I | 14.75 | 0.25 | 14.50 | 98% | win | 196.8 | 191.5 | 37.92 | 44.35 |
+| 8 | H | 18.50 | 0.00 | 18.50 | 100% | win | 180.9 | 190.3 | 41.27 | 47.45 |
+| 9 | I | 21.50 | 0.25 | 21.25 | 99% | win | 178.4 | 190.9 | 41.20 | 45.31 |
+| 10 | H | 16.00 | 0.75 | 15.25 | 95% | win | 195.6 | 194.4 | 37.26 | 47.48 |
+
+## `sequential-wave-probed` — 8 connections
+
+| metric (pooled over 10 rounds) | Immediate | Hybrid |
+|---|---:|---:|
+| operations | 4000 | 4000 |
+| succeeded | 3354 | 3995 |
+| exhausted (4 attempts all 1213) | 646 | 5 |
+| exhausted rate % | 16.15 | 0.13 |
+| exhausted rate 95% Wilson % | 15.04–17.32 | 0.05–0.29 |
+| original deadlocks (attempt 1) | 3500 | 3500 |
+| repeated deadlocks (attempt ≥ 2) | 4783 | 2904 |
+| attempts per op | 2.909 | 2.600 |
+| goodput ops/s | 182.1 | 182.4 |
+| completed ops/s | 217.1 | 182.6 |
+| latency P50 ms (all ops) | 29.27 | 30.34 |
+| latency P95 ms (all ops) | 41.31 | 49.35 |
+| latency P99 ms (all ops) | 47.27 | 62.45 |
+| latency P95 ms (succeeded only) | 40.19 | 48.96 |
+| total jitter sleep ms | 0 | 16182 |
+| succeeded by attempts used | {"1":500,"2":890,"3":1083,"4":881} | {"1":500,"2":921,"3":2259,"4":315} |
+| integrity / guarantees (all runs) | pass | pass |
+
+**Criteria** — C1 exhaustion: pooled Δ=16.03 pp (99.2% relative), 95% CI of (Hybrid−Immediate) = [-17.20, -14.90] pp, rounds passing 10/10 (need 8) → **pass**; C2 goodput ratio 1.002 (completed-ops ratio 0.841, informational) → **pass**; C3 P95 Δ=8.04 ms (allowance 10.00 ms) → **pass**; C4 guarantees → **pass**; sufficient sample: yes.
+
+Host conditions: 0 of 20 runs flagged noisy (load.json).
+
+**Rule outcome for this cell:** `HYBRID` — all pre-registered criteria C1-C4 pass.
+
+| round | first | Imm exh % | Hyb exh % | Δpp | rel | C1 | Imm goodput | Hyb goodput | Imm P95 | Hyb P95 |
+|---:|---|---:|---:|---:|---:|---|---:|---:|---:|---:|
+| 1 | I | 12.75 | 0.25 | 12.50 | 98% | win | 188.6 | 189.7 | 41.30 | 47.52 |
+| 2 | H | 16.25 | 0.25 | 16.00 | 98% | win | 180.1 | 173.9 | 42.42 | 51.73 |
+| 3 | I | 21.00 | 0.00 | 21.00 | 100% | win | 167.9 | 193.0 | 42.75 | 42.84 |
+| 4 | H | 12.75 | 0.25 | 12.50 | 98% | win | 186.2 | 181.6 | 43.07 | 49.75 |
+| 5 | I | 16.25 | 0.00 | 16.25 | 100% | win | 184.1 | 177.3 | 40.94 | 47.73 |
+| 6 | H | 18.50 | 0.25 | 18.25 | 99% | win | 179.6 | 174.6 | 39.66 | 52.17 |
+| 7 | I | 18.25 | 0.00 | 18.25 | 100% | win | 181.2 | 182.9 | 40.60 | 50.78 |
+| 8 | H | 14.25 | 0.00 | 14.25 | 100% | win | 189.5 | 189.2 | 39.17 | 44.92 |
+| 9 | I | 16.50 | 0.00 | 16.50 | 100% | win | 179.0 | 183.6 | 42.57 | 46.95 |
+| 10 | H | 15.00 | 0.25 | 14.75 | 98% | win | 184.8 | 179.7 | 41.31 | 50.32 |
+
+run-all exit=0

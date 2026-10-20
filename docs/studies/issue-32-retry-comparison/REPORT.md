@@ -1,5 +1,9 @@
 # Issue #32 — Immediate vs Hybrid retry: evidence report
 
+> **Follow-up (Issue #42):** the `EVIDENCE REQUIRED` status of C2/C3 below was addressed by two pre-planned clean runs
+> on an independent, qualified host (run-6, run-7): C2/C3 accepted under controlled conditions for the decision cell —
+> see [`ISSUE-42-REPORT.md`](ISSUE-42-REPORT.md). The text below is the PR #41 report as merged; runs 1–5 are unchanged.
+
 Study only. No change to `src/`, the public API, contracts or production-behaviour documentation; no Retry feature is implemented. Design and decision rule: [`METHODOLOGY.md`](METHODOLOGY.md) (rule committed before the main runs, `18cf99e`; post-review amendments in its §8 do not change the rule). Re-run: [`README.md`](README.md).
 
 **Evidence sets.** The study was run **five times** on MySQL 8.0.46 (three full/partial runs, then two targeted repeats of the 8-connection decision cell):

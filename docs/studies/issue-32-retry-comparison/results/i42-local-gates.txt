@@ -1,0 +1,61 @@
+# Issue #42 — CONTRIBUTING.md local gate sequence on the final study tree
+Date: 2026-10-20T07:51:26Z; base commit b88f47b + uncommitted study files; PHP 8.4.4; Composer 2.8.6
+Database: mysql:8.4.10 (the CI service image) in Docker, CI database/user from .github/workflows/ci.yml, SET GLOBAL log_bin_trust_function_creators = 1 as the CI job does. Run after the Phase B measurements had finished.
+
+## $ composer install --no-interaction --no-progress
+Package operations: 65 installs, 0 updates, 0 removals
+exit=0
+
+## $ composer validate --strict
+./composer.json is valid
+exit=0
+
+## $ composer dump-autoload --optimize --strict-psr
+Generated optimized autoload files containing 2728 classes
+exit=0
+
+## $ composer check-platform-reqs
+exit=0
+
+## $ composer audit --no-interaction --abandoned=fail
+No security vulnerability advisories found.
+exit=0
+
+## $ composer analyse
+exit=0
+
+## $ composer test:unit
+OK (260 tests, 487 assertions)
+exit=0
+
+## $ composer test:regression
+OK (51 tests, 621 assertions)
+exit=0
+
+## $ composer test:integration
+OK (153 tests, 642 assertions)
+exit=0
+
+## $ composer test:consumer
+OK: 05_lock_timeout_and_retry
+OK: 01_move_after_older_snapshot
+Consumer run 2 passed.
+Consumer Verification Harness passed: two clean Composer consumer and MySQL runs completed.
+exit=0
+
+## $ vendor/bin/php-cs-fixer fix --dry-run --diff
+Found 0 of 74 files that can be fixed in 1.159 seconds, 148.00 MB memory used
+exit=0
+
+## $ git diff --check
+exit=0
+
+## $ actionlint -color   (v1.7.12 via the official rhysd/actionlint:1.7.12 image; the checksum pinned in ci.yml is for the linux_amd64 tarball, this host is arm64 macOS)
+exit=0
+
+## $ php docs/studies/issue-32-retry-comparison/raw-recheck.php <run-6> <run-7>   (Issue #42 analyzer-independent raw re-check)
+PASS run-6-i42-decision-a {"runs":40,"ops":16000,"bad_outcome":0,"over_4_attempts":0,"retry_without_1213_40001":0,"immediate_sleep_nonzero":0,"hybrid_sleep_out_of_bounds":0,"server_client_deadlock_mismatch":0}
+PASS run-7-i42-decision-b {"runs":40,"ops":16000,"bad_outcome":0,"over_4_attempts":0,"retry_without_1213_40001":0,"immediate_sleep_nonzero":0,"hybrid_sleep_out_of_bounds":0,"server_client_deadlock_mismatch":0}
+exit=0
+
+ALL-DONE

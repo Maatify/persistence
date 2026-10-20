@@ -1,0 +1,65 @@
+PASS 1213+40001 is retried until success
+PASS 1213 with SQLSTATE HY000 is NOT retried
+PASS 1205 lock wait timeout is NOT retried
+PASS 1062 duplicate key is NOT retried
+PASS non-PDO Throwable is NOT retried
+PASS transaction still active after a deadlock => invalid, no retry
+PASS transaction active before the first attempt => invalid, runner never called
+PASS server reports an ACTIVE transaction before a retry => invalid, no retry
+PASS Immediate exhausts after exactly 4 attempts, no sleeps
+PASS Hybrid: 4 attempts, retry1 immediate, retry2 in [0,10ms], retry3 in [0,20ms], none after exhaustion (200 seeds)
+PASS policy none: exactly one attempt
+PASS analyzer: a complete, matched, consistent set validates
+PASS analyzer: missing Hybrid file for a round is rejected
+PASS analyzer: undeclared extra / stale run file is rejected
+PASS analyzer: summary op count != raw / manifest is rejected
+PASS analyzer: summary outcome counts != raw outcomes are rejected
+PASS analyzer: duplicate operation ids are rejected
+PASS analyzer: file name / summary metadata mismatch (stale or duplicated run) is rejected
+PASS analyzer: client deadlock count != raw 1213 attempts is rejected
+PASS analyzer: runs from different harness versions are rejected
+PASS analyzer: missing load.json (host conditions not recorded) is rejected unless --allow-legacy=1
+PASS host evidence: a bare {"noisy_runs":[]} (no per-run records) is rejected as malformed
+PASS host evidence: a declared run without a load.json record is rejected
+PASS host evidence: a record for an undeclared run is rejected
+PASS host evidence: heavy foreign CPU overlapping a run is classified noisy by the recomputation
+PASS host evidence: load.json that hides noisy runs (all noisy=false) is rejected
+PASS host evidence: a wrong per-run sample count is rejected
+PASS host evidence: a noisy_runs list that differs from the recomputed set is rejected
+PASS host evidence: load.json without the raw host-load.log is rejected
+PASS host evidence: a log with no usable samples cannot validate (no sample overlaps the runs)
+PASS host evidence: v1 (process-name) attribution is rejected unless --allow-legacy=1
+PASS analyzer: missing manifest is rejected
+PASS analyzer: legacy attempt records (no SQLSTATE) are rejected unless --allow-legacy=1
+PASS sensor: top exits non-zero => INVALID, exit 1, never a number
+PASS sensor: top prints nothing => INVALID, exit 1, never a number
+PASS sensor: top prints no usable second table => INVALID, exit 1, never a number
+PASS sensor: valid top + valid docker stats => VM suppressed, foreign = 50 + other containers 5 (got 55)
+PASS sensor: docker stats fails => the Docker VM's 300 % is counted as foreign, not hidden (got 350, expected 350)
+PASS sensor: docker stats prints nothing (exit 0) => the Docker VM's 300 % is counted as foreign, not hidden (got 350, expected 350)
+PASS sensor: docker stats lacks the study container => the Docker VM's 300 % is counted as foreign, not hidden (got 350, expected 350)
+PASS sensor: docker stats value not numeric => the Docker VM's 300 % is counted as foreign, not hidden (got 350, expected 350)
+PASS sensor: docker stats has a malformed row for ANOTHER container (partial data) => the Docker VM's 300 % is counted as foreign, not hidden (got 350, expected 350)
+PASS sensor: docker stats has a row with a missing value => the Docker VM's 300 % is counted as foreign, not hidden (got 350, expected 350)
+PASS sampler: a sensor that exits 1 is logged as foreign=INVALID, never foreign=0
+PASS sampler: a sensor that prints a non-number with exit 0 is logged as foreign=INVALID, never foreign=0
+PASS gate: a permanently failing sensor never passes (exit 3, invalid_samples reported)
+PASS gate: an INVALID sample resets the consecutive-quiet count (10,10,INVALID,… never reaches 3)
+PASS gate: valid quiet samples pass (control)
+PASS gate: valid but loud samples do not pass (control)
+PASS host evidence: a run overlapping an INVALID sensor sample is classified noisy (unknown is never clean)
+PASS host evidence: new evidence with a failed sensor sample is rejected as unknown host conditions
+PASS host evidence: load.json that calls a run clean despite an INVALID sample is rejected
+PASS host attribution: the busy processes (3 of them, named worker.php/study.php/bash) are in the OWN set when descendants of the study root
+PASS host attribution: the same processes are NOT in the own set when they are not descendants of the study root (name collisions do not make them own)
+PASS host attribution: measured foreign CPU reflects it (median of 5 interleaved pairs: 320% as foreign vs 48% as own, difference 272%)
+PASS reuse guard: first run into a fresh directory succeeds
+PASS reuse guard: second run into the same directory/tag is refused
+PASS reuse guard: --resume=1 with the same configuration is accepted
+PASS reuse guard: same tag with different parameters is refused even with --resume=1
+PASS analyzer accepts the freshly produced real-MySQL evidence set
+PASS analyzer refuses the same set after a run file is deleted
+PASS observer sensitivity: preflight FAILS when events_transactions_current is disabled
+PASS observer sensitivity: preflight passes again once restored
+
+63 tests, 0 failed
