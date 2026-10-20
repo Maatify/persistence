@@ -1,6 +1,6 @@
 # ADR 0004: Deadlock-Retry Transaction Runner Generation
 
-- **Status:** Accepted; one residual limit is an open Owner decision (see the last section)
+- **Status:** Accepted; the residual limit of replay attribution is an Owner-accepted limitation ([Owner approval](https://github.com/Maatify/persistence/issues/32#issuecomment-6296393312), 2026-10-20; see the last section)
 - **Decision date:** 2026-10-20
 - **Runtime status:** Implemented; Unreleased (not part of the stable `v1.4.0`)
 - **Implementation authorization:** Owner architecture resolution in [Issue #32](https://github.com/Maatify/persistence/issues/32) (2026-10-20)
@@ -34,28 +34,27 @@ The existing runners are `final readonly`, take only `PDO`, and their behavior i
 ## Consequences
 
 - Consumers can opt in to bounded deadlock replay for transactions the runner owns, without any change for existing code or for the default configuration.
-- A replay-enabled callback may run up to four times: consumers own the idempotency of anything outside the transaction (documented prominently). Ending the runner-owned transaction inside the callback is a contract violation; most variants are detected and not replayed, one is not (next section).
+- A replay-enabled callback may run up to four times: consumers own the idempotency of anything outside the transaction (documented prominently). Keeping the runner-owned transaction intact inside the callback is a mandatory precondition of replay (next section).
 - `ScopedOrderingManager::moveWithinScope()` keeps using `PdoTransactionRunner` internally; its behavior is unchanged and it does not replay deadlocks.
 - Two deprecated public classes remain in the `1.x` line until a future Major release.
 
-## Open Owner decision: residual limit of replay attribution
+## Accepted limitation: callback transaction-ownership precondition
 
-Raised by independent review finding F44-02 (PR #44); evidence measured on MySQL 8.4.10 with PHP 8.4.4 / mysqlnd, two real connections and a real InnoDB deadlock each time:
+**Owner decision ([approval](https://github.com/Maatify/persistence/issues/32#issuecomment-6296393312), 2026-10-20), on the recommendation of the independent review of PR #44 (finding F44-02R):** option 1, accept and disclose.
+
+**Normative boundary.** Replay is supported only for callbacks that keep the runner-owned transaction intact: the callback must not end or replace it, neither explicitly (`commit()`, `rollBack()`, `beginTransaction()`, or SQL such as `START TRANSACTION`, `BEGIN`, `COMMIT`, `ROLLBACK`) nor implicitly (DDL and other implicit-commit statements, or session/autocommit changes). All transactional participants stay on the same PDO connection. This is a mandatory precondition of `maxDeadlockRetries > 0`, like the idempotency of effects outside the transaction. Callbacks that violate it are outside the supported behavior: the runner gives **no transaction-identity guarantee** for them, and neither the driver-reported state nor the `DO 0` probe is a proof of transaction identity.
+
+What the runner does detect, without extra statements: a transaction that already ended before the deadlock while the connection is outside a transaction (it is not replayed; review counterexample M below). What it cannot detect: the callback ended the runner-owned transaction **and** the same connection is inside another transaction when the deadlock hits it (M3, M4), which produces the same driver state as a genuine victim; its already committed work would be replayed.
+
+Evidence (MySQL 8.4.10, PHP 8.4.4 / mysqlnd, two real connections, a real InnoDB deadlock each time; counters measured from right after the runner's `BEGIN`):
 
 | Case (runner-owned transaction, callback) | `inTransaction()` before probe | after `DO 0` | `Com_begin` / `Com_commit` / `Com_rollback` delta | Handled |
 |---|---|---|---|---|
-| G: genuine victim on the runner's connection | `true` | `false` | +0 / +0 / +0 | replayed (intended) |
-| M: callback commits, then another connection raises `1213` (review counterexample) | `false` | `false` | +0 / +1 / +0 | **not replayed** |
-| M3: callback commits, begins a new transaction, which is the victim | `true` | `false` | +1 / +1 / +0 | **replayed (residual)** |
-| M4: DDL implicit commit, `SET autocommit = 0`, implicit transaction is the victim | `true` | `false` | +0 / +0 / +0 | **replayed (residual)** |
+| G: genuine victim on the runner's connection | `true` | `false` | +0 / +0 / +0 | replayed (supported) |
+| M: callback commits, then another connection raises `1213` (review counterexample) | `false` | `false` | +0 / +1 / +0 | not replayed |
+| M3: callback commits, begins a new transaction, which is the victim | `true` | `false` | +1 / +1 / +0 | replayed (outside the supported contract) |
+| M4: DDL implicit commit, `SET autocommit = 0`, implicit transaction is the victim | `true` | `false` | +0 / +0 / +0 | replayed (outside the supported contract) |
 
 (`Handler_*` counters change per statement and do not separate M4 from G.)
 
-The residual cases violate the callback contract (never end the runner-owned transaction), but the runner cannot technically guarantee their detection with unprivileged information. Options for the Owner:
-
-1. **Accept and document** (current implementation): the runner detects every variant in which the connection is not inside a transaction when the deadlock arrives (M and all "ended without a new transaction" variants); M3/M4 stay a documented contract violation. No extra statements.
-2. **Session-counter fingerprint:** read `Com_begin`/`Com_commit`/`Com_rollback` (`SHOW SESSION STATUS`, no privilege) after each `BEGIN` and at the replay decision, and refuse replay on any delta. Detects M3 and explicit `COMMIT`/`ROLLBACK`/`BEGIN` statements; M4 (implicit commit + implicit transaction) stays undetectable. Costs one extra round trip per attempt when replay is enabled, which the Issue #32 study did not measure.
-3. **Privileged transaction identity:** compare the InnoDB transaction id (`information_schema.INNODB_TRX`, needs `PROCESS`) or `performance_schema` transaction events (needs `SELECT` on `performance_schema`) before and after; refuse replay when unavailable. Detects all cases but makes replay depend on privileges that least-privilege application accounts usually do not have.
-4. **Defer replay:** ship the runner generation with fail-closed transaction control but without replay (only `0` accepted) until a detection method is approved. Removes the residual, and the measured benefit, for now.
-
-Until the Owner decides, the PR is not merge-ready on this point.
+Alternatives not adopted: a session-counter fingerprint (`SHOW SESSION STATUS` per attempt) would not cover M4 and adds per-attempt cost the Issue #32 study did not measure; privileged transaction identity (`INNODB_TRX` with `PROCESS`, or `performance_schema`) conflicts with least-privilege application accounts and is not a portable contract; deferring replay would remove the capability Issue #32 requested. No runtime check, monitoring or extra statement was added for this limitation.

@@ -159,11 +159,14 @@ $transactions = new PdoDeadlockRetryTransactionRunner($pdo, maxDeadlockRetries: 
 > **The whole callback runs again on every replay.** Keep effects that a
 > `ROLLBACK` cannot undo (e-mails, HTTP calls, queues, files, other connections)
 > outside the callback, after `run()` returns, or make them idempotent. Never
-> begin, commit, or roll back the runner-owned transaction inside the callback,
-> and never commit it implicitly (DDL). A transaction the callback already ended
-> is not replayed when the connection is outside a transaction at the deadlock;
-> if the callback ended it and started another one that then deadlocks, the
-> runner cannot tell and would replay (see the
+> begin, commit, or roll back the runner-owned transaction inside the callback
+> (PDO methods or SQL), and never end it through an implicit commit (DDL, or
+> session/autocommit changes). Keeping that transaction intact is a
+> mandatory precondition of replay: callbacks that end or replace it are outside
+> the supported contract and get no transaction-identity guarantee. A transaction
+> the callback already ended is not replayed when the connection is outside a
+> transaction at the deadlock; if the callback ended it and started another
+> transaction that then deadlocks, the runner cannot tell and would replay (see the
 > [Package Reference](PERSISTENCE_PACKAGE_REFERENCE.md)).
 
 Nothing else is retried: not lock wait timeouts (`1205`) or other errors, not

@@ -33,7 +33,8 @@ use Throwable;
  * outside this PDO connection are not rolled back and would be repeated; keep
  * them outside the callback or make them idempotent. The callback must not
  * begin, commit or roll back the runner-owned transaction itself, or commit it
- * implicitly (see ADR 0004 for the residual limit).
+ * implicitly: keeping it intact is a mandatory precondition of replay
+ * (Owner-accepted limit, ADR 0004).
  */
 final readonly class PdoDeadlockRetrySavepointTransactionRunner implements SavepointTransactionRunnerInterface
 {

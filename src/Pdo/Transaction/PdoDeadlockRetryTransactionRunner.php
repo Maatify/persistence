@@ -38,7 +38,8 @@ use PDO;
  * them idempotent. The callback must not begin, commit or roll back the
  * runner-owned transaction itself, or commit it implicitly: if it ended the
  * transaction and started another one that then deadlocks, the runner cannot
- * tell and would replay (see ADR 0004).
+ * tell and would replay. Keeping the runner-owned transaction intact is a
+ * mandatory precondition of replay (Owner-accepted limit, ADR 0004).
  */
 final readonly class PdoDeadlockRetryTransactionRunner implements TransactionRunnerInterface
 {

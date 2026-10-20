@@ -200,16 +200,25 @@ The package-level schema notes are in [schema/README.md](schema/README.md).
   attempts; e-mails, HTTP calls, queue messages, files, other connections and
   in-memory state are not, and would be repeated. Keep such effects outside the
   callback (after `run()` returns) or make them idempotent. The callback must not
-  begin, commit, or roll back the runner-owned transaction, and must not run
-  statements that commit it implicitly.
-* **Residual limit (not detectable)**: a callback that ends the runner-owned
-  transaction **and** leaves the same connection inside another transaction
-  when a deadlock hits it (an explicit new `BEGIN`, or an implicit commit such
-  as DDL followed by an implicit transaction under `autocommit = 0`) is
-  indistinguishable from a deadlock victim, and its already committed work
-  would be replayed. This violates the callback contract above; detecting it
-  would need privileged server introspection. Its handling is an open Owner
-  decision ([ADR 0004](docs/adr/0004-deadlock-retry-transaction-runner-generation.md)).
+  end or replace the runner-owned transaction, neither explicitly (`commit()`,
+  `rollBack()`, `beginTransaction()`, or SQL such as `START TRANSACTION`,
+  `COMMIT`, `ROLLBACK`) nor implicitly (DDL and other implicit-commit
+  statements, or session/autocommit changes).
+* **Callback transaction-ownership precondition (Owner-accepted limit)**: keeping
+  the runner-owned transaction intact is a mandatory precondition of replay.
+  Callbacks that end or replace it are outside the supported contract, and the
+  runner gives no transaction-identity guarantee for them: neither the
+  driver-reported state nor the `DO 0` probe proves transaction identity. A
+  transaction that already ended while the connection is outside a transaction
+  when the deadlock arrives is not replayed; but a callback that ends the
+  runner-owned transaction **and** leaves the same connection inside another
+  transaction when a deadlock hits it (an explicit new `BEGIN`, or an implicit
+  commit such as DDL followed by an implicit transaction under
+  `autocommit = 0`) looks like a deadlock victim, and its already committed
+  work would be replayed (cases M3 and M4 in ADR 0004). This is unsupported
+  usage and is not automatically prevented. Accepted by the Owner
+  ([approval](https://github.com/Maatify/persistence/issues/32#issuecomment-6296393312), see
+  [ADR 0004](docs/adr/0004-deadlock-retry-transaction-runner-generation.md#accepted-limitation-callback-transaction-ownership-precondition)).
 * **Composition Requirement**: Atomic composition requires every participant to
   use the same PDO connection.
 * **Measured scope of the value `3`**: the Issue #32 study measured three

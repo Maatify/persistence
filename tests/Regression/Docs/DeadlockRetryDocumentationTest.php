@@ -17,6 +17,9 @@ final class DeadlockRetryDocumentationTest extends TestCase
 {
     private const ADR = 'docs/adr/0004-deadlock-retry-transaction-runner-generation.md';
 
+    /** Owner approval of the accepted replay limit (Issue #32, option 1). */
+    private const OWNER_APPROVAL = 'https://github.com/Maatify/persistence/issues/32#issuecomment-6296393312';
+
     /** @return array<string, array{string}> */
     public static function activeUsageDocuments(): array
     {
@@ -64,21 +67,61 @@ final class DeadlockRetryDocumentationTest extends TestCase
         self::assertStringContainsString('Unreleased, not part of the stable `v1.4.0`', $reference);
     }
 
-    public function testFailClosedControlAndTheResidualReplayLimitAreDocumented(): void
+    public function testFailClosedControlIsDocumented(): void
     {
         $reference = $this->flattened('PERSISTENCE_PACKAGE_REFERENCE.md');
         self::assertStringContainsString('**Non-throwing control failures (fail-closed)**', $reference);
-        self::assertStringContainsString('**Residual limit (not detectable)**', $reference);
         self::assertStringContainsString('the end cannot be attributed to the deadlock, and nothing is replayed', $reference);
+        self::assertStringContainsString('raises `TransactionExecutionException`', $this->flattened('README.md'));
+    }
 
-        $readme = $this->flattened('README.md');
-        self::assertStringContainsString('raises `TransactionExecutionException`', $readme);
-        self::assertStringContainsString('the runner cannot tell and would replay', $readme);
+    /** @return array<string, array{string}> */
+    public static function ownerAcceptedLimitDocuments(): array
+    {
+        return [
+            'README' => ['README.md'],
+            'Package Reference' => ['PERSISTENCE_PACKAGE_REFERENCE.md'],
+            'architecture' => ['docs/architecture/PDO_TRANSACTION_ARCHITECTURE.md'],
+            'ADR 0004' => [self::ADR],
+        ];
+    }
 
+    /**
+     * Owner-accepted limit (ADR 0004, review F44-02R): the callback
+     * transaction-ownership precondition stays explicit, including DDL /
+     * implicit commits, and no document promotes the driver state or the probe
+     * into a guarantee of transaction identity.
+     */
+    #[DataProvider('ownerAcceptedLimitDocuments')]
+    public function testOwnerAcceptedReplayLimitStaysExplicitAndIsNeverPromotedToAGuarantee(string $relativePath): void
+    {
+        $contents = $this->flattened($relativePath);
+
+        self::assertStringContainsString('mandatory precondition of replay', $contents);
+        self::assertStringContainsString('no transaction-identity guarantee', $contents);
+        self::assertStringContainsString('DDL', $contents);
+        self::assertMatchesRegularExpression('/implicit(ly)? commit/', $contents);
+        self::assertStringContainsString('another transaction', $contents);
+
+        foreach (['server is proven', 'proven to have ended', 'really ended', 'proves the server ended', 'proves that the deadlock', 'guarantees transaction identity', 'guarantee of transaction identity'] as $overclaim) {
+            self::assertStringNotContainsString($overclaim, $contents, $relativePath . ' must not claim: ' . $overclaim);
+        }
+    }
+
+    public function testAdrRecordsTheOwnerAcceptedLimitInsteadOfAnOpenDecision(): void
+    {
         $adr = $this->flattened(self::ADR);
-        self::assertStringContainsString('## Open Owner decision: residual limit of replay attribution', $adr);
-        self::assertStringNotContainsString('server is proven', $adr);
-        self::assertStringNotContainsString('server is proven', $this->flattened('docs/architecture/PDO_TRANSACTION_ARCHITECTURE.md'));
+
+        self::assertStringContainsString('## Accepted limitation: callback transaction-ownership precondition', $adr);
+        self::assertStringContainsString('Owner-accepted limitation', $adr);
+        self::assertStringNotContainsString('Open Owner decision', $adr);
+        self::assertStringNotContainsString('open Owner decision', $this->flattened('PERSISTENCE_PACKAGE_REFERENCE.md'));
+        self::assertStringNotContainsString('open Owner decision', $this->flattened('docs/architecture/PDO_TRANSACTION_ARCHITECTURE.md'));
+        self::assertStringContainsString('[Owner approval](' . self::OWNER_APPROVAL . ')', $adr);
+        self::assertStringNotContainsString('__OWNER_APPROVAL', $adr);
+        foreach (['PERSISTENCE_PACKAGE_REFERENCE.md', 'docs/architecture/PDO_TRANSACTION_ARCHITECTURE.md'] as $file) {
+            self::assertStringContainsString(self::OWNER_APPROVAL, $this->read($file), $file);
+        }
     }
 
     public function testDeprecationIsRecordedWithoutRewritingHistory(): void

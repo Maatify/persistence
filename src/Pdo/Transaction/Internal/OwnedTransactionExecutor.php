@@ -36,12 +36,12 @@ use Throwable;
  * - a no-op statement (DO 0) then succeeds and the server reports no active
  *   transaction any more (InnoDB rolled back the whole victim transaction).
  *
- * Residual limit (not detectable without privileged server introspection): a
- * callback that ends the runner's transaction and leaves this connection inside
+ * Neither check proves transaction identity. Keeping the runner-owned
+ * transaction intact is a mandatory precondition of replay (Owner-accepted
+ * limit, ADR 0004): a callback that ends it and leaves this connection inside
  * ANOTHER transaction when a deadlock hits it (an explicit new BEGIN, or an
  * implicit commit followed by an implicit transaction under autocommit = 0)
- * looks exactly like a deadlock victim. The callback contract forbids ending
- * the runner-owned transaction (ADR 0004).
+ * looks exactly like a deadlock victim and is outside the supported contract.
  *
  * Delays before retry 1, 2 and 3: none, uniform 0-10 ms, uniform 0-20 ms. No
  * transaction (and no lock) is held while waiting.
