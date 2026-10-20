@@ -93,3 +93,8 @@ Fourth review (F41-10/11), again without changing the rule and without any new m
 
 - **F41-10.** `host-quiet.sh` v3 is fail-closed: a failing, empty or unparseable `top` sample prints `INVALID` and exits 1; a failing/empty/non-numeric `docker stats` (or one that does not list the study container) makes the whole Docker VM count as foreign instead of being suppressed. `host-load.sh` logs such samples as `foreign=INVALID` (never 0), `host-gate.sh` (extracted from `run-all.sh`) resets its quiet count on `INVALID` and can only pass on consecutive valid quiet samples, `loadlib.php` classifies any run overlapping an `INVALID` sample as noisy, and `analyze.php` rejects new evidence with a failed host sensor ("unknown host conditions"). Negative tests: `harness/selftest.php` (50/50 without a database; forced `top`/`docker stats` failures, empty/garbage output, flaky gate, tampered `load.json`). Run-1…run-5 are untouched; run-5 predates v3 and its log contains only valid samples.
 - **F41-11.** README single-cell workflow now includes the host-evidence steps; report wording corrected to five runs.
+
+Fifth review (F41-12/13), again without changing the rule and without any new measurement:
+
+- **F41-12.** `host-quiet.sh` accepts `docker stats` only if the command succeeded, the study container is listed, and **every** row is `<name> <number>%`; any malformed row for another container invalidates the docker view, so the VM's CPU is counted as foreign rather than suppressed with partial data (negative tests: partial row, missing value).
+- **F41-13.** The README single-cell example is a `bash -euo pipefail` script whose gate verdict goes to `quiet-gate.txt` and aborts on exit 3 (no `tee` masking the exit code).

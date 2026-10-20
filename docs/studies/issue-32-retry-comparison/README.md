@@ -51,14 +51,20 @@ Single cell **with the host evidence the analyzer requires** (collection only is
 
 ```bash
 cd docs/studies/issue-32-retry-comparison
+bash -euo pipefail <<'SCRIPT'            # stops at the first failure; do not paste the lines into a shell without -e/pipefail
 export STUDY_ROOT_PID=$$ STUDY_DOCKER_CONTAINER=maatify-i32-mysql      # host attribution by process tree
 OUT=results/try                                                         # fresh directory
-mkdir -p "$OUT" && ./host-gate.sh 2400 200 15 | tee "$OUT/quiet-gate.txt"   # fail-closed; exit 3 = not quiet / sensor failed
+mkdir -p "$OUT"
+# fail-closed gate: exit 3 (not quiet / sensor failed) aborts the whole script; its verdict is kept in quiet-gate.txt
+./host-gate.sh 2400 200 15 > "$OUT/quiet-gate.txt" || { cat "$OUT/quiet-gate.txt"; echo "host not quiet: not measuring" >&2; exit 3; }
+cat "$OUT/quiet-gate.txt"
 ./host-load.sh > "$OUT/host-load.log" & SAMPLER=$!
+trap 'kill $SAMPLER 2>/dev/null || true' EXIT
 (cd harness && php study.php run --out="../$OUT" --tag=sequential-wave --levels=8 --rounds=2 --ops=400)
-kill $SAMPLER
+kill $SAMPLER; trap - EXIT
 php load-report.php "$OUT"                                              # writes load.json / LOAD.md
 php harness/analyze.php --dir="$OUT"                                    # refuses incomplete/inconsistent evidence (exit 3)
+SCRIPT
 php harness/selftest.php --with-db=1 --with-host=1                      # harness self-tests (--with-db needs the study MySQL)
 ```
 

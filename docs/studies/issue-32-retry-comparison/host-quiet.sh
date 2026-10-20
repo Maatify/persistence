@@ -8,7 +8,8 @@
 # Attribution is by process TREE, never by name: "own" = STUDY_ROOT_PID (set by run-all.sh; fallback: the parent of this
 # script) and all of its descendants. MySQL runs in the Docker Desktop VM: the study container's CPU
 # (STUDY_DOCKER_CONTAINER) is own, every OTHER container's CPU is foreign (docker stats). If docker stats fails, prints
-# nothing usable, or does not list the study container, the whole VM process is counted as foreign (conservative).
+# nothing usable, does not list the study container, or contains ANY malformed row, the whole VM process is counted as
+# foreign (conservative).
 #
 # Test hooks (harness/selftest.php): HOST_QUIET_TOP_CMD / HOST_QUIET_DOCKER_CMD replace `top` / `docker`,
 # HOST_QUIET_PRINT_OWN=1 prints the attributed own pids and stops.
@@ -33,7 +34,10 @@ docker_foreign=""
 if [ -n "${STUDY_DOCKER_CONTAINER:-}" ]; then
   dstats=$("$DOCKER" stats --no-stream --format '{{.Name}} {{.CPUPerc}}' 2>/dev/null); drc=$?
   # Usable only if the command succeeded AND listed the study container with a numeric CPU value.
-  if [ "$drc" -eq 0 ] && echo "$dstats" | awk -v c="$STUDY_DOCKER_CONTAINER" '$1 == c && $2 ~ /^[0-9.]+%$/ { ok = 1 } END { exit ok ? 0 : 1 }'; then
+  # Usable only if the command succeeded, the study container is listed, AND every row is "<name> <number>%" — one
+  # malformed row (e.g. "N/A" for another container) invalidates the whole docker view, because that container's CPU
+  # would otherwise be silently dropped while the VM's CPU is suppressed.
+  if [ "$drc" -eq 0 ] && echo "$dstats" | awk -v c="$STUDY_DOCKER_CONTAINER" 'NF == 0 { next } NF != 2 || $2 !~ /^[0-9.]+%$/ { bad = 1 } $1 == c && $2 ~ /^[0-9.]+%$/ { ok = 1 } END { exit (ok && !bad) ? 0 : 1 }'; then
     docker_foreign=$(echo "$dstats" | awk -v own="$STUDY_DOCKER_CONTAINER" '$1 != own { v = $2; gsub("%", "", v); if (v ~ /^[0-9.]+$/) s += v } END { printf "%.0f", s }')
   fi
 fi

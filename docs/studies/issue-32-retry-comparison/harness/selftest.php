@@ -309,6 +309,8 @@ $dockerFail = $write('docker-fail', 'exit 1');
 $dockerEmpty = $write('docker-empty', 'exit 0');
 $dockerNoStudy = $write('docker-nostudy', "echo 'other 10.00%'");
 $dockerNonNumeric = $write('docker-nonnumeric', "echo 'study N/A'; echo 'other 5.00%'");
+$dockerPartial = $write('docker-partial', "echo 'study 80.00%'; echo 'other1 5.00%'; echo 'other2 N/A'");
+$dockerOneField = $write('docker-onefield', "echo 'study 80.00%'; echo 'other1'");
 $dockerOk = $write('docker-ok', "echo 'study 80.00%'; echo 'other 5.00%'");
 $hq = static function (string $top, string $docker) use ($root): array {
     $cmd = 'STUDY_ROOT_PID=' . getmypid() . ' STUDY_DOCKER_CONTAINER=study HOST_QUIET_TOP_CMD=' . escapeshellarg($top) . ' HOST_QUIET_DOCKER_CMD=' . escapeshellarg($docker) . ' ' . escapeshellarg($root . '/host-quiet.sh') . ' 2>/dev/null';
@@ -322,7 +324,7 @@ foreach (['top exits non-zero' => $topFail, 'top prints nothing' => $topEmpty, '
 }
 [$out, $rc] = $hq($topOk, $dockerOk);
 t('sensor: valid top + valid docker stats => VM suppressed, foreign = 50 + other containers 5 (got ' . $out . ')', $rc === 0 && $out === '55');
-foreach (['docker stats fails' => $dockerFail, 'docker stats prints nothing (exit 0)' => $dockerEmpty, 'docker stats lacks the study container' => $dockerNoStudy, 'docker stats value not numeric' => $dockerNonNumeric] as $label => $docker) {
+foreach (['docker stats fails' => $dockerFail, 'docker stats prints nothing (exit 0)' => $dockerEmpty, 'docker stats lacks the study container' => $dockerNoStudy, 'docker stats value not numeric' => $dockerNonNumeric, 'docker stats has a malformed row for ANOTHER container (partial data)' => $dockerPartial, 'docker stats has a row with a missing value' => $dockerOneField] as $label => $docker) {
     [$out, $rc] = $hq($topOk, $docker);
     t("sensor: $label => the Docker VM's 300 % is counted as foreign, not hidden (got $out, expected 350)", $rc === 0 && $out === '350');
 }
