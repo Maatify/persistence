@@ -1,0 +1,88 @@
+##### atomicity.php
+
+== Scenario 1 final write fails (injected)  | UNIQUE signed, 1..6, move id1 -> 4
+  B  park+ORDER BY             threw 1644 | txn alive: true
+                               before {"1":1,"2":2,"3":3,"4":4,"5":5,"6":6} -> inside {"1":7,"2":1,"3":2,"4":3,"5":5,"6":6} -> after caller COMMIT {"1":7,"2":1,"3":2,"4":3,"5":5,"6":6}   [PARTIAL/CHANGED]
+  BS park+ORDER BY+savepoint   threw 1644 | txn alive: true
+                               before {"1":1,"2":2,"3":3,"4":4,"5":5,"6":6} -> inside {"1":1,"2":2,"3":3,"4":4,"5":5,"6":6} -> after caller COMMIT {"1":1,"2":2,"3":3,"4":4,"5":5,"6":6}   [RESTORED]
+
+== Scenario 2 a shift write fails (injected)| UNIQUE signed, 1..6, move id1 -> 4
+  B  park+ORDER BY             threw 1644 | txn alive: true
+                               before {"1":1,"2":2,"3":3,"4":4,"5":5,"6":6} -> inside {"1":7,"2":2,"3":3,"4":4,"5":5,"6":6} -> after caller COMMIT {"1":7,"2":2,"3":3,"4":4,"5":5,"6":6}   [PARTIAL/CHANGED]
+  BS park+ORDER BY+savepoint   threw 1644 | txn alive: true
+                               before {"1":1,"2":2,"3":3,"4":4,"5":5,"6":6} -> inside {"1":1,"2":2,"3":3,"4":4,"5":5,"6":6} -> after caller COMMIT {"1":1,"2":2,"3":3,"4":4,"5":5,"6":6}   [RESTORED]
+
+== Scenario 3 organic 1062: soft-deleted row | UNIQUE signed, active 1,2,4,5,6 deleted 3, move id1 -> 5
+  B  park+ORDER BY             threw 1062 | txn alive: true
+                               before {"1":1,"2":2,"3":4,"4":5,"5":6} -> inside {"1":7,"2":2,"3":4,"4":5,"5":6} -> after caller COMMIT {"1":7,"2":2,"3":4,"4":5,"5":6}   [PARTIAL/CHANGED]
+  BS park+ORDER BY+savepoint   threw 1062 | txn alive: true
+                               before {"1":1,"2":2,"3":4,"4":5,"5":6} -> inside {"1":1,"2":2,"3":4,"4":5,"5":6} -> after caller COMMIT {"1":1,"2":2,"3":4,"4":5,"5":6}   [RESTORED]
+
+== Reference: S0 shipped, NON-unique, 1..6, move id1 -> 4, final write fails (injected)
+  S0 shipped                   threw 1644 | txn alive: true
+                               before {"1":1,"2":2,"3":3,"4":4,"5":5,"6":6} -> inside {"1":1,"2":1,"3":2,"4":3,"5":5,"6":6} -> after caller COMMIT {"1":1,"2":1,"3":2,"4":3,"5":5,"6":6}   [PARTIAL/CHANGED]
+##### stale_snapshot_park.php
+B  park+ORDER BY               PDOException 1062 SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry '1-7' for key 'probe_rc01.idx_scope_order'
+B2 park(locked max)+ORDER BY   ok
+##### locks.php
+non-unique  S0 shipped                     total 18  [["idx_scope_order","RECORD","X",7],["idx_scope_order","RECORD","X,GAP",4],["PRIMARY","RECORD","X,REC_NOT_GAP",6],[null,"TABLE","IX",1]]
+non-unique  B  park+ORDER BY               total 19  [["idx_scope_order","RECORD","X",7],["idx_scope_order","RECORD","X,GAP",5],["PRIMARY","RECORD","X,REC_NOT_GAP",6],[null,"TABLE","IX",1]]
+non-unique  B2 park(locked max)+ORDER BY   total 19  [["idx_scope_order","RECORD","X",7],["idx_scope_order","RECORD","X,GAP",5],["PRIMARY","RECORD","X,REC_NOT_GAP",6],[null,"TABLE","IX",1]]
+UNIQUE      B  park+ORDER BY               total 22  [["idx_scope_order","RECORD","X",7],["idx_scope_order","RECORD","X,GAP",5],["idx_scope_order","RECORD","X,REC_NOT_GAP",3],["PRIMARY","RECORD","X,REC_NOT_GAP",6],[null,"TABLE","IX",1]]
+UNIQUE      B2 park(locked max)+ORDER BY   total 22  [["idx_scope_order","RECORD","X",7],["idx_scope_order","RECORD","X,GAP",5],["idx_scope_order","RECORD","X,REC_NOT_GAP",3],["PRIMARY","RECORD","X,REC_NOT_GAP",6],[null,"TABLE","IX",1]]
+##### concurrency.php (B2, 4 x 150)
+candidate: B2 park(locked max)+ORDER BY; workers: 4 x 150 moves
+{"ok":130,"errors":{"1213":20}}
+{"ok":123,"errors":{"1213":27}}
+{"ok":124,"errors":{"1213":26}}
+{"ok":124,"errors":{"1213":26}}
+final active orders: [1,2,3,4,5,6,7,8]
+INVARIANT (exactly 1..8, no duplicates, no gaps): HOLDS
+##### concurrency.php (BS2 savepoint variant, 4 x 150)
+candidate: BS2 B2+savepoint; workers: 4 x 150 moves
+{"ok":127,"errors":{"1213":23}}
+{"ok":132,"errors":{"1213":18}}
+{"ok":137,"errors":{"1213":13}}
+{"ok":129,"errors":{"1213":21}}
+final active orders: [1,2,3,4,5,6,7,8]
+INVARIANT (exactly 1..8, no duplicates, no gaps): HOLDS
+##### control: S0 shipped, NON-unique
+schema: non-unique
+candidate: S0 shipped; workers: 4 x 150 moves
+{"ok":128,"errors":{"1213":22}}
+{"ok":134,"errors":{"1213":16}}
+{"ok":133,"errors":{"1213":17}}
+{"ok":136,"errors":{"1213":14}}
+final active orders: [1,2,3,4,5,6,7,8]
+INVARIANT (exactly 1..8, no duplicates, no gaps): HOLDS
+##### B2 on NON-unique
+schema: non-unique
+candidate: B2 park(locked max)+ORDER BY; workers: 4 x 150 moves
+{"ok":122,"errors":{"1213":28}}
+{"ok":128,"errors":{"1213":22}}
+{"ok":124,"errors":{"1213":26}}
+{"ok":121,"errors":{"1213":29}}
+final active orders: [1,2,3,4,5,6,7,8]
+INVARIANT (exactly 1..8, no duplicates, no gaps): HOLDS
+##### B2 on UNIQUE
+schema: UNIQUE
+candidate: B2 park(locked max)+ORDER BY; workers: 4 x 150 moves
+{"ok":128,"errors":{"1213":22}}
+{"ok":133,"errors":{"1213":17}}
+{"ok":129,"errors":{"1213":21}}
+{"ok":122,"errors":{"1213":28}}
+final active orders: [1,2,3,4,5,6,7,8]
+INVARIANT (exactly 1..8, no duplicates, no gaps): HOLDS
+##### control: S0 shipped, NON-unique, only 2 workers
+schema: non-unique
+candidate: S0 shipped; workers: 2 x 300 moves
+{"ok":294,"errors":{"1213":6}}
+{"ok":295,"errors":{"1213":5}}
+final active orders: [1,2,3,4,5,6,7,8]
+INVARIANT (exactly 1..8, no duplicates, no gaps): HOLDS
+##### control: S0 shipped, NON-unique, 1 worker (sanity: no concurrency)
+schema: non-unique
+candidate: S0 shipped; workers: 1 x 300 moves
+{"ok":300,"errors":[]}
+final active orders: [1,2,3,4,5,6,7,8]
+INVARIANT (exactly 1..8, no duplicates, no gaps): HOLDS

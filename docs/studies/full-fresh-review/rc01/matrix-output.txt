@@ -1,0 +1,92 @@
+dataset                                                        | schema                             | candidate                   | mode       | GREEN / total  (errors)
+----------------------------------------------------------------------------------------------------------------------------------------------------------------
+contiguous 1..6                                                | UNIQUE signed                      | S0 shipped                  | owned txn  |   7 / 42  RED   {"SQLSTATE 23000/1062":35}
+contiguous 1..6                                                | UNIQUE signed                      | S0 shipped                  | caller txn |   7 / 42  RED   {"SQLSTATE 23000/1062":35}
+contiguous 1..6                                                | UNIQUE signed                      | A  ORDER BY only            | owned txn  |   7 / 42  RED   {"SQLSTATE 23000/1062":35}
+contiguous 1..6                                                | UNIQUE signed                      | A  ORDER BY only            | caller txn |   7 / 42  RED   {"SQLSTATE 23000/1062":35}
+contiguous 1..6                                                | UNIQUE signed                      | B  park+ORDER BY            | owned txn  |  42 / 42  GREEN
+contiguous 1..6                                                | UNIQUE signed                      | B  park+ORDER BY            | caller txn |  42 / 42  GREEN
+contiguous 1..6                                                | UNIQUE signed                      | BS park+ORDER BY+savepoint  | owned txn  |  42 / 42  GREEN
+contiguous 1..6                                                | UNIQUE signed                      | BS park+ORDER BY+savepoint  | caller txn |  42 / 42  GREEN
+contiguous 1..6                                                | UNIQUE signed                      | D  negate+CASE              | owned txn  |  42 / 42  GREEN
+contiguous 1..6                                                | UNIQUE signed                      | D  negate+CASE              | caller txn |  42 / 42  GREEN
+contiguous 1..6                                                | UNIQUE unsigned                    | S0 shipped                  | owned txn  |   7 / 42  RED   {"SQLSTATE 23000/1062":35}
+contiguous 1..6                                                | UNIQUE unsigned                    | S0 shipped                  | caller txn |   7 / 42  RED   {"SQLSTATE 23000/1062":35}
+contiguous 1..6                                                | UNIQUE unsigned                    | A  ORDER BY only            | owned txn  |   7 / 42  RED   {"SQLSTATE 23000/1062":35}
+contiguous 1..6                                                | UNIQUE unsigned                    | A  ORDER BY only            | caller txn |   7 / 42  RED   {"SQLSTATE 23000/1062":35}
+contiguous 1..6                                                | UNIQUE unsigned                    | B  park+ORDER BY            | owned txn  |  42 / 42  GREEN
+contiguous 1..6                                                | UNIQUE unsigned                    | B  park+ORDER BY            | caller txn |  42 / 42  GREEN
+contiguous 1..6                                                | UNIQUE unsigned                    | BS park+ORDER BY+savepoint  | owned txn  |  42 / 42  GREEN
+contiguous 1..6                                                | UNIQUE unsigned                    | BS park+ORDER BY+savepoint  | caller txn |  42 / 42  GREEN
+contiguous 1..6                                                | UNIQUE unsigned                    | D  negate+CASE              | owned txn  |   7 / 42  RED   {"SQLSTATE 22003/1264":35}
+contiguous 1..6                                                | UNIQUE unsigned                    | D  negate+CASE              | caller txn |   7 / 42  RED   {"SQLSTATE 22003/1264":35}
+contiguous 1..6                                                | UNIQUE active-only (generated col) | S0 shipped                  | owned txn  |   7 / 42  RED   {"SQLSTATE 23000/1062":35}
+contiguous 1..6                                                | UNIQUE active-only (generated col) | S0 shipped                  | caller txn |   7 / 42  RED   {"SQLSTATE 23000/1062":35}
+contiguous 1..6                                                | UNIQUE active-only (generated col) | A  ORDER BY only            | owned txn  |   7 / 42  RED   {"SQLSTATE 23000/1062":35}
+contiguous 1..6                                                | UNIQUE active-only (generated col) | A  ORDER BY only            | caller txn |   7 / 42  RED   {"SQLSTATE 23000/1062":35}
+contiguous 1..6                                                | UNIQUE active-only (generated col) | B  park+ORDER BY            | owned txn  |  42 / 42  GREEN
+contiguous 1..6                                                | UNIQUE active-only (generated col) | B  park+ORDER BY            | caller txn |  42 / 42  GREEN
+contiguous 1..6                                                | UNIQUE active-only (generated col) | BS park+ORDER BY+savepoint  | owned txn  |  42 / 42  GREEN
+contiguous 1..6                                                | UNIQUE active-only (generated col) | BS park+ORDER BY+savepoint  | caller txn |  42 / 42  GREEN
+contiguous 1..6                                                | UNIQUE active-only (generated col) | D  negate+CASE              | owned txn  |  42 / 42  GREEN
+contiguous 1..6                                                | UNIQUE active-only (generated col) | D  negate+CASE              | caller txn |  42 / 42  GREEN
+gaps 1,2,5,6,9,10                                              | UNIQUE signed                      | S0 shipped                  | owned txn  |  27 / 66  RED   {"SQLSTATE 23000/1062":39}
+gaps 1,2,5,6,9,10                                              | UNIQUE signed                      | S0 shipped                  | caller txn |  27 / 66  RED   {"SQLSTATE 23000/1062":39}
+gaps 1,2,5,6,9,10                                              | UNIQUE signed                      | A  ORDER BY only            | owned txn  |  33 / 66  RED   {"SQLSTATE 23000/1062":33}
+gaps 1,2,5,6,9,10                                              | UNIQUE signed                      | A  ORDER BY only            | caller txn |  33 / 66  RED   {"SQLSTATE 23000/1062":33}
+gaps 1,2,5,6,9,10                                              | UNIQUE signed                      | B  park+ORDER BY            | owned txn  |  66 / 66  GREEN
+gaps 1,2,5,6,9,10                                              | UNIQUE signed                      | B  park+ORDER BY            | caller txn |  66 / 66  GREEN
+gaps 1,2,5,6,9,10                                              | UNIQUE signed                      | BS park+ORDER BY+savepoint  | owned txn  |  66 / 66  GREEN
+gaps 1,2,5,6,9,10                                              | UNIQUE signed                      | BS park+ORDER BY+savepoint  | caller txn |  66 / 66  GREEN
+gaps 1,2,5,6,9,10                                              | UNIQUE signed                      | D  negate+CASE              | owned txn  |  66 / 66  GREEN
+gaps 1,2,5,6,9,10                                              | UNIQUE signed                      | D  negate+CASE              | caller txn |  66 / 66  GREEN
+gaps 1,2,5,6,9,10                                              | UNIQUE unsigned                    | S0 shipped                  | owned txn  |  27 / 66  RED   {"SQLSTATE 23000/1062":39}
+gaps 1,2,5,6,9,10                                              | UNIQUE unsigned                    | S0 shipped                  | caller txn |  27 / 66  RED   {"SQLSTATE 23000/1062":39}
+gaps 1,2,5,6,9,10                                              | UNIQUE unsigned                    | A  ORDER BY only            | owned txn  |  33 / 66  RED   {"SQLSTATE 23000/1062":33}
+gaps 1,2,5,6,9,10                                              | UNIQUE unsigned                    | A  ORDER BY only            | caller txn |  33 / 66  RED   {"SQLSTATE 23000/1062":33}
+gaps 1,2,5,6,9,10                                              | UNIQUE unsigned                    | B  park+ORDER BY            | owned txn  |  66 / 66  GREEN
+gaps 1,2,5,6,9,10                                              | UNIQUE unsigned                    | B  park+ORDER BY            | caller txn |  66 / 66  GREEN
+gaps 1,2,5,6,9,10                                              | UNIQUE unsigned                    | BS park+ORDER BY+savepoint  | owned txn  |  66 / 66  GREEN
+gaps 1,2,5,6,9,10                                              | UNIQUE unsigned                    | BS park+ORDER BY+savepoint  | caller txn |  66 / 66  GREEN
+gaps 1,2,5,6,9,10                                              | UNIQUE unsigned                    | D  negate+CASE              | owned txn  |   7 / 66  RED   {"SQLSTATE 22003/1264":59}
+gaps 1,2,5,6,9,10                                              | UNIQUE unsigned                    | D  negate+CASE              | caller txn |   7 / 66  RED   {"SQLSTATE 22003/1264":59}
+gaps 1,2,5,6,9,10                                              | UNIQUE active-only (generated col) | S0 shipped                  | owned txn  |  27 / 66  RED   {"SQLSTATE 23000/1062":39}
+gaps 1,2,5,6,9,10                                              | UNIQUE active-only (generated col) | S0 shipped                  | caller txn |  27 / 66  RED   {"SQLSTATE 23000/1062":39}
+gaps 1,2,5,6,9,10                                              | UNIQUE active-only (generated col) | A  ORDER BY only            | owned txn  |  33 / 66  RED   {"SQLSTATE 23000/1062":33}
+gaps 1,2,5,6,9,10                                              | UNIQUE active-only (generated col) | A  ORDER BY only            | caller txn |  33 / 66  RED   {"SQLSTATE 23000/1062":33}
+gaps 1,2,5,6,9,10                                              | UNIQUE active-only (generated col) | B  park+ORDER BY            | owned txn  |  66 / 66  GREEN
+gaps 1,2,5,6,9,10                                              | UNIQUE active-only (generated col) | B  park+ORDER BY            | caller txn |  66 / 66  GREEN
+gaps 1,2,5,6,9,10                                              | UNIQUE active-only (generated col) | BS park+ORDER BY+savepoint  | owned txn  |  66 / 66  GREEN
+gaps 1,2,5,6,9,10                                              | UNIQUE active-only (generated col) | BS park+ORDER BY+savepoint  | caller txn |  66 / 66  GREEN
+gaps 1,2,5,6,9,10                                              | UNIQUE active-only (generated col) | D  negate+CASE              | owned txn  |  66 / 66  GREEN
+gaps 1,2,5,6,9,10                                              | UNIQUE active-only (generated col) | D  negate+CASE              | caller txn |  66 / 66  GREEN
+soft-deleted row inside range (active 1,2,4,5,6; deleted 3)    | UNIQUE signed                      | S0 shipped                  | owned txn  |   6 / 35  RED   {"SQLSTATE 23000/1062":29}
+soft-deleted row inside range (active 1,2,4,5,6; deleted 3)    | UNIQUE signed                      | S0 shipped                  | caller txn |   6 / 35  RED   {"SQLSTATE 23000/1062":29}
+soft-deleted row inside range (active 1,2,4,5,6; deleted 3)    | UNIQUE signed                      | A  ORDER BY only            | owned txn  |   6 / 35  RED   {"SQLSTATE 23000/1062":29}
+soft-deleted row inside range (active 1,2,4,5,6; deleted 3)    | UNIQUE signed                      | A  ORDER BY only            | caller txn |   6 / 35  RED   {"SQLSTATE 23000/1062":29}
+soft-deleted row inside range (active 1,2,4,5,6; deleted 3)    | UNIQUE signed                      | B  park+ORDER BY            | owned txn  |  16 / 35  RED   {"SQLSTATE 23000/1062":19}
+soft-deleted row inside range (active 1,2,4,5,6; deleted 3)    | UNIQUE signed                      | B  park+ORDER BY            | caller txn |  16 / 35  RED   {"SQLSTATE 23000/1062":19}
+soft-deleted row inside range (active 1,2,4,5,6; deleted 3)    | UNIQUE signed                      | BS park+ORDER BY+savepoint  | owned txn  |  16 / 35  RED   {"SQLSTATE 23000/1062":19}
+soft-deleted row inside range (active 1,2,4,5,6; deleted 3)    | UNIQUE signed                      | BS park+ORDER BY+savepoint  | caller txn |  16 / 35  RED   {"SQLSTATE 23000/1062":19}
+soft-deleted row inside range (active 1,2,4,5,6; deleted 3)    | UNIQUE signed                      | D  negate+CASE              | owned txn  |  16 / 35  RED   {"SQLSTATE 23000/1062":19}
+soft-deleted row inside range (active 1,2,4,5,6; deleted 3)    | UNIQUE signed                      | D  negate+CASE              | caller txn |  16 / 35  RED   {"SQLSTATE 23000/1062":19}
+soft-deleted row inside range (active 1,2,4,5,6; deleted 3)    | UNIQUE unsigned                    | S0 shipped                  | owned txn  |   6 / 35  RED   {"SQLSTATE 23000/1062":29}
+soft-deleted row inside range (active 1,2,4,5,6; deleted 3)    | UNIQUE unsigned                    | S0 shipped                  | caller txn |   6 / 35  RED   {"SQLSTATE 23000/1062":29}
+soft-deleted row inside range (active 1,2,4,5,6; deleted 3)    | UNIQUE unsigned                    | A  ORDER BY only            | owned txn  |   6 / 35  RED   {"SQLSTATE 23000/1062":29}
+soft-deleted row inside range (active 1,2,4,5,6; deleted 3)    | UNIQUE unsigned                    | A  ORDER BY only            | caller txn |   6 / 35  RED   {"SQLSTATE 23000/1062":29}
+soft-deleted row inside range (active 1,2,4,5,6; deleted 3)    | UNIQUE unsigned                    | B  park+ORDER BY            | owned txn  |  16 / 35  RED   {"SQLSTATE 23000/1062":19}
+soft-deleted row inside range (active 1,2,4,5,6; deleted 3)    | UNIQUE unsigned                    | B  park+ORDER BY            | caller txn |  16 / 35  RED   {"SQLSTATE 23000/1062":19}
+soft-deleted row inside range (active 1,2,4,5,6; deleted 3)    | UNIQUE unsigned                    | BS park+ORDER BY+savepoint  | owned txn  |  16 / 35  RED   {"SQLSTATE 23000/1062":19}
+soft-deleted row inside range (active 1,2,4,5,6; deleted 3)    | UNIQUE unsigned                    | BS park+ORDER BY+savepoint  | caller txn |  16 / 35  RED   {"SQLSTATE 23000/1062":19}
+soft-deleted row inside range (active 1,2,4,5,6; deleted 3)    | UNIQUE unsigned                    | D  negate+CASE              | owned txn  |   6 / 35  RED   {"SQLSTATE 22003/1264":29}
+soft-deleted row inside range (active 1,2,4,5,6; deleted 3)    | UNIQUE unsigned                    | D  negate+CASE              | caller txn |   6 / 35  RED   {"SQLSTATE 22003/1264":29}
+soft-deleted row inside range (active 1,2,4,5,6; deleted 3)    | UNIQUE active-only (generated col) | S0 shipped                  | owned txn  |  13 / 35  RED   {"SQLSTATE 23000/1062":22}
+soft-deleted row inside range (active 1,2,4,5,6; deleted 3)    | UNIQUE active-only (generated col) | S0 shipped                  | caller txn |  13 / 35  RED   {"SQLSTATE 23000/1062":22}
+soft-deleted row inside range (active 1,2,4,5,6; deleted 3)    | UNIQUE active-only (generated col) | A  ORDER BY only            | owned txn  |  14 / 35  RED   {"SQLSTATE 23000/1062":21}
+soft-deleted row inside range (active 1,2,4,5,6; deleted 3)    | UNIQUE active-only (generated col) | A  ORDER BY only            | caller txn |  14 / 35  RED   {"SQLSTATE 23000/1062":21}
+soft-deleted row inside range (active 1,2,4,5,6; deleted 3)    | UNIQUE active-only (generated col) | B  park+ORDER BY            | owned txn  |  35 / 35  GREEN
+soft-deleted row inside range (active 1,2,4,5,6; deleted 3)    | UNIQUE active-only (generated col) | B  park+ORDER BY            | caller txn |  35 / 35  GREEN
+soft-deleted row inside range (active 1,2,4,5,6; deleted 3)    | UNIQUE active-only (generated col) | BS park+ORDER BY+savepoint  | owned txn  |  35 / 35  GREEN
+soft-deleted row inside range (active 1,2,4,5,6; deleted 3)    | UNIQUE active-only (generated col) | BS park+ORDER BY+savepoint  | caller txn |  35 / 35  GREEN
+soft-deleted row inside range (active 1,2,4,5,6; deleted 3)    | UNIQUE active-only (generated col) | D  negate+CASE              | owned txn  |  35 / 35  GREEN
+soft-deleted row inside range (active 1,2,4,5,6; deleted 3)    | UNIQUE active-only (generated col) | D  negate+CASE              | caller txn |  35 / 35  GREEN

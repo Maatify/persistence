@@ -1,0 +1,27 @@
+
+== E1 caller carries on after 1213 (no mitigation)
+  caught driver code 1213; inTransaction() = true
+  after next statement inTransaction() = false
+  commit() -> PDOException: There is no active transaction
+  committed (seen by another connection): ["caller-after"]
+
+== E2 mitigation: resynchronise with a no-op statement right after the 1213
+  caught driver code 1213; inTransaction() = true
+  after DO 0, inTransaction() = false  (a caller guard `if (!inTransaction()) abort` now sees the truth BEFORE any further write)
+  caller guard aborts; no later write is made
+  committed (seen by another connection): []
+
+== E3 session autocommit=0, caller carries on after 1213
+  caught driver code 1213; inTransaction() = true
+  after next statement inTransaction() = true
+  commit() succeeded (silently commits only the post-deadlock work)
+  committed (seen by another connection): ["caller-after"]
+
+== E4 lock wait timeout (1205) inside the savepoint runner, caller-owned transaction
+  caught driver code 1205; inTransaction() = true
+  rows visible inside the caller transaction: ["caller-before"]  (savepoint rolled back, caller work kept)
+  committed after carrying on: ["caller-before","caller-after"]
+
+== E5 detecting a vanished transaction without writing
+  SELECT @@in_transaction => PDOException: SQLSTATE[HY000]: General error: 1193 Unknown system variable 'in_transaction'
+  DO 0 => OK (works on MySQL and MariaDB)
