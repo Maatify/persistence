@@ -93,9 +93,17 @@ try {
     $ordering->moveWithinScope($pdo, $config, $playlistId, $itemId, 5);
     $pdo->commit();
 } catch (Throwable $throwable) {
-    if ($pdo->inTransaction()) {
-        $pdo->rollBack();
+    // Best effort: after a deadlock (1213) the server has already rolled back,
+    // inTransaction() may be stale and rollBack() may itself throw. Never let
+    // cleanup replace the original exception.
+    try {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+    } catch (Throwable) {
+        // ignored on purpose
     }
+
     throw $throwable;
 }
 ```

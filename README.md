@@ -75,6 +75,11 @@ composer require maatify/persistence
 | `PdoDeadlockRetryTransactionRunner`, `PdoDeadlockRetrySavepointTransactionRunner`, `InvalidTransactionConfigurationException` | **Unreleased** |
 | Deprecation of `PdoTransactionRunner` and `PdoSavepointTransactionRunner` | **Unreleased** (not deprecated in `v1.4.0`) |
 
+The first rows list API *availability* in `v1.4.0` only. A method present in
+`v1.4.0` can still behave differently from `main` when a later fix is listed as
+Unreleased (for example `moveWithinScope()`'s clamp), and the guides and examples
+describe `main`.
+
 *Unreleased* means merged to `main` but not tagged. A class that exists on
 `main` cannot be installed with `composer require maatify/persistence` until a
 release that contains it is tagged.
@@ -113,8 +118,16 @@ $ordering = new ScopedOrderingManager();
 $pdo->beginTransaction();
 
 try {
-    $pdo->prepare('SELECT `id` FROM `maa_shipping_methods` WHERE `id` = :id FOR UPDATE')
-        ->execute(['id' => 2]);
+    // Serialization precondition: the parent row exists, and EVERY writer that
+    // allocates a position in this scope takes this same lock first, before any
+    // non-locking read of its transaction. Without an existing, selected row
+    // nothing is locked.
+    $parentLock = $pdo->prepare('SELECT `id` FROM `maa_shipping_methods` WHERE `id` = :id FOR UPDATE');
+    $parentLock->execute(['id' => 2]);
+
+    if ($parentLock->fetchColumn() === false) {
+        throw new RuntimeException('Parent row 2 does not exist, so nothing was locked.');
+    }
 
     $nextPosition = $ordering->getNextPosition(
         pdo: $pdo,
@@ -122,17 +135,36 @@ try {
         scopeValue: 2, // Use null for global ordering
     );
 
-    // Insert the new row at $nextPosition using the same PDO connection.
+    // Insert on the same connection and in the same transaction, then commit
+    // (add your table's other columns).
+    $pdo->prepare('INSERT INTO `maa_shipping_rates` (`method_id`, `display_order`) VALUES (:method_id, :position)')
+        ->execute(['method_id' => 2, 'position' => $nextPosition]);
 
     $pdo->commit();
 } catch (Throwable $throwable) {
-    if ($pdo->inTransaction()) {
-        $pdo->rollBack();
+    // Best effort: a failing cleanup must never replace the original exception
+    // (after a deadlock, 1213, the server has already rolled the transaction
+    // back and inTransaction() can be stale, so rollBack() itself may throw).
+    try {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+    } catch (Throwable) {
+        // Ignored on purpose; the original $throwable is rethrown below.
     }
 
     throw $throwable;
 }
+```
 
+This is **error propagation in a transaction you own**, not a retry: the block
+always ends the transaction and rethrows the original exception unchanged, so a
+`PDOException` with driver code `1213` reaches your caller intact. Re-running the
+whole unit of work after `1213` is a separate, deliberate decision of the code
+that owns the transaction (see [Deadlock `1213` Is Fatal](#-deadlock-1213-is-fatal-to-the-surrounding-transaction));
+the package's own opt-in replay is Unreleased.
+
+```php
 // 3. Move an existing row within its scope
 $success = $ordering->moveWithinScope(
     pdo: $pdo,

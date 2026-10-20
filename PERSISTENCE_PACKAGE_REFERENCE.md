@@ -19,8 +19,12 @@
   stale-snapshot clamp fix (Issue #33), `PdoDeadlockRetryTransactionRunner`,
   `PdoDeadlockRetrySavepointTransactionRunner`,
   `InvalidTransactionConfigurationException`, and the deprecation of
-  `PdoTransactionRunner` / `PdoSavepointTransactionRunner`. Everything else
-  documented here is part of `v1.4.0`.
+  `PdoTransactionRunner` / `PdoSavepointTransactionRunner`. The other public
+  classes and methods listed in this Reference are present in `v1.4.0`; this
+  states API availability only. Behavior, fixes and examples described here
+  reflect `main` and may differ from the tagged release (for example, the
+  `moveWithinScope()` clamp fix above), so do not assume that every behavior in
+  this document is in `v1.4.0`.
 
 ## Persistence and Schema Ownership
 
