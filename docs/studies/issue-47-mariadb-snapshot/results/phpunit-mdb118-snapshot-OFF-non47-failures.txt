@@ -1,0 +1,8 @@
+# integration suite, mdb118, innodb_snapshot_isolation=OFF (Issue #47 effect removed), base 0685d77
+Tests: 163, Assertions: 1065, Errors: 2.
+1) Maatify\Persistence\Tests\Integration\Pdo\Transaction\PdoDeadlockRetrySavepointTransactionRunnerParityIntegrationTest
+Failed asserting that '11.8.9-MariaDB-ubu2404' matches PCRE pattern "/^8\.4\./".
+
+2) Maatify\Persistence\Tests\Integration\Pdo\Transaction\PdoSavepointTransactionRunnerIntegrationTest
+Failed asserting that '11.8.9-MariaDB-ubu2404' matches PCRE pattern "/^8\.4\./".
+
