@@ -1,0 +1,70 @@
+== P5 8.0.46 innodb_snapshot_isolation=(absent)
+  none (baseline)                                                getNextPositionForUpdate ok: 6          [[1,1],[1,2],[1,3],[2,1],[2,2]]
+  none (baseline)                                                moveWithinScope(1->5)    ok: true       [[1,5],[1,1],[1,2],[2,1],[2,2],[1,3],[1,4]]
+  R1 SET SESSION snapshot_isolation=OFF before BEGIN             getNextPositionForUpdate ok: 6          [[1,1],[1,2],[1,3],[2,1],[2,2]]
+  R1 SET SESSION snapshot_isolation=OFF before BEGIN             moveWithinScope(1->5)    ok: true       [[1,5],[1,1],[1,2],[2,1],[2,2],[1,3],[1,4]]
+  R2 SET SESSION snapshot_isolation=OFF after snapshot (mid-txn) getNextPositionForUpdate ok: 6          [[1,1],[1,2],[1,3],[2,1],[2,2]]
+  R2 SET SESSION snapshot_isolation=OFF after snapshot (mid-txn) moveWithinScope(1->5)    ok: true       [[1,5],[1,1],[1,2],[2,1],[2,2],[1,3],[1,4]]
+  R3 SET TRANSACTION ISOLATION LEVEL READ COMMITTED before BEGIN getNextPositionForUpdate ok: 6          [[1,1],[1,2],[1,3],[2,1],[2,2],[1,4],[1,5]]
+  R3 SET TRANSACTION ISOLATION LEVEL READ COMMITTED before BEGIN moveWithinScope(1->5)    ok: true       [[1,5],[1,1],[1,2],[2,1],[2,2],[1,3],[1,4]]
+  R4 SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED      getNextPositionForUpdate ok: 6          [[1,1],[1,2],[1,3],[2,1],[2,2],[1,4],[1,5]]
+  R4 SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED      moveWithinScope(1->5)    ok: true       [[1,5],[1,1],[1,2],[2,1],[2,2],[1,3],[1,4]]
+  R5 scope lock taken BEFORE the first plain read                getNextPositionForUpdate concurrent writer blocked by remedy lock (ERR 1205) - correct serialization, nothing to read
+  R5 scope lock taken BEFORE the first plain read                moveWithinScope(1->5)    concurrent writer blocked by remedy lock (ERR 1205) - correct serialization, nothing to read
+  R6 caller restarts the whole transaction on 1020               getNextPositionForUpdate first=ok: 6, restarted=ok: 6
+== P5 8.4.10 innodb_snapshot_isolation=(absent)
+  none (baseline)                                                getNextPositionForUpdate ok: 6          [[1,1],[1,2],[1,3],[2,1],[2,2]]
+  none (baseline)                                                moveWithinScope(1->5)    ok: true       [[1,5],[1,1],[1,2],[2,1],[2,2],[1,3],[1,4]]
+  R1 SET SESSION snapshot_isolation=OFF before BEGIN             getNextPositionForUpdate ok: 6          [[1,1],[1,2],[1,3],[2,1],[2,2]]
+  R1 SET SESSION snapshot_isolation=OFF before BEGIN             moveWithinScope(1->5)    ok: true       [[1,5],[1,1],[1,2],[2,1],[2,2],[1,3],[1,4]]
+  R2 SET SESSION snapshot_isolation=OFF after snapshot (mid-txn) getNextPositionForUpdate ok: 6          [[1,1],[1,2],[1,3],[2,1],[2,2]]
+  R2 SET SESSION snapshot_isolation=OFF after snapshot (mid-txn) moveWithinScope(1->5)    ok: true       [[1,5],[1,1],[1,2],[2,1],[2,2],[1,3],[1,4]]
+  R3 SET TRANSACTION ISOLATION LEVEL READ COMMITTED before BEGIN getNextPositionForUpdate ok: 6          [[1,1],[1,2],[1,3],[2,1],[2,2],[1,4],[1,5]]
+  R3 SET TRANSACTION ISOLATION LEVEL READ COMMITTED before BEGIN moveWithinScope(1->5)    ok: true       [[1,5],[1,1],[1,2],[2,1],[2,2],[1,3],[1,4]]
+  R4 SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED      getNextPositionForUpdate ok: 6          [[1,1],[1,2],[1,3],[2,1],[2,2],[1,4],[1,5]]
+  R4 SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED      moveWithinScope(1->5)    ok: true       [[1,5],[1,1],[1,2],[2,1],[2,2],[1,3],[1,4]]
+  R5 scope lock taken BEFORE the first plain read                getNextPositionForUpdate concurrent writer blocked by remedy lock (ERR 1205) - correct serialization, nothing to read
+  R5 scope lock taken BEFORE the first plain read                moveWithinScope(1->5)    concurrent writer blocked by remedy lock (ERR 1205) - correct serialization, nothing to read
+  R6 caller restarts the whole transaction on 1020               getNextPositionForUpdate first=ok: 6, restarted=ok: 6
+== P5 10.11.18-MariaDB-ubu2204 innodb_snapshot_isolation=0
+  none (baseline)                                                getNextPositionForUpdate ok: 6          [[1,1],[1,2],[1,3],[2,1],[2,2]]
+  none (baseline)                                                moveWithinScope(1->5)    ok: true       [[1,5],[1,1],[1,2],[2,1],[2,2],[1,3],[1,4]]
+  R1 SET SESSION snapshot_isolation=OFF before BEGIN             getNextPositionForUpdate ok: 6          [[1,1],[1,2],[1,3],[2,1],[2,2]]
+  R1 SET SESSION snapshot_isolation=OFF before BEGIN             moveWithinScope(1->5)    ok: true       [[1,5],[1,1],[1,2],[2,1],[2,2],[1,3],[1,4]]
+  R2 SET SESSION snapshot_isolation=OFF after snapshot (mid-txn) getNextPositionForUpdate ok: 6          [[1,1],[1,2],[1,3],[2,1],[2,2]]
+  R2 SET SESSION snapshot_isolation=OFF after snapshot (mid-txn) moveWithinScope(1->5)    ok: true       [[1,5],[1,1],[1,2],[2,1],[2,2],[1,3],[1,4]]
+  R3 SET TRANSACTION ISOLATION LEVEL READ COMMITTED before BEGIN getNextPositionForUpdate ok: 6          [[1,1],[1,2],[1,3],[2,1],[2,2],[1,4],[1,5]]
+  R3 SET TRANSACTION ISOLATION LEVEL READ COMMITTED before BEGIN moveWithinScope(1->5)    ok: true       [[1,5],[1,1],[1,2],[2,1],[2,2],[1,3],[1,4]]
+  R4 SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED      getNextPositionForUpdate ok: 6          [[1,1],[1,2],[1,3],[2,1],[2,2],[1,4],[1,5]]
+  R4 SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED      moveWithinScope(1->5)    ok: true       [[1,5],[1,1],[1,2],[2,1],[2,2],[1,3],[1,4]]
+  R5 scope lock taken BEFORE the first plain read                getNextPositionForUpdate concurrent writer blocked by remedy lock (ERR 1205) - correct serialization, nothing to read
+  R5 scope lock taken BEFORE the first plain read                moveWithinScope(1->5)    concurrent writer blocked by remedy lock (ERR 1205) - correct serialization, nothing to read
+  R6 caller restarts the whole transaction on 1020               getNextPositionForUpdate first=ok: 6, restarted=ok: 6
+== P5 11.4.7-MariaDB-ubu2404 innodb_snapshot_isolation=0
+  none (baseline)                                                getNextPositionForUpdate ok: 6          [[1,1],[1,2],[1,3],[2,1],[2,2]]
+  none (baseline)                                                moveWithinScope(1->5)    ok: true       [[1,5],[1,1],[1,2],[2,1],[2,2],[1,3],[1,4]]
+  R1 SET SESSION snapshot_isolation=OFF before BEGIN             getNextPositionForUpdate ok: 6          [[1,1],[1,2],[1,3],[2,1],[2,2]]
+  R1 SET SESSION snapshot_isolation=OFF before BEGIN             moveWithinScope(1->5)    ok: true       [[1,5],[1,1],[1,2],[2,1],[2,2],[1,3],[1,4]]
+  R2 SET SESSION snapshot_isolation=OFF after snapshot (mid-txn) getNextPositionForUpdate ok: 6          [[1,1],[1,2],[1,3],[2,1],[2,2]]
+  R2 SET SESSION snapshot_isolation=OFF after snapshot (mid-txn) moveWithinScope(1->5)    ok: true       [[1,5],[1,1],[1,2],[2,1],[2,2],[1,3],[1,4]]
+  R3 SET TRANSACTION ISOLATION LEVEL READ COMMITTED before BEGIN getNextPositionForUpdate ok: 6          [[1,1],[1,2],[1,3],[2,1],[2,2],[1,4],[1,5]]
+  R3 SET TRANSACTION ISOLATION LEVEL READ COMMITTED before BEGIN moveWithinScope(1->5)    ok: true       [[1,5],[1,1],[1,2],[2,1],[2,2],[1,3],[1,4]]
+  R4 SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED      getNextPositionForUpdate ok: 6          [[1,1],[1,2],[1,3],[2,1],[2,2],[1,4],[1,5]]
+  R4 SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED      moveWithinScope(1->5)    ok: true       [[1,5],[1,1],[1,2],[2,1],[2,2],[1,3],[1,4]]
+  R5 scope lock taken BEFORE the first plain read                getNextPositionForUpdate concurrent writer blocked by remedy lock (ERR 1205) - correct serialization, nothing to read
+  R5 scope lock taken BEFORE the first plain read                moveWithinScope(1->5)    concurrent writer blocked by remedy lock (ERR 1205) - correct serialization, nothing to read
+  R6 caller restarts the whole transaction on 1020               getNextPositionForUpdate first=ok: 6, restarted=ok: 6
+== P5 11.8.9-MariaDB-ubu2404 innodb_snapshot_isolation=1
+  none (baseline)                                                getNextPositionForUpdate ERR 1020       -
+  none (baseline)                                                moveWithinScope(1->5)    ERR 1020       -
+  R1 SET SESSION snapshot_isolation=OFF before BEGIN             getNextPositionForUpdate ok: 6          [[1,1],[1,2],[1,3],[2,1],[2,2]]
+  R1 SET SESSION snapshot_isolation=OFF before BEGIN             moveWithinScope(1->5)    ok: true       [[1,5],[1,1],[1,2],[2,1],[2,2],[1,3],[1,4]]
+  R2 SET SESSION snapshot_isolation=OFF after snapshot (mid-txn) getNextPositionForUpdate ok: 6          [[1,1],[1,2],[1,3],[2,1],[2,2]]
+  R2 SET SESSION snapshot_isolation=OFF after snapshot (mid-txn) moveWithinScope(1->5)    ok: true       [[1,5],[1,1],[1,2],[2,1],[2,2],[1,3],[1,4]]
+  R3 SET TRANSACTION ISOLATION LEVEL READ COMMITTED before BEGIN getNextPositionForUpdate ok: 6          [[1,1],[1,2],[1,3],[2,1],[2,2],[1,4],[1,5]]
+  R3 SET TRANSACTION ISOLATION LEVEL READ COMMITTED before BEGIN moveWithinScope(1->5)    ok: true       [[1,5],[1,1],[1,2],[2,1],[2,2],[1,3],[1,4]]
+  R4 SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED      getNextPositionForUpdate ok: 6          [[1,1],[1,2],[1,3],[2,1],[2,2],[1,4],[1,5]]
+  R4 SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED      moveWithinScope(1->5)    ok: true       [[1,5],[1,1],[1,2],[2,1],[2,2],[1,3],[1,4]]
+  R5 scope lock taken BEFORE the first plain read                getNextPositionForUpdate concurrent writer blocked by remedy lock (ERR 1205) - correct serialization, nothing to read
+  R5 scope lock taken BEFORE the first plain read                moveWithinScope(1->5)    concurrent writer blocked by remedy lock (ERR 1205) - correct serialization, nothing to read
+  R6 caller restarts the whole transaction on 1020               getNextPositionForUpdate first=ERR 1020, restarted=ok: 6

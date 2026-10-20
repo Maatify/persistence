@@ -1,0 +1,70 @@
+== P2 8.0.46 innodb_snapshot_isolation=(absent)
+statement \ concurrent change    | other INSERT (1,4)             | other UPDATE row id=3          | other soft-DELETE id=3         | other INSERT other scope (2,9) | NO concurrent change          
+FOR UPDATE tail (DESC LIMIT 1)   | ok: '1 row(s)'                 | ok: '1 row(s)'                 | ok: '1 row(s)'                 | ok: '1 row(s)'                 | ok: '1 row(s)'                
+LOCK IN SHARE MODE tail          | ok: '1 row(s)'                 | ok: '1 row(s)'                 | ok: '1 row(s)'                 | ok: '1 row(s)'                 | ok: '1 row(s)'                
+FOR UPDATE whole scope (ASC)     | ok: '4 row(s)'                 | ok: '3 row(s)'                 | ok: '2 row(s)'                 | ok: '3 row(s)'                 | ok: '3 row(s)'                
+FOR UPDATE id=1 (untouched row)  | ok: '1 row(s)'                 | ok: '1 row(s)'                 | ok: '1 row(s)'                 | ok: '1 row(s)'                 | ok: '1 row(s)'                
+FOR UPDATE NOWAIT tail           | ok: '1 row(s)'                 | ok: '1 row(s)'                 | ok: '1 row(s)'                 | ok: '1 row(s)'                 | ok: '1 row(s)'                
+FOR UPDATE SKIP LOCKED tail      | ok: '1 row(s)'                 | ok: '1 row(s)'                 | ok: '1 row(s)'                 | ok: '1 row(s)'                 | ok: '1 row(s)'                
+UPDATE untouched row id=1        | ok: '0 row(s)'                 | ok: '0 row(s)'                 | ok: '0 row(s)'                 | ok: '0 row(s)'                 | ok: '0 row(s)'                
+UPDATE scope range (shift)       | ok: '0 row(s)'                 | ok: '0 row(s)'                 | ok: '0 row(s)'                 | ok: '0 row(s)'                 | ok: '0 row(s)'                
+plain INSERT (1,99)              | ok: '0 row(s)'                 | ok: '0 row(s)'                 | ok: '0 row(s)'                 | ok: '0 row(s)'                 | ok: '0 row(s)'                
+plain SELECT MAX (non-locking)   | ok: '1 row(s)'                 | ok: '1 row(s)'                 | ok: '1 row(s)'                 | ok: '1 row(s)'                 | ok: '1 row(s)'                
+first-statement FOR UPDATE tail, change committed after BEGIN but before it: ok: 4
+  ...then FOR UPDATE of an unrelated row changed by a commit after the first locking read: ok: 2
+== P2 8.4.10 innodb_snapshot_isolation=(absent)
+statement \ concurrent change    | other INSERT (1,4)             | other UPDATE row id=3          | other soft-DELETE id=3         | other INSERT other scope (2,9) | NO concurrent change          
+FOR UPDATE tail (DESC LIMIT 1)   | ok: '1 row(s)'                 | ok: '1 row(s)'                 | ok: '1 row(s)'                 | ok: '1 row(s)'                 | ok: '1 row(s)'                
+LOCK IN SHARE MODE tail          | ok: '1 row(s)'                 | ok: '1 row(s)'                 | ok: '1 row(s)'                 | ok: '1 row(s)'                 | ok: '1 row(s)'                
+FOR UPDATE whole scope (ASC)     | ok: '4 row(s)'                 | ok: '3 row(s)'                 | ok: '2 row(s)'                 | ok: '3 row(s)'                 | ok: '3 row(s)'                
+FOR UPDATE id=1 (untouched row)  | ok: '1 row(s)'                 | ok: '1 row(s)'                 | ok: '1 row(s)'                 | ok: '1 row(s)'                 | ok: '1 row(s)'                
+FOR UPDATE NOWAIT tail           | ok: '1 row(s)'                 | ok: '1 row(s)'                 | ok: '1 row(s)'                 | ok: '1 row(s)'                 | ok: '1 row(s)'                
+FOR UPDATE SKIP LOCKED tail      | ok: '1 row(s)'                 | ok: '1 row(s)'                 | ok: '1 row(s)'                 | ok: '1 row(s)'                 | ok: '1 row(s)'                
+UPDATE untouched row id=1        | ok: '0 row(s)'                 | ok: '0 row(s)'                 | ok: '0 row(s)'                 | ok: '0 row(s)'                 | ok: '0 row(s)'                
+UPDATE scope range (shift)       | ok: '0 row(s)'                 | ok: '0 row(s)'                 | ok: '0 row(s)'                 | ok: '0 row(s)'                 | ok: '0 row(s)'                
+plain INSERT (1,99)              | ok: '0 row(s)'                 | ok: '0 row(s)'                 | ok: '0 row(s)'                 | ok: '0 row(s)'                 | ok: '0 row(s)'                
+plain SELECT MAX (non-locking)   | ok: '1 row(s)'                 | ok: '1 row(s)'                 | ok: '1 row(s)'                 | ok: '1 row(s)'                 | ok: '1 row(s)'                
+first-statement FOR UPDATE tail, change committed after BEGIN but before it: ok: 4
+  ...then FOR UPDATE of an unrelated row changed by a commit after the first locking read: ok: 2
+== P2 10.11.18-MariaDB-ubu2204 innodb_snapshot_isolation=0
+statement \ concurrent change    | other INSERT (1,4)             | other UPDATE row id=3          | other soft-DELETE id=3         | other INSERT other scope (2,9) | NO concurrent change          
+FOR UPDATE tail (DESC LIMIT 1)   | ok: '1 row(s)'                 | ok: '1 row(s)'                 | ok: '1 row(s)'                 | ok: '1 row(s)'                 | ok: '1 row(s)'                
+LOCK IN SHARE MODE tail          | ok: '1 row(s)'                 | ok: '1 row(s)'                 | ok: '1 row(s)'                 | ok: '1 row(s)'                 | ok: '1 row(s)'                
+FOR UPDATE whole scope (ASC)     | ok: '4 row(s)'                 | ok: '3 row(s)'                 | ok: '2 row(s)'                 | ok: '3 row(s)'                 | ok: '3 row(s)'                
+FOR UPDATE id=1 (untouched row)  | ok: '1 row(s)'                 | ok: '1 row(s)'                 | ok: '1 row(s)'                 | ok: '1 row(s)'                 | ok: '1 row(s)'                
+FOR UPDATE NOWAIT tail           | ok: '1 row(s)'                 | ok: '1 row(s)'                 | ok: '1 row(s)'                 | ok: '1 row(s)'                 | ok: '1 row(s)'                
+FOR UPDATE SKIP LOCKED tail      | ok: '1 row(s)'                 | ok: '1 row(s)'                 | ok: '1 row(s)'                 | ok: '1 row(s)'                 | ok: '1 row(s)'                
+UPDATE untouched row id=1        | ok: '0 row(s)'                 | ok: '0 row(s)'                 | ok: '0 row(s)'                 | ok: '0 row(s)'                 | ok: '0 row(s)'                
+UPDATE scope range (shift)       | ok: '0 row(s)'                 | ok: '0 row(s)'                 | ok: '0 row(s)'                 | ok: '0 row(s)'                 | ok: '0 row(s)'                
+plain INSERT (1,99)              | ok: '0 row(s)'                 | ok: '0 row(s)'                 | ok: '0 row(s)'                 | ok: '0 row(s)'                 | ok: '0 row(s)'                
+plain SELECT MAX (non-locking)   | ok: '1 row(s)'                 | ok: '1 row(s)'                 | ok: '1 row(s)'                 | ok: '1 row(s)'                 | ok: '1 row(s)'                
+first-statement FOR UPDATE tail, change committed after BEGIN but before it: ok: 4
+  ...then FOR UPDATE of an unrelated row changed by a commit after the first locking read: ok: 2
+== P2 11.4.7-MariaDB-ubu2404 innodb_snapshot_isolation=0
+statement \ concurrent change    | other INSERT (1,4)             | other UPDATE row id=3          | other soft-DELETE id=3         | other INSERT other scope (2,9) | NO concurrent change          
+FOR UPDATE tail (DESC LIMIT 1)   | ok: '1 row(s)'                 | ok: '1 row(s)'                 | ok: '1 row(s)'                 | ok: '1 row(s)'                 | ok: '1 row(s)'                
+LOCK IN SHARE MODE tail          | ok: '1 row(s)'                 | ok: '1 row(s)'                 | ok: '1 row(s)'                 | ok: '1 row(s)'                 | ok: '1 row(s)'                
+FOR UPDATE whole scope (ASC)     | ok: '4 row(s)'                 | ok: '3 row(s)'                 | ok: '2 row(s)'                 | ok: '3 row(s)'                 | ok: '3 row(s)'                
+FOR UPDATE id=1 (untouched row)  | ok: '1 row(s)'                 | ok: '1 row(s)'                 | ok: '1 row(s)'                 | ok: '1 row(s)'                 | ok: '1 row(s)'                
+FOR UPDATE NOWAIT tail           | ok: '1 row(s)'                 | ok: '1 row(s)'                 | ok: '1 row(s)'                 | ok: '1 row(s)'                 | ok: '1 row(s)'                
+FOR UPDATE SKIP LOCKED tail      | ok: '1 row(s)'                 | ok: '1 row(s)'                 | ok: '1 row(s)'                 | ok: '1 row(s)'                 | ok: '1 row(s)'                
+UPDATE untouched row id=1        | ok: '0 row(s)'                 | ok: '0 row(s)'                 | ok: '0 row(s)'                 | ok: '0 row(s)'                 | ok: '0 row(s)'                
+UPDATE scope range (shift)       | ok: '0 row(s)'                 | ok: '0 row(s)'                 | ok: '0 row(s)'                 | ok: '0 row(s)'                 | ok: '0 row(s)'                
+plain INSERT (1,99)              | ok: '0 row(s)'                 | ok: '0 row(s)'                 | ok: '0 row(s)'                 | ok: '0 row(s)'                 | ok: '0 row(s)'                
+plain SELECT MAX (non-locking)   | ok: '1 row(s)'                 | ok: '1 row(s)'                 | ok: '1 row(s)'                 | ok: '1 row(s)'                 | ok: '1 row(s)'                
+first-statement FOR UPDATE tail, change committed after BEGIN but before it: ok: 4
+  ...then FOR UPDATE of an unrelated row changed by a commit after the first locking read: ok: 2
+== P2 11.8.9-MariaDB-ubu2404 innodb_snapshot_isolation=1
+statement \ concurrent change    | other INSERT (1,4)             | other UPDATE row id=3          | other soft-DELETE id=3         | other INSERT other scope (2,9) | NO concurrent change          
+FOR UPDATE tail (DESC LIMIT 1)   | ERR 1020                       | ERR 1020                       | ERR 1020                       | ok: '1 row(s)'                 | ok: '1 row(s)'                
+LOCK IN SHARE MODE tail          | ERR 1020                       | ERR 1020                       | ERR 1020                       | ok: '1 row(s)'                 | ok: '1 row(s)'                
+FOR UPDATE whole scope (ASC)     | ERR 1020                       | ERR 1020                       | ERR 1020                       | ok: '3 row(s)'                 | ok: '3 row(s)'                
+FOR UPDATE id=1 (untouched row)  | ok: '1 row(s)'                 | ok: '1 row(s)'                 | ok: '1 row(s)'                 | ok: '1 row(s)'                 | ok: '1 row(s)'                
+FOR UPDATE NOWAIT tail           | ERR 1020                       | ERR 1020                       | ERR 1020                       | ok: '1 row(s)'                 | ok: '1 row(s)'                
+FOR UPDATE SKIP LOCKED tail      | ERR 1020                       | ERR 1020                       | ERR 1020                       | ok: '1 row(s)'                 | ok: '1 row(s)'                
+UPDATE untouched row id=1        | ok: '0 row(s)'                 | ok: '0 row(s)'                 | ok: '0 row(s)'                 | ok: '0 row(s)'                 | ok: '0 row(s)'                
+UPDATE scope range (shift)       | ok: '0 row(s)'                 | ERR 1020                       | ERR 1020                       | ok: '0 row(s)'                 | ok: '0 row(s)'                
+plain INSERT (1,99)              | ok: '0 row(s)'                 | ok: '0 row(s)'                 | ok: '0 row(s)'                 | ok: '0 row(s)'                 | ok: '0 row(s)'                
+plain SELECT MAX (non-locking)   | ok: '1 row(s)'                 | ok: '1 row(s)'                 | ok: '1 row(s)'                 | ok: '1 row(s)'                 | ok: '1 row(s)'                
+first-statement FOR UPDATE tail, change committed after BEGIN but before it: ok: 4
+  ...then FOR UPDATE of an unrelated row changed by a commit after the first locking read: ok: 2
