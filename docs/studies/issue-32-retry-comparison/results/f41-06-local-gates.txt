@@ -1,0 +1,81 @@
+# F41-06 — local repository gates (CONTRIBUTING.md parity sequence) on the final tree
+base a75a41a; HEAD before the review-fix commit: 061b3c9e1f36499a5235163c2383f96c821fed66; PHP 8.5.9; Composer version 2.10.2 2026-07-01 11:24:45
+Database: mysql:8.4.11 in Docker, CI credentials/database from CONTRIBUTING.md, started with --log-bin-trust-function-creators=1 (the CI workflow sets the same global before the suite). Two earlier attempts are recorded honestly: against 8.0.46 the suite's own 'server must be 8.4.x' assertion fails (TransactionSavepointIntegrationTestCase.php:72); against 8.4.11 without the trust flag 5 failure-injector tests fail with error 1419 (trigger creation). Both are environment prerequisites, not code defects; this log is the run with the CI-equivalent prerequisites.
+
+## $ composer install --no-interaction --no-progress
+Nothing to install, update or remove
+Generating optimized autoload files
+57 packages you are using are looking for funding.
+Use the `composer fund` command to find out more!
+exit=0
+
+## $ composer validate --strict
+./composer.json is valid
+exit=0
+
+## $ composer dump-autoload --optimize --strict-psr
+Generating optimized autoload files
+Generated optimized autoload files containing 2728 classes
+exit=0
+
+## $ composer check-platform-reqs
+ext-phar      8.5.9      success                                       
+ext-tokenizer 8.5.9      success                                       
+ext-xmlwriter 8.5.9      success                                       
+php           8.5.9      success                                       
+exit=0
+
+## $ composer audit --no-interaction --abandoned=fail
+No security vulnerability advisories found.
+exit=0
+
+## $ composer analyse
+ 74/74 [▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓] 100%
+
+
+ [OK] No errors                                                                 
+exit=0
+
+## $ composer test:unit
+
+Time: 00:00.108, Memory: 12.00 MB
+
+OK (260 tests, 487 assertions)
+exit=0
+
+## $ composer test:regression
+
+Time: 00:00.029, Memory: 10.00 MB
+
+OK (51 tests, 621 assertions)
+exit=0
+
+## $ composer test:integration
+
+Time: 00:31.678, Memory: 14.00 MB
+
+OK (153 tests, 639 assertions)
+exit=0
+
+## $ composer test:consumer
+3. No caller transaction: owned transaction committed -> [b, c, a].
+OK: 01_move_after_older_snapshot
+Consumer run 2 passed.
+Consumer Verification Harness passed: two clean Composer consumer and MySQL runs completed.
+exit=0
+
+## $ vendor/bin/php-cs-fixer fix --dry-run --diff
+ 74/74 [▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓] 100%
+
+
+Found 0 of 74 files that can be fixed in 2.063 seconds, 20.00 MB memory used
+exit=0
+
+## $ git diff --check
+
+exit=0
+
+## $ actionlint
+exit=0
+
+ALL-DONE

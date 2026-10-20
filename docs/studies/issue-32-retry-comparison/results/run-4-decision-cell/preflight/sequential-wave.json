@@ -1,0 +1,89 @@
+{
+    "at": "2026-10-19T21:30:11+00:00",
+    "checks": [
+        {
+            "name": "@@performance_schema = 1",
+            "pass": true,
+            "detail": null
+        },
+        {
+            "name": "setup_consumers.global_instrumentation = YES",
+            "pass": true,
+            "detail": null
+        },
+        {
+            "name": "setup_consumers.thread_instrumentation = YES",
+            "pass": true,
+            "detail": null
+        },
+        {
+            "name": "setup_consumers.events_transactions_current = YES",
+            "pass": true,
+            "detail": null
+        },
+        {
+            "name": "setup_instruments 'transaction' enabled",
+            "pass": true,
+            "detail": {
+                "ENABLED": "YES",
+                "TIMED": "YES"
+            }
+        },
+        {
+            "name": "study connection thread is INSTRUMENTED",
+            "pass": true,
+            "detail": null
+        },
+        {
+            "name": "control: no ACTIVE transaction before the probe",
+            "pass": true,
+            "detail": null
+        },
+        {
+            "name": "positive control: per-retry probe sees the open transaction",
+            "pass": true,
+            "detail": [
+                {
+                    "STATE": "ACTIVE",
+                    "ISOLATION_LEVEL": "REPEATABLE READ"
+                }
+            ]
+        },
+        {
+            "name": "positive control: end-of-run probe sees the open transaction",
+            "pass": true,
+            "detail": [
+                {
+                    "THREAD_ID": 72,
+                    "STATE": "ACTIVE"
+                }
+            ]
+        },
+        {
+            "name": "positive control: INNODB_TRX sees the open transaction (after cache expiry)",
+            "pass": true,
+            "detail": 1
+        },
+        {
+            "name": "positive control: PDO::inTransaction() is true",
+            "pass": true,
+            "detail": null
+        },
+        {
+            "name": "control: per-retry probe empty after rollback",
+            "pass": true,
+            "detail": null
+        },
+        {
+            "name": "control: end-of-run probe empty after rollback",
+            "pass": true,
+            "detail": null
+        },
+        {
+            "name": "control: INNODB_TRX empty after rollback",
+            "pass": true,
+            "detail": null
+        }
+    ],
+    "pass": true
+}

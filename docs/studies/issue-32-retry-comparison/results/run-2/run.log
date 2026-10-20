@@ -1,0 +1,695 @@
+PASS 1213+40001 is retried until success
+PASS 1213 with SQLSTATE HY000 is NOT retried
+PASS 1205 lock wait timeout is NOT retried
+PASS 1062 duplicate key is NOT retried
+PASS non-PDO Throwable is NOT retried
+PASS transaction still active after a deadlock => invalid, no retry
+PASS transaction active before the first attempt => invalid, runner never called
+PASS server reports an ACTIVE transaction before a retry => invalid, no retry
+PASS Immediate exhausts after exactly 4 attempts, no sleeps
+PASS Hybrid: 4 attempts, retry1 immediate, retry2 in [0,10ms], retry3 in [0,20ms], none after exhaustion (200 seeds)
+PASS policy none: exactly one attempt
+PASS analyzer: a complete, matched, consistent set validates
+PASS analyzer: missing Hybrid file for a round is rejected
+PASS analyzer: undeclared extra / stale run file is rejected
+PASS analyzer: summary op count != raw / manifest is rejected
+PASS analyzer: summary outcome counts != raw outcomes are rejected
+PASS analyzer: duplicate operation ids are rejected
+PASS analyzer: file name / summary metadata mismatch (stale or duplicated run) is rejected
+PASS analyzer: client deadlock count != raw 1213 attempts is rejected
+PASS analyzer: runs from different harness versions are rejected
+PASS analyzer: missing manifest is rejected
+PASS analyzer: legacy attempt records (no SQLSTATE) are rejected unless --allow-legacy=1
+PASS reuse guard: first run into a fresh directory succeeds
+PASS reuse guard: second run into the same directory/tag is refused
+PASS reuse guard: --resume=1 with the same configuration is accepted
+PASS reuse guard: same tag with different parameters is refused even with --resume=1
+PASS analyzer accepts the freshly produced real-MySQL evidence set
+PASS analyzer refuses the same set after a run file is deleted
+PASS observer sensitivity: preflight FAILS when events_transactions_current is disabled
+PASS observer sensitivity: preflight passes again once restored
+
+30 tests, 0 failed
+diagnosis written to ../results/run-2/diagnosis.json
+[sequential-wave c=2 r=1 immediate #1] ok=400 exhausted=0 err=0 deadlocks(client/server)=200/200 active=2.43s integrity=OK
+[sequential-wave c=2 r=1 hybrid    #2] ok=400 exhausted=0 err=0 deadlocks(client/server)=200/200 active=2.33s integrity=OK
+[sequential-wave c=2 r=2 hybrid    #1] ok=400 exhausted=0 err=0 deadlocks(client/server)=199/199 active=2.30s integrity=OK
+[sequential-wave c=2 r=2 immediate #2] ok=400 exhausted=0 err=0 deadlocks(client/server)=200/200 active=2.55s integrity=OK
+[sequential-wave c=2 r=3 immediate #1] ok=400 exhausted=0 err=0 deadlocks(client/server)=200/200 active=2.35s integrity=OK
+[sequential-wave c=2 r=3 hybrid    #2] ok=400 exhausted=0 err=0 deadlocks(client/server)=200/200 active=2.57s integrity=OK
+[sequential-wave c=2 r=4 hybrid    #1] ok=400 exhausted=0 err=0 deadlocks(client/server)=199/199 active=2.67s integrity=OK
+[sequential-wave c=2 r=4 immediate #2] ok=400 exhausted=0 err=0 deadlocks(client/server)=200/200 active=2.70s integrity=OK
+[sequential-wave c=2 r=5 immediate #1] ok=400 exhausted=0 err=0 deadlocks(client/server)=200/200 active=2.99s integrity=OK
+[sequential-wave c=2 r=5 hybrid    #2] ok=400 exhausted=0 err=0 deadlocks(client/server)=200/200 active=2.53s integrity=OK
+[sequential-wave c=2 r=6 hybrid    #1] ok=400 exhausted=0 err=0 deadlocks(client/server)=199/199 active=3.20s integrity=OK
+[sequential-wave c=2 r=6 immediate #2] ok=400 exhausted=0 err=0 deadlocks(client/server)=199/199 active=5.00s integrity=OK
+[sequential-wave c=2 r=7 immediate #1] ok=400 exhausted=0 err=0 deadlocks(client/server)=200/200 active=3.19s integrity=OK
+[sequential-wave c=2 r=7 hybrid    #2] ok=400 exhausted=0 err=0 deadlocks(client/server)=200/200 active=3.93s integrity=OK
+[sequential-wave c=2 r=8 hybrid    #1] ok=400 exhausted=0 err=0 deadlocks(client/server)=200/200 active=3.89s integrity=OK
+[sequential-wave c=2 r=8 immediate #2] ok=400 exhausted=0 err=0 deadlocks(client/server)=199/199 active=4.54s integrity=OK
+[sequential-wave c=2 r=9 immediate #1] ok=400 exhausted=0 err=0 deadlocks(client/server)=196/196 active=4.67s integrity=OK
+[sequential-wave c=2 r=9 hybrid    #2] ok=400 exhausted=0 err=0 deadlocks(client/server)=200/200 active=2.63s integrity=OK
+[sequential-wave c=2 r=10 hybrid    #1] ok=400 exhausted=0 err=0 deadlocks(client/server)=200/200 active=2.78s integrity=OK
+[sequential-wave c=2 r=10 immediate #2] ok=400 exhausted=0 err=0 deadlocks(client/server)=200/200 active=3.53s integrity=OK
+[sequential-wave c=4 r=1 immediate #1] ok=400 exhausted=0 err=0 deadlocks(client/server)=472/472 active=3.55s integrity=OK
+[sequential-wave c=4 r=1 hybrid    #2] ok=400 exhausted=0 err=0 deadlocks(client/server)=451/451 active=4.75s integrity=OK
+[sequential-wave c=4 r=2 hybrid    #1] ok=400 exhausted=0 err=0 deadlocks(client/server)=451/451 active=4.00s integrity=OK
+[sequential-wave c=4 r=2 immediate #2] ok=400 exhausted=0 err=0 deadlocks(client/server)=452/452 active=2.57s integrity=OK
+[sequential-wave c=4 r=3 immediate #1] ok=400 exhausted=0 err=0 deadlocks(client/server)=466/466 active=2.69s integrity=OK
+[sequential-wave c=4 r=3 hybrid    #2] ok=400 exhausted=0 err=0 deadlocks(client/server)=459/459 active=4.33s integrity=OK
+[sequential-wave c=4 r=4 hybrid    #1] ok=400 exhausted=0 err=0 deadlocks(client/server)=446/446 active=5.31s integrity=OK
+[sequential-wave c=4 r=4 immediate #2] ok=400 exhausted=0 err=0 deadlocks(client/server)=480/480 active=3.08s integrity=OK
+[sequential-wave c=4 r=5 immediate #1] ok=400 exhausted=0 err=0 deadlocks(client/server)=479/479 active=2.69s integrity=OK
+[sequential-wave c=4 r=5 hybrid    #2] ok=400 exhausted=0 err=0 deadlocks(client/server)=441/441 active=4.72s integrity=OK
+[sequential-wave c=4 r=6 hybrid    #1] ok=400 exhausted=0 err=0 deadlocks(client/server)=454/454 active=8.25s integrity=OK
+[sequential-wave c=4 r=6 immediate #2] ok=400 exhausted=0 err=0 deadlocks(client/server)=395/395 active=23.32s integrity=OK
+[sequential-wave c=4 r=7 immediate #1] ok=400 exhausted=0 err=0 deadlocks(client/server)=484/484 active=2.91s integrity=OK
+[sequential-wave c=4 r=7 hybrid    #2] ok=400 exhausted=0 err=0 deadlocks(client/server)=452/452 active=4.67s integrity=OK
+[sequential-wave c=4 r=8 hybrid    #1] ok=400 exhausted=0 err=0 deadlocks(client/server)=449/449 active=7.45s integrity=OK
+[sequential-wave c=4 r=8 immediate #2] ok=400 exhausted=0 err=0 deadlocks(client/server)=446/446 active=8.25s integrity=OK
+[sequential-wave c=4 r=9 immediate #1] ok=400 exhausted=0 err=0 deadlocks(client/server)=418/418 active=10.36s integrity=OK
+[sequential-wave c=4 r=9 hybrid    #2] ok=400 exhausted=0 err=0 deadlocks(client/server)=458/458 active=3.37s integrity=OK
+[sequential-wave c=4 r=10 hybrid    #1] ok=400 exhausted=0 err=0 deadlocks(client/server)=451/451 active=3.54s integrity=OK
+[sequential-wave c=4 r=10 immediate #2] ok=400 exhausted=0 err=0 deadlocks(client/server)=473/473 active=3.16s integrity=OK
+[sequential-wave c=8 r=1 immediate #1] ok=347 exhausted=53 err=0 deadlocks(client/server)=791/791 active=2.45s integrity=OK
+[sequential-wave c=8 r=1 hybrid    #2] ok=400 exhausted=0 err=0 deadlocks(client/server)=631/631 active=2.51s integrity=OK
+[sequential-wave c=8 r=2 hybrid    #1] ok=400 exhausted=0 err=0 deadlocks(client/server)=650/650 active=2.56s integrity=OK
+[sequential-wave c=8 r=2 immediate #2] ok=345 exhausted=55 err=0 deadlocks(client/server)=805/805 active=2.16s integrity=OK
+[sequential-wave c=8 r=3 immediate #1] ok=339 exhausted=61 err=0 deadlocks(client/server)=824/824 active=2.15s integrity=OK
+[sequential-wave c=8 r=3 hybrid    #2] ok=400 exhausted=0 err=0 deadlocks(client/server)=649/649 active=2.50s integrity=OK
+[sequential-wave c=8 r=4 hybrid    #1] ok=399 exhausted=1 err=0 deadlocks(client/server)=641/641 active=2.50s integrity=OK
+[sequential-wave c=8 r=4 immediate #2] ok=340 exhausted=60 err=0 deadlocks(client/server)=812/812 active=2.19s integrity=OK
+[sequential-wave c=8 r=5 immediate #1] ok=351 exhausted=49 err=0 deadlocks(client/server)=773/773 active=2.30s integrity=OK
+[sequential-wave c=8 r=5 hybrid    #2] ok=397 exhausted=3 err=0 deadlocks(client/server)=654/654 active=2.69s integrity=OK
+[sequential-wave c=8 r=6 hybrid    #1] ok=400 exhausted=0 err=0 deadlocks(client/server)=631/631 active=2.46s integrity=OK
+[sequential-wave c=8 r=6 immediate #2] ok=351 exhausted=49 err=0 deadlocks(client/server)=772/772 active=2.18s integrity=OK
+[sequential-wave c=8 r=7 immediate #1] ok=342 exhausted=58 err=0 deadlocks(client/server)=822/822 active=2.23s integrity=OK
+[sequential-wave c=8 r=7 hybrid    #2] ok=399 exhausted=1 err=0 deadlocks(client/server)=643/643 active=2.93s integrity=OK
+[sequential-wave c=8 r=8 hybrid    #1] ok=397 exhausted=3 err=0 deadlocks(client/server)=655/655 active=4.14s integrity=OK
+[sequential-wave c=8 r=8 immediate #2] ok=353 exhausted=47 err=0 deadlocks(client/server)=709/709 active=7.33s integrity=OK
+[sequential-wave c=8 r=9 immediate #1] ok=364 exhausted=36 err=0 deadlocks(client/server)=637/637 active=8.07s integrity=OK
+[sequential-wave c=8 r=9 hybrid    #2] ok=399 exhausted=1 err=0 deadlocks(client/server)=616/616 active=4.53s integrity=OK
+[sequential-wave c=8 r=10 hybrid    #1] ok=397 exhausted=3 err=0 deadlocks(client/server)=659/659 active=4.03s integrity=OK
+[sequential-wave c=8 r=10 immediate #2] ok=365 exhausted=35 err=0 deadlocks(client/server)=635/635 active=8.65s integrity=OK
+[sequential-wave c=16 r=1 immediate #1] ok=326 exhausted=74 err=0 deadlocks(client/server)=812/812 active=4.64s integrity=OK
+[sequential-wave c=16 r=1 hybrid    #2] ok=396 exhausted=4 err=0 deadlocks(client/server)=822/822 active=1.96s integrity=OK
+[sequential-wave c=16 r=2 hybrid    #1] ok=387 exhausted=13 err=0 deadlocks(client/server)=845/845 active=2.56s integrity=OK
+[sequential-wave c=16 r=2 immediate #2] ok=283 exhausted=117 err=0 deadlocks(client/server)=1005/1005 active=3.68s integrity=OK
+[sequential-wave c=16 r=3 immediate #1] ok=244 exhausted=156 err=0 deadlocks(client/server)=1079/1079 active=2.16s integrity=OK
+[sequential-wave c=16 r=3 hybrid    #2] ok=371 exhausted=29 err=0 deadlocks(client/server)=871/871 active=5.37s integrity=OK
+[sequential-wave c=16 r=4 hybrid    #1] ok=367 exhausted=33 err=0 deadlocks(client/server)=891/891 active=4.10s integrity=OK
+[sequential-wave c=16 r=4 immediate #2] ok=280 exhausted=120 err=0 deadlocks(client/server)=1000/1000 active=2.18s integrity=OK
+[sequential-wave c=16 r=5 immediate #1] ok=285 exhausted=115 err=0 deadlocks(client/server)=1025/1025 active=2.53s integrity=OK
+[sequential-wave c=16 r=5 hybrid    #2] ok=391 exhausted=9 err=0 deadlocks(client/server)=827/827 active=2.00s integrity=OK
+[sequential-wave c=16 r=6 hybrid    #1] ok=389 exhausted=11 err=0 deadlocks(client/server)=820/820 active=2.16s integrity=OK
+[sequential-wave c=16 r=6 immediate #2] ok=275 exhausted=125 err=0 deadlocks(client/server)=1017/1017 active=2.71s integrity=OK
+[sequential-wave c=16 r=7 immediate #1] ok=287 exhausted=113 err=0 deadlocks(client/server)=1014/1014 active=2.42s integrity=OK
+[sequential-wave c=16 r=7 hybrid    #2] ok=391 exhausted=9 err=0 deadlocks(client/server)=827/827 active=2.04s integrity=OK
+[sequential-wave c=16 r=8 hybrid    #1] ok=386 exhausted=14 err=0 deadlocks(client/server)=850/850 active=2.63s integrity=OK
+[sequential-wave c=16 r=8 immediate #2] ok=288 exhausted=112 err=0 deadlocks(client/server)=984/984 active=3.94s integrity=OK
+[sequential-wave c=16 r=9 immediate #1] ok=279 exhausted=121 err=0 deadlocks(client/server)=995/995 active=3.82s integrity=OK
+[sequential-wave c=16 r=9 hybrid    #2] ok=315 exhausted=85 err=0 deadlocks(client/server)=934/934 active=15.23s integrity=OK
+[sequential-wave c=16 r=10 hybrid    #1] ok=379 exhausted=21 err=0 deadlocks(client/server)=840/840 active=2.68s integrity=OK
+[sequential-wave c=16 r=10 immediate #2] ok=284 exhausted=116 err=0 deadlocks(client/server)=1012/1012 active=2.43s integrity=OK
+[baseline-none c=2 r=1 none      #1] ok=203 exhausted=197 err=0 deadlocks(client/server)=197/197 active=2.02s integrity=OK
+[baseline-none c=2 r=2 none      #1] ok=202 exhausted=198 err=0 deadlocks(client/server)=198/198 active=2.14s integrity=OK
+[baseline-none c=2 r=3 none      #1] ok=202 exhausted=198 err=0 deadlocks(client/server)=198/198 active=2.09s integrity=OK
+[baseline-none c=2 r=4 none      #1] ok=203 exhausted=197 err=0 deadlocks(client/server)=197/197 active=2.03s integrity=OK
+[baseline-none c=2 r=5 none      #1] ok=203 exhausted=197 err=0 deadlocks(client/server)=197/197 active=2.06s integrity=OK
+[baseline-none c=8 r=1 none      #1] ok=52 exhausted=348 err=0 deadlocks(client/server)=348/348 active=0.68s integrity=OK
+[baseline-none c=8 r=2 none      #1] ok=50 exhausted=350 err=0 deadlocks(client/server)=350/350 active=0.82s integrity=OK
+[baseline-none c=8 r=3 none      #1] ok=59 exhausted=341 err=0 deadlocks(client/server)=341/341 active=0.88s integrity=OK
+[baseline-none c=8 r=4 none      #1] ok=56 exhausted=344 err=0 deadlocks(client/server)=344/344 active=0.81s integrity=OK
+[baseline-none c=8 r=5 none      #1] ok=56 exhausted=344 err=0 deadlocks(client/server)=344/344 active=0.81s integrity=OK
+[integrity-verify c=8 r=1 immediate #1] ok=340 exhausted=60 err=0 deadlocks(client/server)=803/803 active=5.20s integrity=OK
+[integrity-verify c=8 r=1 hybrid    #2] ok=396 exhausted=4 err=0 deadlocks(client/server)=598/598 active=11.53s integrity=OK
+[integrity-verify c=8 r=2 hybrid    #1] ok=395 exhausted=5 err=0 deadlocks(client/server)=548/548 active=8.26s integrity=OK
+[integrity-verify c=8 r=2 immediate #2] ok=353 exhausted=47 err=0 deadlocks(client/server)=756/756 active=6.23s integrity=OK
+[integrity-verify c=8 r=3 immediate #1] ok=342 exhausted=58 err=0 deadlocks(client/server)=781/781 active=7.39s integrity=OK
+[integrity-verify c=8 r=3 hybrid    #2] ok=398 exhausted=2 err=0 deadlocks(client/server)=566/566 active=8.00s integrity=OK
+[integrity-verify c=8 r=4 hybrid    #1] ok=400 exhausted=0 err=0 deadlocks(client/server)=553/553 active=3.80s integrity=OK
+[integrity-verify c=8 r=4 immediate #2] ok=352 exhausted=48 err=0 deadlocks(client/server)=777/777 active=3.15s integrity=OK
+[integrity-verify c=8 r=5 immediate #1] ok=359 exhausted=41 err=0 deadlocks(client/server)=757/757 active=4.11s integrity=OK
+[integrity-verify c=8 r=5 hybrid    #2] ok=399 exhausted=1 err=0 deadlocks(client/server)=635/635 active=2.54s integrity=OK
+[shuffled-wave c=2 r=1 immediate #1] ok=400 exhausted=0 err=0 deadlocks(client/server)=3/3 active=2.74s integrity=OK
+[shuffled-wave c=2 r=1 hybrid    #2] ok=400 exhausted=0 err=0 deadlocks(client/server)=3/3 active=2.75s integrity=OK
+[shuffled-wave c=2 r=2 hybrid    #1] ok=400 exhausted=0 err=0 deadlocks(client/server)=7/7 active=2.59s integrity=OK
+[shuffled-wave c=2 r=2 immediate #2] ok=400 exhausted=0 err=0 deadlocks(client/server)=7/7 active=2.59s integrity=OK
+[shuffled-wave c=2 r=3 immediate #1] ok=400 exhausted=0 err=0 deadlocks(client/server)=7/7 active=3.24s integrity=OK
+[shuffled-wave c=2 r=3 hybrid    #2] ok=400 exhausted=0 err=0 deadlocks(client/server)=7/7 active=2.71s integrity=OK
+[shuffled-wave c=2 r=4 hybrid    #1] ok=400 exhausted=0 err=0 deadlocks(client/server)=5/5 active=2.73s integrity=OK
+[shuffled-wave c=2 r=4 immediate #2] ok=400 exhausted=0 err=0 deadlocks(client/server)=5/5 active=2.89s integrity=OK
+[shuffled-wave c=2 r=5 immediate #1] ok=400 exhausted=0 err=0 deadlocks(client/server)=8/8 active=3.07s integrity=OK
+[shuffled-wave c=2 r=5 hybrid    #2] ok=400 exhausted=0 err=0 deadlocks(client/server)=7/7 active=2.65s integrity=OK
+[shuffled-wave c=2 r=6 hybrid    #1] ok=400 exhausted=0 err=0 deadlocks(client/server)=5/5 active=2.28s integrity=OK
+[shuffled-wave c=2 r=6 immediate #2] ok=400 exhausted=0 err=0 deadlocks(client/server)=5/5 active=2.10s integrity=OK
+[shuffled-wave c=2 r=7 immediate #1] ok=400 exhausted=0 err=0 deadlocks(client/server)=5/5 active=2.31s integrity=OK
+[shuffled-wave c=2 r=7 hybrid    #2] ok=400 exhausted=0 err=0 deadlocks(client/server)=5/5 active=3.87s integrity=OK
+[shuffled-wave c=2 r=8 hybrid    #1] ok=400 exhausted=0 err=0 deadlocks(client/server)=2/2 active=2.61s integrity=OK
+[shuffled-wave c=2 r=8 immediate #2] ok=400 exhausted=0 err=0 deadlocks(client/server)=2/2 active=2.17s integrity=OK
+[shuffled-wave c=2 r=9 immediate #1] ok=400 exhausted=0 err=0 deadlocks(client/server)=5/5 active=2.41s integrity=OK
+[shuffled-wave c=2 r=9 hybrid    #2] ok=400 exhausted=0 err=0 deadlocks(client/server)=5/5 active=3.01s integrity=OK
+[shuffled-wave c=2 r=10 hybrid    #1] ok=400 exhausted=0 err=0 deadlocks(client/server)=13/13 active=2.79s integrity=OK
+[shuffled-wave c=2 r=10 immediate #2] ok=400 exhausted=0 err=0 deadlocks(client/server)=13/13 active=2.81s integrity=OK
+[shuffled-wave c=8 r=1 immediate #1] ok=400 exhausted=0 err=0 deadlocks(client/server)=23/23 active=1.11s integrity=OK
+[shuffled-wave c=8 r=1 hybrid    #2] ok=400 exhausted=0 err=0 deadlocks(client/server)=17/17 active=3.39s integrity=OK
+[shuffled-wave c=8 r=2 hybrid    #1] ok=400 exhausted=0 err=0 deadlocks(client/server)=33/33 active=6.44s integrity=OK
+[shuffled-wave c=8 r=2 immediate #2] ok=400 exhausted=0 err=0 deadlocks(client/server)=31/31 active=2.26s integrity=OK
+[shuffled-wave c=8 r=3 immediate #1] ok=397 exhausted=3 err=0 deadlocks(client/server)=45/45 active=2.10s integrity=OK
+[shuffled-wave c=8 r=3 hybrid    #2] ok=400 exhausted=0 err=0 deadlocks(client/server)=33/33 active=1.14s integrity=OK
+[shuffled-wave c=8 r=4 hybrid    #1] ok=400 exhausted=0 err=0 deadlocks(client/server)=22/22 active=1.37s integrity=OK
+[shuffled-wave c=8 r=4 immediate #2] ok=400 exhausted=0 err=0 deadlocks(client/server)=13/13 active=1.47s integrity=OK
+[shuffled-wave c=8 r=5 immediate #1] ok=400 exhausted=0 err=0 deadlocks(client/server)=25/25 active=1.03s integrity=OK
+[shuffled-wave c=8 r=5 hybrid    #2] ok=400 exhausted=0 err=0 deadlocks(client/server)=21/21 active=1.50s integrity=OK
+[shuffled-wave c=8 r=6 hybrid    #1] ok=400 exhausted=0 err=0 deadlocks(client/server)=45/45 active=0.91s integrity=OK
+[shuffled-wave c=8 r=6 immediate #2] ok=397 exhausted=3 err=0 deadlocks(client/server)=56/56 active=0.77s integrity=OK
+[shuffled-wave c=8 r=7 immediate #1] ok=400 exhausted=0 err=0 deadlocks(client/server)=49/49 active=0.90s integrity=OK
+[shuffled-wave c=8 r=7 hybrid    #2] ok=400 exhausted=0 err=0 deadlocks(client/server)=45/45 active=0.78s integrity=OK
+[shuffled-wave c=8 r=8 hybrid    #1] ok=400 exhausted=0 err=0 deadlocks(client/server)=31/31 active=0.78s integrity=OK
+[shuffled-wave c=8 r=8 immediate #2] ok=400 exhausted=0 err=0 deadlocks(client/server)=24/24 active=1.05s integrity=OK
+[shuffled-wave c=8 r=9 immediate #1] ok=400 exhausted=0 err=0 deadlocks(client/server)=30/30 active=5.31s integrity=OK
+[shuffled-wave c=8 r=9 hybrid    #2] ok=400 exhausted=0 err=0 deadlocks(client/server)=31/31 active=0.99s integrity=OK
+[shuffled-wave c=8 r=10 hybrid    #1] ok=400 exhausted=0 err=0 deadlocks(client/server)=41/41 active=1.10s integrity=OK
+[shuffled-wave c=8 r=10 immediate #2] ok=399 exhausted=1 err=0 deadlocks(client/server)=40/40 active=5.31s integrity=OK
+[shuffled-wave c=16 r=1 immediate #1] ok=400 exhausted=0 err=0 deadlocks(client/server)=29/29 active=3.20s integrity=OK
+[shuffled-wave c=16 r=1 hybrid    #2] ok=400 exhausted=0 err=0 deadlocks(client/server)=42/42 active=1.02s integrity=OK
+[shuffled-wave c=16 r=2 hybrid    #1] ok=399 exhausted=1 err=0 deadlocks(client/server)=60/60 active=0.88s integrity=OK
+[shuffled-wave c=16 r=2 immediate #2] ok=400 exhausted=0 err=0 deadlocks(client/server)=39/39 active=0.83s integrity=OK
+[shuffled-wave c=16 r=3 immediate #1] ok=396 exhausted=4 err=0 deadlocks(client/server)=90/90 active=0.69s integrity=OK
+[shuffled-wave c=16 r=3 hybrid    #2] ok=400 exhausted=0 err=0 deadlocks(client/server)=66/66 active=1.68s integrity=OK
+[shuffled-wave c=16 r=4 hybrid    #1] ok=399 exhausted=1 err=0 deadlocks(client/server)=73/73 active=1.44s integrity=OK
+[shuffled-wave c=16 r=4 immediate #2] ok=398 exhausted=2 err=0 deadlocks(client/server)=78/78 active=1.36s integrity=OK
+[shuffled-wave c=16 r=5 immediate #1] ok=400 exhausted=0 err=0 deadlocks(client/server)=36/36 active=1.70s integrity=OK
+[shuffled-wave c=16 r=5 hybrid    #2] ok=400 exhausted=0 err=0 deadlocks(client/server)=50/50 active=3.40s integrity=OK
+[shuffled-wave c=16 r=6 hybrid    #1] ok=400 exhausted=0 err=0 deadlocks(client/server)=55/55 active=1.99s integrity=OK
+[shuffled-wave c=16 r=6 immediate #2] ok=400 exhausted=0 err=0 deadlocks(client/server)=36/36 active=0.76s integrity=OK
+[shuffled-wave c=16 r=7 immediate #1] ok=396 exhausted=4 err=0 deadlocks(client/server)=77/77 active=0.69s integrity=OK
+[shuffled-wave c=16 r=7 hybrid    #2] ok=400 exhausted=0 err=0 deadlocks(client/server)=65/65 active=1.43s integrity=OK
+[shuffled-wave c=16 r=8 hybrid    #1] ok=400 exhausted=0 err=0 deadlocks(client/server)=51/51 active=1.80s integrity=OK
+[shuffled-wave c=16 r=8 immediate #2] ok=400 exhausted=0 err=0 deadlocks(client/server)=68/68 active=0.69s integrity=OK
+[shuffled-wave c=16 r=9 immediate #1] ok=395 exhausted=5 err=0 deadlocks(client/server)=70/70 active=0.67s integrity=OK
+[shuffled-wave c=16 r=9 hybrid    #2] ok=400 exhausted=0 err=0 deadlocks(client/server)=67/67 active=0.96s integrity=OK
+[shuffled-wave c=16 r=10 hybrid    #1] ok=395 exhausted=5 err=0 deadlocks(client/server)=85/85 active=0.74s integrity=OK
+[shuffled-wave c=16 r=10 immediate #2] ok=391 exhausted=9 err=0 deadlocks(client/server)=96/96 active=0.84s integrity=OK
+[sequential-free c=4 r=1 immediate #1] ok=400 exhausted=0 err=0 deadlocks(client/server)=15/15 active=1.24s integrity=OK
+[sequential-free c=4 r=1 hybrid    #2] ok=400 exhausted=0 err=0 deadlocks(client/server)=7/7 active=3.76s integrity=OK
+[sequential-free c=4 r=2 hybrid    #1] ok=400 exhausted=0 err=0 deadlocks(client/server)=9/9 active=1.57s integrity=OK
+[sequential-free c=4 r=2 immediate #2] ok=400 exhausted=0 err=0 deadlocks(client/server)=5/5 active=2.11s integrity=OK
+[sequential-free c=4 r=3 immediate #1] ok=400 exhausted=0 err=0 deadlocks(client/server)=7/7 active=0.94s integrity=OK
+[sequential-free c=4 r=3 hybrid    #2] ok=400 exhausted=0 err=0 deadlocks(client/server)=4/4 active=1.01s integrity=OK
+[sequential-free c=4 r=4 hybrid    #1] ok=400 exhausted=0 err=0 deadlocks(client/server)=10/10 active=1.38s integrity=OK
+[sequential-free c=4 r=4 immediate #2] ok=400 exhausted=0 err=0 deadlocks(client/server)=6/6 active=1.13s integrity=OK
+[sequential-free c=4 r=5 immediate #1] ok=400 exhausted=0 err=0 deadlocks(client/server)=6/6 active=1.25s integrity=OK
+[sequential-free c=4 r=5 hybrid    #2] ok=400 exhausted=0 err=0 deadlocks(client/server)=6/6 active=6.44s integrity=OK
+[sequential-free c=4 r=6 hybrid    #1] ok=400 exhausted=0 err=0 deadlocks(client/server)=5/5 active=1.79s integrity=OK
+[sequential-free c=4 r=6 immediate #2] ok=400 exhausted=0 err=0 deadlocks(client/server)=11/11 active=1.39s integrity=OK
+[sequential-free c=4 r=7 immediate #1] ok=400 exhausted=0 err=0 deadlocks(client/server)=13/13 active=1.16s integrity=OK
+[sequential-free c=4 r=7 hybrid    #2] ok=400 exhausted=0 err=0 deadlocks(client/server)=13/13 active=1.01s integrity=OK
+[sequential-free c=4 r=8 hybrid    #1] ok=400 exhausted=0 err=0 deadlocks(client/server)=13/13 active=1.00s integrity=OK
+[sequential-free c=4 r=8 immediate #2] ok=400 exhausted=0 err=0 deadlocks(client/server)=6/6 active=1.11s integrity=OK
+[sequential-free c=4 r=9 immediate #1] ok=400 exhausted=0 err=0 deadlocks(client/server)=5/5 active=1.18s integrity=OK
+[sequential-free c=4 r=9 hybrid    #2] ok=400 exhausted=0 err=0 deadlocks(client/server)=9/9 active=0.88s integrity=OK
+[sequential-free c=4 r=10 hybrid    #1] ok=400 exhausted=0 err=0 deadlocks(client/server)=6/6 active=1.18s integrity=OK
+[sequential-free c=4 r=10 immediate #2] ok=400 exhausted=0 err=0 deadlocks(client/server)=5/5 active=1.04s integrity=OK
+[sequential-free c=8 r=1 immediate #1] ok=400 exhausted=0 err=0 deadlocks(client/server)=15/15 active=0.79s integrity=OK
+[sequential-free c=8 r=1 hybrid    #2] ok=400 exhausted=0 err=0 deadlocks(client/server)=24/24 active=0.84s integrity=OK
+[sequential-free c=8 r=2 hybrid    #1] ok=400 exhausted=0 err=0 deadlocks(client/server)=19/19 active=0.84s integrity=OK
+[sequential-free c=8 r=2 immediate #2] ok=399 exhausted=1 err=0 deadlocks(client/server)=31/31 active=0.85s integrity=OK
+[sequential-free c=8 r=3 immediate #1] ok=397 exhausted=3 err=0 deadlocks(client/server)=43/43 active=0.90s integrity=OK
+[sequential-free c=8 r=3 hybrid    #2] ok=400 exhausted=0 err=0 deadlocks(client/server)=18/18 active=0.88s integrity=OK
+[sequential-free c=8 r=4 hybrid    #1] ok=400 exhausted=0 err=0 deadlocks(client/server)=18/18 active=0.83s integrity=OK
+[sequential-free c=8 r=4 immediate #2] ok=398 exhausted=2 err=0 deadlocks(client/server)=23/23 active=0.85s integrity=OK
+[sequential-free c=8 r=5 immediate #1] ok=399 exhausted=1 err=0 deadlocks(client/server)=24/24 active=0.85s integrity=OK
+[sequential-free c=8 r=5 hybrid    #2] ok=400 exhausted=0 err=0 deadlocks(client/server)=33/33 active=0.93s integrity=OK
+[sequential-free c=8 r=6 hybrid    #1] ok=400 exhausted=0 err=0 deadlocks(client/server)=22/22 active=0.81s integrity=OK
+[sequential-free c=8 r=6 immediate #2] ok=396 exhausted=4 err=0 deadlocks(client/server)=26/26 active=0.87s integrity=OK
+[sequential-free c=8 r=7 immediate #1] ok=399 exhausted=1 err=0 deadlocks(client/server)=25/25 active=0.85s integrity=OK
+[sequential-free c=8 r=7 hybrid    #2] ok=400 exhausted=0 err=0 deadlocks(client/server)=22/22 active=0.88s integrity=OK
+[sequential-free c=8 r=8 hybrid    #1] ok=400 exhausted=0 err=0 deadlocks(client/server)=16/16 active=0.89s integrity=OK
+[sequential-free c=8 r=8 immediate #2] ok=400 exhausted=0 err=0 deadlocks(client/server)=33/33 active=0.98s integrity=OK
+[sequential-free c=8 r=9 immediate #1] ok=400 exhausted=0 err=0 deadlocks(client/server)=14/14 active=0.92s integrity=OK
+[sequential-free c=8 r=9 hybrid    #2] ok=400 exhausted=0 err=0 deadlocks(client/server)=20/20 active=0.83s integrity=OK
+[sequential-free c=8 r=10 hybrid    #1] ok=400 exhausted=0 err=0 deadlocks(client/server)=17/17 active=0.86s integrity=OK
+[sequential-free c=8 r=10 immediate #2] ok=397 exhausted=3 err=0 deadlocks(client/server)=41/41 active=0.90s integrity=OK
+[sequential-free c=16 r=1 immediate #1] ok=396 exhausted=4 err=0 deadlocks(client/server)=63/63 active=1.02s integrity=OK
+[sequential-free c=16 r=1 hybrid    #2] ok=400 exhausted=0 err=0 deadlocks(client/server)=61/61 active=0.66s integrity=OK
+[sequential-free c=16 r=2 hybrid    #1] ok=400 exhausted=0 err=0 deadlocks(client/server)=49/49 active=0.66s integrity=OK
+[sequential-free c=16 r=2 immediate #2] ok=390 exhausted=10 err=0 deadlocks(client/server)=115/115 active=0.82s integrity=OK
+[sequential-free c=16 r=3 immediate #1] ok=400 exhausted=0 err=0 deadlocks(client/server)=75/75 active=0.68s integrity=OK
+[sequential-free c=16 r=3 hybrid    #2] ok=400 exhausted=0 err=0 deadlocks(client/server)=49/49 active=0.80s integrity=OK
+[sequential-free c=16 r=4 hybrid    #1] ok=398 exhausted=2 err=0 deadlocks(client/server)=71/71 active=0.89s integrity=OK
+[sequential-free c=16 r=4 immediate #2] ok=400 exhausted=0 err=0 deadlocks(client/server)=46/46 active=0.60s integrity=OK
+[sequential-free c=16 r=5 immediate #1] ok=399 exhausted=1 err=0 deadlocks(client/server)=48/48 active=0.58s integrity=OK
+[sequential-free c=16 r=5 hybrid    #2] ok=400 exhausted=0 err=0 deadlocks(client/server)=26/26 active=1.22s integrity=OK
+[sequential-free c=16 r=6 hybrid    #1] ok=400 exhausted=0 err=0 deadlocks(client/server)=36/36 active=4.92s integrity=OK
+[sequential-free c=16 r=6 immediate #2] ok=400 exhausted=0 err=0 deadlocks(client/server)=34/34 active=3.57s integrity=OK
+[sequential-free c=16 r=7 immediate #1] ok=399 exhausted=1 err=0 deadlocks(client/server)=53/53 active=0.89s integrity=OK
+[sequential-free c=16 r=7 hybrid    #2] ok=400 exhausted=0 err=0 deadlocks(client/server)=24/24 active=0.78s integrity=OK
+[sequential-free c=16 r=8 hybrid    #1] ok=400 exhausted=0 err=0 deadlocks(client/server)=38/38 active=0.80s integrity=OK
+[sequential-free c=16 r=8 immediate #2] ok=398 exhausted=2 err=0 deadlocks(client/server)=44/44 active=0.58s integrity=OK
+[sequential-free c=16 r=9 immediate #1] ok=394 exhausted=6 err=0 deadlocks(client/server)=59/59 active=0.60s integrity=OK
+[sequential-free c=16 r=9 hybrid    #2] ok=399 exhausted=1 err=0 deadlocks(client/server)=50/50 active=0.87s integrity=OK
+[sequential-free c=16 r=10 hybrid    #1] ok=400 exhausted=0 err=0 deadlocks(client/server)=32/32 active=0.92s integrity=OK
+[sequential-free c=16 r=10 immediate #2] ok=400 exhausted=0 err=0 deadlocks(client/server)=35/35 active=2.89s integrity=OK
+# Analysis output — `run-2`
+
+Evidence validation: 220 declared run files present, matched and internally consistent.
+
+Generated by `harness/analyze.php`; all numbers derive from `runs/*.jsonl.gz`. Latencies in ms, throughput in successful ops per active second.
+
+## `baseline-none` — 2 connections
+
+| policy | rounds | ops | ok | exhausted % | original deadlock % of ops | attempts/op | integrity |
+|---|---:|---:|---:|---:|---:|---:|---|
+| none | 5 | 2000 | 1013 | 49.35 | 49.35 | 1.000 | pass |
+
+## `baseline-none` — 8 connections
+
+| policy | rounds | ops | ok | exhausted % | original deadlock % of ops | attempts/op | integrity |
+|---|---:|---:|---:|---:|---:|---:|---|
+| none | 5 | 2000 | 273 | 86.35 | 86.35 | 1.000 | pass |
+
+## `integrity-verify` — 8 connections
+
+| metric (pooled over 5 rounds) | Immediate | Hybrid |
+|---|---:|---:|
+| operations | 2000 | 2000 |
+| succeeded | 1746 | 1988 |
+| exhausted (4 attempts all 1213) | 254 | 12 |
+| exhausted rate % | 12.70 | 0.60 |
+| exhausted rate 95% Wilson % | 11.31–14.23 | 0.34–1.05 |
+| original deadlocks (attempt 1) | 1735 | 1623 |
+| repeated deadlocks (attempt ≥ 2) | 2139 | 1277 |
+| attempts per op | 2.810 | 2.444 |
+| goodput ops/s | 66.9 | 58.3 |
+| completed ops/s | 76.7 | 58.6 |
+| latency P50 ms (all ops) | 51.36 | 45.84 |
+| latency P95 ms (all ops) | 299.12 | 457.29 |
+| latency P99 ms (all ops) | 518.58 | 766.55 |
+| latency P95 ms (succeeded only) | 293.87 | 446.06 |
+| total jitter sleep ms | 0 | 7369 |
+| succeeded by attempts used | {"1":265,"2":494,"3":597,"4":390} | {"1":377,"2":572,"3":837,"4":202} |
+| integrity / guarantees (all runs) | pass | pass |
+
+**Criteria** — C1 exhaustion: pooled Δ=12.10 pp (95.3% relative), 95% CI of (Hybrid−Immediate) = [-13.65, -10.64] pp, rounds passing 5/5 (need 4) → **pass**; C2 goodput ratio 0.870 (completed-ops ratio 0.764, informational) → **fail**; C3 P95 Δ=158.17 ms (allowance 29.91 ms) → **fail**; C4 guarantees → **pass**; sufficient sample: yes.
+
+**Rule outcome for this cell:** `IMMEDIATE` — Hybrid fails C2 throughput, C3 P95 on an adequate sample.
+
+| round | first | Imm exh % | Hyb exh % | Δpp | rel | C1 | Imm goodput | Hyb goodput | Imm P95 | Hyb P95 |
+|---:|---|---:|---:|---:|---:|---|---:|---:|---:|---:|
+| 1 | I | 15.00 | 1.00 | 14.00 | 93% | win | 65.4 | 34.4 | 295.83 | 638.03 |
+| 2 | H | 11.75 | 1.25 | 10.50 | 89% | win | 56.7 | 47.8 | 362.96 | 387.05 |
+| 3 | I | 14.50 | 0.50 | 14.00 | 97% | win | 46.3 | 49.7 | 462.74 | 508.34 |
+| 4 | H | 12.00 | 0.00 | 12.00 | 100% | win | 111.7 | 105.4 | 77.75 | 88.01 |
+| 5 | I | 10.25 | 0.25 | 10.00 | 98% | win | 87.4 | 157.3 | 159.72 | 57.16 |
+
+## `sequential-free` — 4 connections
+
+| metric (pooled over 10 rounds) | Immediate | Hybrid |
+|---|---:|---:|
+| operations | 4000 | 4000 |
+| succeeded | 4000 | 4000 |
+| exhausted (4 attempts all 1213) | 0 | 0 |
+| exhausted rate % | 0.00 | 0.00 |
+| exhausted rate 95% Wilson % | 0.00–0.10 | 0.00–0.10 |
+| original deadlocks (attempt 1) | 53 | 62 |
+| repeated deadlocks (attempt ≥ 2) | 26 | 20 |
+| attempts per op | 1.020 | 1.021 |
+| goodput ops/s | 318.8 | 199.7 |
+| completed ops/s | 318.8 | 199.7 |
+| latency P50 ms (all ops) | 11.03 | 11.11 |
+| latency P95 ms (all ops) | 19.76 | 76.04 |
+| latency P99 ms (all ops) | 42.69 | 127.33 |
+| latency P95 ms (succeeded only) | 19.76 | 76.04 |
+| total jitter sleep ms | 0 | 132 |
+| succeeded by attempts used | {"1":3947,"2":33,"3":14,"4":6} | {"1":3938,"2":43,"3":18,"4":1} |
+| integrity / guarantees (all runs) | pass | pass |
+
+**Criteria** — C1 exhaustion: pooled Δ=0.00 pp (0.0% relative), 95% CI of (Hybrid−Immediate) = [-0.10, 0.10] pp, rounds passing 0/10 (need 8) → **fail**; C2 goodput ratio 0.627 (completed-ops ratio 0.627, informational) → **fail**; C3 P95 Δ=56.28 ms (allowance 10.00 ms) → **fail**; C4 guarantees → **pass**; sufficient sample: NO.
+
+**Rule outcome for this cell:** `INCONCLUSIVE` — sample insufficient (rounds, ops per round, or Immediate exhausted operations below the pre-registered minimum).
+
+| round | first | Imm exh % | Hyb exh % | Δpp | rel | C1 | Imm goodput | Hyb goodput | Imm P95 | Hyb P95 |
+|---:|---|---:|---:|---:|---:|---|---:|---:|---:|---:|
+| 1 | I | 0.00 | 0.00 | 0.00 | 0% | — | 323.4 | 106.3 | 16.09 | 118.17 |
+| 2 | H | 0.00 | 0.00 | 0.00 | 0% | — | 189.8 | 255.4 | 60.21 | 44.14 |
+| 3 | I | 0.00 | 0.00 | 0.00 | 0% | — | 426.7 | 395.5 | 12.36 | 14.34 |
+| 4 | H | 0.00 | 0.00 | 0.00 | 0% | — | 353.0 | 290.2 | 15.36 | 21.57 |
+| 5 | I | 0.00 | 0.00 | 0.00 | 0% | — | 318.9 | 62.1 | 20.73 | 133.99 |
+| 6 | H | 0.00 | 0.00 | 0.00 | 0% | — | 287.8 | 223.2 | 21.10 | 23.87 |
+| 7 | I | 0.00 | 0.00 | 0.00 | 0% | — | 345.7 | 395.1 | 17.88 | 14.35 |
+| 8 | H | 0.00 | 0.00 | 0.00 | 0% | — | 359.9 | 398.6 | 18.87 | 13.47 |
+| 9 | I | 0.00 | 0.00 | 0.00 | 0% | — | 339.0 | 453.3 | 16.97 | 12.59 |
+| 10 | H | 0.00 | 0.00 | 0.00 | 0% | — | 384.1 | 339.7 | 13.63 | 16.52 |
+
+## `sequential-free` — 8 connections
+
+| metric (pooled over 10 rounds) | Immediate | Hybrid |
+|---|---:|---:|
+| operations | 4000 | 4000 |
+| succeeded | 3985 | 4000 |
+| exhausted (4 attempts all 1213) | 15 | 0 |
+| exhausted rate % | 0.38 | 0.00 |
+| exhausted rate 95% Wilson % | 0.23–0.62 | 0.00–0.10 |
+| original deadlocks (attempt 1) | 150 | 137 |
+| repeated deadlocks (attempt ≥ 2) | 125 | 72 |
+| attempts per op | 1.065 | 1.052 |
+| goodput ops/s | 454.7 | 465.2 |
+| completed ops/s | 456.4 | 465.2 |
+| latency P50 ms (all ops) | 15.63 | 15.46 |
+| latency P95 ms (all ops) | 26.79 | 25.57 |
+| latency P99 ms (all ops) | 52.58 | 50.74 |
+| latency P95 ms (succeeded only) | 26.09 | 25.57 |
+| total jitter sleep ms | 0 | 409 |
+| succeeded by attempts used | {"1":3850,"2":79,"3":32,"4":24} | {"1":3863,"2":76,"3":50,"4":11} |
+| integrity / guarantees (all runs) | pass | pass |
+
+**Criteria** — C1 exhaustion: pooled Δ=0.38 pp (100.0% relative), 95% CI of (Hybrid−Immediate) = [-0.62, -0.20] pp, rounds passing 1/10 (need 8) → **fail**; C2 goodput ratio 1.023 (completed-ops ratio 1.019, informational) → **pass**; C3 P95 Δ=-1.22 ms (allowance 10.00 ms) → **pass**; C4 guarantees → **pass**; sufficient sample: NO.
+
+**Rule outcome for this cell:** `INCONCLUSIVE` — sample insufficient (rounds, ops per round, or Immediate exhausted operations below the pre-registered minimum).
+
+| round | first | Imm exh % | Hyb exh % | Δpp | rel | C1 | Imm goodput | Hyb goodput | Imm P95 | Hyb P95 |
+|---:|---|---:|---:|---:|---:|---|---:|---:|---:|---:|
+| 1 | I | 0.00 | 0.00 | 0.00 | 0% | — | 506.9 | 473.9 | 27.50 | 23.73 |
+| 2 | H | 0.25 | 0.00 | 0.25 | 100% | — | 470.9 | 477.0 | 24.40 | 22.56 |
+| 3 | I | 0.75 | 0.00 | 0.75 | 100% | — | 440.6 | 455.0 | 27.92 | 27.56 |
+| 4 | H | 0.50 | 0.00 | 0.50 | 100% | — | 467.0 | 484.2 | 25.20 | 21.53 |
+| 5 | I | 0.25 | 0.00 | 0.25 | 100% | — | 469.1 | 428.9 | 24.73 | 29.91 |
+| 6 | H | 1.00 | 0.00 | 1.00 | 100% | win | 455.0 | 492.2 | 25.24 | 25.99 |
+| 7 | I | 0.25 | 0.00 | 0.25 | 100% | — | 469.3 | 456.9 | 23.97 | 26.94 |
+| 8 | H | 0.00 | 0.00 | 0.00 | 0% | — | 406.8 | 447.1 | 29.16 | 23.64 |
+| 9 | I | 0.00 | 0.00 | 0.00 | 0% | — | 435.2 | 480.8 | 31.27 | 23.81 |
+| 10 | H | 0.75 | 0.00 | 0.75 | 100% | — | 440.5 | 463.5 | 28.28 | 23.18 |
+
+## `sequential-free` — 16 connections
+
+| metric (pooled over 10 rounds) | Immediate | Hybrid |
+|---|---:|---:|
+| operations | 4000 | 4000 |
+| succeeded | 3976 | 3997 |
+| exhausted (4 attempts all 1213) | 24 | 3 |
+| exhausted rate % | 0.60 | 0.08 |
+| exhausted rate 95% Wilson % | 0.40–0.89 | 0.03–0.22 |
+| original deadlocks (attempt 1) | 335 | 290 |
+| repeated deadlocks (attempt ≥ 2) | 237 | 146 |
+| attempts per op | 1.137 | 1.108 |
+| goodput ops/s | 324.9 | 319.2 |
+| completed ops/s | 326.9 | 319.4 |
+| latency P50 ms (all ops) | 23.79 | 24.83 |
+| latency P95 ms (all ops) | 199.99 | 189.70 |
+| latency P99 ms (all ops) | 296.16 | 317.99 |
+| latency P95 ms (succeeded only) | 203.44 | 189.87 |
+| total jitter sleep ms | 0 | 939 |
+| succeeded by attempts used | {"1":3665,"2":189,"3":79,"4":43} | {"1":3710,"2":184,"3":69,"4":34} |
+| integrity / guarantees (all runs) | pass | pass |
+
+**Criteria** — C1 exhaustion: pooled Δ=0.53 pp (87.5% relative), 95% CI of (Hybrid−Immediate) = [-0.82, -0.28] pp, rounds passing 3/10 (need 8) → **fail**; C2 goodput ratio 0.982 (completed-ops ratio 0.977, informational) → **pass**; C3 P95 Δ=-10.29 ms (allowance 20.00 ms) → **pass**; C4 guarantees → **pass**; sufficient sample: NO.
+
+**Rule outcome for this cell:** `INCONCLUSIVE` — sample insufficient (rounds, ops per round, or Immediate exhausted operations below the pre-registered minimum).
+
+| round | first | Imm exh % | Hyb exh % | Δpp | rel | C1 | Imm goodput | Hyb goodput | Imm P95 | Hyb P95 |
+|---:|---|---:|---:|---:|---:|---|---:|---:|---:|---:|
+| 1 | I | 1.00 | 0.00 | 1.00 | 100% | win | 388.6 | 606.2 | 76.88 | 44.80 |
+| 2 | H | 2.50 | 0.00 | 2.50 | 100% | win | 473.9 | 608.0 | 74.08 | 40.85 |
+| 3 | I | 0.00 | 0.00 | 0.00 | 0% | — | 586.6 | 499.0 | 46.30 | 65.75 |
+| 4 | H | 0.00 | 0.50 | -0.50 | 0% | — | 668.9 | 445.3 | 37.05 | 69.04 |
+| 5 | I | 0.25 | 0.00 | 0.25 | 100% | — | 682.9 | 328.3 | 37.01 | 153.60 |
+| 6 | H | 0.00 | 0.00 | 0.00 | 0% | — | 112.1 | 81.3 | 322.34 | 361.73 |
+| 7 | I | 0.25 | 0.00 | 0.25 | 100% | — | 448.5 | 514.3 | 65.60 | 57.99 |
+| 8 | H | 0.50 | 0.00 | 0.50 | 100% | — | 683.6 | 498.8 | 39.69 | 84.06 |
+| 9 | I | 1.50 | 0.25 | 1.25 | 83% | win | 654.1 | 457.3 | 38.46 | 57.19 |
+| 10 | H | 0.00 | 0.00 | 0.00 | 0% | — | 138.6 | 434.7 | 292.43 | 95.86 |
+
+## `sequential-wave` — 2 connections
+
+| metric (pooled over 10 rounds) | Immediate | Hybrid |
+|---|---:|---:|
+| operations | 4000 | 4000 |
+| succeeded | 4000 | 4000 |
+| exhausted (4 attempts all 1213) | 0 | 0 |
+| exhausted rate % | 0.00 | 0.00 |
+| exhausted rate 95% Wilson % | 0.00–0.10 | 0.00–0.10 |
+| original deadlocks (attempt 1) | 1994 | 1997 |
+| repeated deadlocks (attempt ≥ 2) | 0 | 0 |
+| attempts per op | 1.499 | 1.499 |
+| goodput ops/s | 117.8 | 138.7 |
+| completed ops/s | 117.8 | 138.7 |
+| latency P50 ms (all ops) | 11.14 | 10.47 |
+| latency P95 ms (all ops) | 26.86 | 20.69 |
+| latency P99 ms (all ops) | 46.88 | 36.86 |
+| latency P95 ms (succeeded only) | 26.86 | 20.69 |
+| total jitter sleep ms | 0 | 0 |
+| succeeded by attempts used | {"1":2006,"2":1994} | {"1":2003,"2":1997} |
+| integrity / guarantees (all runs) | pass | pass |
+
+**Criteria** — C1 exhaustion: pooled Δ=0.00 pp (0.0% relative), 95% CI of (Hybrid−Immediate) = [-0.10, 0.10] pp, rounds passing 0/10 (need 8) → **fail**; C2 goodput ratio 1.178 (completed-ops ratio 1.178, informational) → **pass**; C3 P95 Δ=-6.17 ms (allowance 10.00 ms) → **pass**; C4 guarantees → **pass**; sufficient sample: NO.
+
+**Rule outcome for this cell:** `INCONCLUSIVE` — sample insufficient (rounds, ops per round, or Immediate exhausted operations below the pre-registered minimum).
+
+| round | first | Imm exh % | Hyb exh % | Δpp | rel | C1 | Imm goodput | Hyb goodput | Imm P95 | Hyb P95 |
+|---:|---|---:|---:|---:|---:|---|---:|---:|---:|---:|
+| 1 | I | 0.00 | 0.00 | 0.00 | 0% | — | 164.8 | 171.7 | 15.60 | 14.03 |
+| 2 | H | 0.00 | 0.00 | 0.00 | 0% | — | 156.6 | 173.7 | 17.38 | 13.26 |
+| 3 | I | 0.00 | 0.00 | 0.00 | 0% | — | 170.2 | 155.9 | 14.30 | 16.03 |
+| 4 | H | 0.00 | 0.00 | 0.00 | 0% | — | 148.3 | 150.1 | 16.57 | 16.76 |
+| 5 | I | 0.00 | 0.00 | 0.00 | 0% | — | 133.8 | 157.9 | 22.74 | 13.82 |
+| 6 | H | 0.00 | 0.00 | 0.00 | 0% | — | 80.0 | 125.0 | 37.14 | 21.89 |
+| 7 | I | 0.00 | 0.00 | 0.00 | 0% | — | 125.5 | 101.8 | 23.08 | 32.29 |
+| 8 | H | 0.00 | 0.00 | 0.00 | 0% | — | 88.1 | 102.8 | 34.26 | 30.07 |
+| 9 | I | 0.00 | 0.00 | 0.00 | 0% | — | 85.6 | 151.9 | 39.87 | 15.48 |
+| 10 | H | 0.00 | 0.00 | 0.00 | 0% | — | 113.2 | 143.9 | 23.97 | 20.43 |
+
+## `sequential-wave` — 4 connections
+
+| metric (pooled over 10 rounds) | Immediate | Hybrid |
+|---|---:|---:|
+| operations | 4000 | 4000 |
+| succeeded | 4000 | 4000 |
+| exhausted (4 attempts all 1213) | 0 | 0 |
+| exhausted rate % | 0.00 | 0.00 |
+| exhausted rate 95% Wilson % | 0.00–0.10 | 0.00–0.10 |
+| original deadlocks (attempt 1) | 2927 | 2992 |
+| repeated deadlocks (attempt ≥ 2) | 1638 | 1520 |
+| attempts per op | 2.141 | 2.128 |
+| goodput ops/s | 63.9 | 79.4 |
+| completed ops/s | 63.9 | 79.4 |
+| latency P50 ms (all ops) | 22.77 | 23.49 |
+| latency P95 ms (all ops) | 177.72 | 86.29 |
+| latency P99 ms (all ops) | 541.35 | 284.64 |
+| latency P95 ms (succeeded only) | 177.72 | 86.29 |
+| total jitter sleep ms | 0 | 8070 |
+| succeeded by attempts used | {"1":1073,"2":1561,"3":1094,"4":272} | {"1":1008,"2":1555,"3":1354,"4":83} |
+| integrity / guarantees (all runs) | pass | pass |
+
+**Criteria** — C1 exhaustion: pooled Δ=0.00 pp (0.0% relative), 95% CI of (Hybrid−Immediate) = [-0.10, 0.10] pp, rounds passing 0/10 (need 8) → **fail**; C2 goodput ratio 1.242 (completed-ops ratio 1.242, informational) → **pass**; C3 P95 Δ=-91.44 ms (allowance 17.77 ms) → **pass**; C4 guarantees → **pass**; sufficient sample: NO.
+
+**Rule outcome for this cell:** `INCONCLUSIVE` — sample insufficient (rounds, ops per round, or Immediate exhausted operations below the pre-registered minimum).
+
+| round | first | Imm exh % | Hyb exh % | Δpp | rel | C1 | Imm goodput | Hyb goodput | Imm P95 | Hyb P95 |
+|---:|---|---:|---:|---:|---:|---|---:|---:|---:|---:|
+| 1 | I | 0.00 | 0.00 | 0.00 | 0% | — | 112.8 | 84.2 | 43.50 | 65.55 |
+| 2 | H | 0.00 | 0.00 | 0.00 | 0% | — | 155.5 | 100.0 | 30.98 | 52.26 |
+| 3 | I | 0.00 | 0.00 | 0.00 | 0% | — | 148.7 | 92.3 | 32.71 | 62.70 |
+| 4 | H | 0.00 | 0.00 | 0.00 | 0% | — | 129.8 | 75.3 | 41.35 | 108.08 |
+| 5 | I | 0.00 | 0.00 | 0.00 | 0% | — | 148.5 | 84.7 | 31.29 | 74.77 |
+| 6 | H | 0.00 | 0.00 | 0.00 | 0% | — | 17.2 | 48.5 | 651.25 | 247.91 |
+| 7 | I | 0.00 | 0.00 | 0.00 | 0% | — | 137.6 | 85.6 | 37.09 | 55.49 |
+| 8 | H | 0.00 | 0.00 | 0.00 | 0% | — | 48.5 | 53.7 | 265.37 | 232.36 |
+| 9 | I | 0.00 | 0.00 | 0.00 | 0% | — | 38.6 | 118.6 | 278.37 | 40.13 |
+| 10 | H | 0.00 | 0.00 | 0.00 | 0% | — | 126.8 | 113.0 | 40.14 | 45.22 |
+
+## `sequential-wave` — 8 connections
+
+| metric (pooled over 10 rounds) | Immediate | Hybrid |
+|---|---:|---:|
+| operations | 4000 | 4000 |
+| succeeded | 3497 | 3988 |
+| exhausted (4 attempts all 1213) | 503 | 12 |
+| exhausted rate % | 12.58 | 0.30 |
+| exhausted rate 95% Wilson % | 11.58–13.64 | 0.17–0.52 |
+| original deadlocks (attempt 1) | 3401 | 3482 |
+| repeated deadlocks (attempt ≥ 2) | 4179 | 2947 |
+| attempts per op | 2.769 | 2.604 |
+| goodput ops/s | 88.1 | 129.3 |
+| completed ops/s | 100.7 | 129.7 |
+| latency P50 ms (all ops) | 37.92 | 36.92 |
+| latency P95 ms (all ops) | 220.70 | 66.49 |
+| latency P99 ms (all ops) | 499.68 | 318.30 |
+| latency P95 ms (succeeded only) | 217.99 | 65.81 |
+| total jitter sleep ms | 0 | 16599 |
+| succeeded by attempts used | {"1":599,"2":1018,"3":1090,"4":790} | {"1":518,"2":961,"3":2107,"4":402} |
+| integrity / guarantees (all runs) | pass | pass |
+
+**Criteria** — C1 exhaustion: pooled Δ=12.28 pp (97.6% relative), 95% CI of (Hybrid−Immediate) = [-13.35, -11.26] pp, rounds passing 10/10 (need 8) → **pass**; C2 goodput ratio 1.468 (completed-ops ratio 1.287, informational) → **pass**; C3 P95 Δ=-154.22 ms (allowance 22.07 ms) → **pass**; C4 guarantees → **pass**; sufficient sample: yes.
+
+**Rule outcome for this cell:** `HYBRID` — all pre-registered criteria C1-C4 pass.
+
+| round | first | Imm exh % | Hyb exh % | Δpp | rel | C1 | Imm goodput | Hyb goodput | Imm P95 | Hyb P95 |
+|---:|---|---:|---:|---:|---:|---|---:|---:|---:|---:|
+| 1 | I | 13.25 | 0.00 | 13.25 | 100% | win | 141.5 | 159.5 | 57.56 | 57.30 |
+| 2 | H | 13.75 | 0.00 | 13.75 | 100% | win | 159.8 | 156.0 | 48.11 | 55.64 |
+| 3 | I | 15.25 | 0.00 | 15.25 | 100% | win | 157.9 | 159.9 | 48.76 | 57.59 |
+| 4 | H | 15.00 | 0.25 | 14.75 | 98% | win | 155.5 | 159.7 | 49.00 | 54.94 |
+| 5 | I | 12.25 | 0.75 | 11.50 | 94% | win | 152.5 | 147.5 | 58.93 | 62.73 |
+| 6 | H | 12.25 | 0.00 | 12.25 | 100% | win | 161.1 | 162.7 | 50.24 | 53.84 |
+| 7 | I | 14.50 | 0.25 | 14.25 | 98% | win | 153.2 | 136.3 | 53.01 | 70.08 |
+| 8 | H | 11.75 | 0.75 | 11.00 | 94% | win | 48.2 | 96.0 | 449.52 | 212.81 |
+| 9 | I | 9.00 | 0.25 | 8.75 | 97% | win | 45.1 | 88.1 | 429.81 | 241.43 |
+| 10 | H | 8.75 | 0.75 | 8.00 | 91% | win | 42.2 | 98.5 | 444.86 | 250.85 |
+
+## `sequential-wave` — 16 connections
+
+| metric (pooled over 10 rounds) | Immediate | Hybrid |
+|---|---:|---:|
+| operations | 4000 | 4000 |
+| succeeded | 2831 | 3772 |
+| exhausted (4 attempts all 1213) | 1169 | 228 |
+| exhausted rate % | 29.23 | 5.70 |
+| exhausted rate 95% Wilson % | 27.84–30.65 | 5.02–6.46 |
+| original deadlocks (attempt 1) | 3702 | 3741 |
+| repeated deadlocks (attempt ≥ 2) | 6241 | 4786 |
+| attempts per op | 3.194 | 3.075 |
+| goodput ops/s | 92.7 | 92.6 |
+| completed ops/s | 131.0 | 98.2 |
+| latency P50 ms (all ops) | 84.37 | 70.28 |
+| latency P95 ms (all ops) | 212.34 | 533.69 |
+| latency P99 ms (all ops) | 485.97 | 701.31 |
+| latency P95 ms (succeeded only) | 219.73 | 466.06 |
+| total jitter sleep ms | 0 | 30000 |
+| succeeded by attempts used | {"1":298,"2":692,"3":948,"4":893} | {"1":259,"2":612,"3":1700,"4":1201} |
+| integrity / guarantees (all runs) | pass | pass |
+
+**Criteria** — C1 exhaustion: pooled Δ=23.53 pp (80.5% relative), 95% CI of (Hybrid−Immediate) = [-25.11, -21.94] pp, rounds passing 10/10 (need 8) → **pass**; C2 goodput ratio 0.998 (completed-ops ratio 0.749, informational) → **pass**; C3 P95 Δ=321.35 ms (allowance 21.23 ms) → **fail**; C4 guarantees → **pass**; sufficient sample: yes.
+
+**Rule outcome for this cell:** `IMMEDIATE` — Hybrid fails C3 P95 on an adequate sample.
+
+| round | first | Imm exh % | Hyb exh % | Δpp | rel | C1 | Imm goodput | Hyb goodput | Imm P95 | Hyb P95 |
+|---:|---|---:|---:|---:|---:|---|---:|---:|---:|---:|
+| 1 | I | 18.50 | 1.00 | 17.50 | 95% | win | 70.2 | 202.3 | 517.02 | 85.27 |
+| 2 | H | 29.25 | 3.25 | 26.00 | 89% | win | 76.9 | 151.1 | 371.76 | 126.78 |
+| 3 | I | 39.00 | 7.25 | 31.75 | 81% | win | 112.8 | 69.1 | 102.49 | 702.34 |
+| 4 | H | 30.00 | 8.25 | 21.75 | 73% | win | 128.3 | 89.5 | 109.08 | 542.32 |
+| 5 | I | 28.75 | 2.25 | 26.50 | 92% | win | 112.5 | 195.3 | 144.53 | 84.00 |
+| 6 | H | 31.25 | 2.75 | 28.50 | 91% | win | 101.3 | 180.2 | 135.78 | 97.82 |
+| 7 | I | 28.25 | 2.25 | 26.00 | 92% | win | 118.7 | 191.2 | 127.66 | 86.50 |
+| 8 | H | 28.00 | 3.50 | 24.50 | 88% | win | 73.0 | 146.5 | 292.00 | 123.21 |
+| 9 | I | 30.25 | 21.25 | 9.00 | 30% | win | 73.0 | 20.7 | 253.83 | 695.93 |
+| 10 | H | 29.00 | 5.25 | 23.75 | 82% | win | 117.1 | 141.2 | 125.15 | 116.90 |
+
+## `shuffled-wave` — 2 connections
+
+| metric (pooled over 10 rounds) | Immediate | Hybrid |
+|---|---:|---:|
+| operations | 4000 | 4000 |
+| succeeded | 4000 | 4000 |
+| exhausted (4 attempts all 1213) | 0 | 0 |
+| exhausted rate % | 0.00 | 0.00 |
+| exhausted rate 95% Wilson % | 0.00–0.10 | 0.00–0.10 |
+| original deadlocks (attempt 1) | 60 | 59 |
+| repeated deadlocks (attempt ≥ 2) | 0 | 0 |
+| attempts per op | 1.015 | 1.015 |
+| goodput ops/s | 152.0 | 143.0 |
+| completed ops/s | 152.0 | 143.0 |
+| latency P50 ms (all ops) | 8.86 | 8.13 |
+| latency P95 ms (all ops) | 36.82 | 57.12 |
+| latency P99 ms (all ops) | 94.40 | 109.49 |
+| latency P95 ms (succeeded only) | 36.82 | 57.12 |
+| total jitter sleep ms | 0 | 0 |
+| succeeded by attempts used | {"1":3940,"2":60} | {"1":3941,"2":59} |
+| integrity / guarantees (all runs) | pass | pass |
+
+**Criteria** — C1 exhaustion: pooled Δ=0.00 pp (0.0% relative), 95% CI of (Hybrid−Immediate) = [-0.10, 0.10] pp, rounds passing 0/10 (need 8) → **fail**; C2 goodput ratio 0.941 (completed-ops ratio 0.941, informational) → **fail**; C3 P95 Δ=20.30 ms (allowance 10.00 ms) → **fail**; C4 guarantees → **pass**; sufficient sample: NO.
+
+**Rule outcome for this cell:** `INCONCLUSIVE` — sample insufficient (rounds, ops per round, or Immediate exhausted operations below the pre-registered minimum).
+
+| round | first | Imm exh % | Hyb exh % | Δpp | rel | C1 | Imm goodput | Hyb goodput | Imm P95 | Hyb P95 |
+|---:|---|---:|---:|---:|---:|---|---:|---:|---:|---:|
+| 1 | I | 0.00 | 0.00 | 0.00 | 0% | — | 146.1 | 145.7 | 57.32 | 58.01 |
+| 2 | H | 0.00 | 0.00 | 0.00 | 0% | — | 154.5 | 154.4 | 67.90 | 57.09 |
+| 3 | I | 0.00 | 0.00 | 0.00 | 0% | — | 123.5 | 147.5 | 55.50 | 65.11 |
+| 4 | H | 0.00 | 0.00 | 0.00 | 0% | — | 138.6 | 146.3 | 61.96 | 62.95 |
+| 5 | I | 0.00 | 0.00 | 0.00 | 0% | — | 130.3 | 150.8 | 63.70 | 64.24 |
+| 6 | H | 0.00 | 0.00 | 0.00 | 0% | — | 190.1 | 175.8 | 14.24 | 15.60 |
+| 7 | I | 0.00 | 0.00 | 0.00 | 0% | — | 173.3 | 103.4 | 15.73 | 95.69 |
+| 8 | H | 0.00 | 0.00 | 0.00 | 0% | — | 184.3 | 153.5 | 14.99 | 53.64 |
+| 9 | I | 0.00 | 0.00 | 0.00 | 0% | — | 166.1 | 133.1 | 17.92 | 22.72 |
+| 10 | H | 0.00 | 0.00 | 0.00 | 0% | — | 142.5 | 143.6 | 61.84 | 71.00 |
+
+## `shuffled-wave` — 8 connections
+
+| metric (pooled over 10 rounds) | Immediate | Hybrid |
+|---|---:|---:|
+| operations | 4000 | 4000 |
+| succeeded | 3993 | 4000 |
+| exhausted (4 attempts all 1213) | 7 | 0 |
+| exhausted rate % | 0.18 | 0.00 |
+| exhausted rate 95% Wilson % | 0.08–0.36 | 0.00–0.10 |
+| original deadlocks (attempt 1) | 256 | 256 |
+| repeated deadlocks (attempt ≥ 2) | 80 | 63 |
+| attempts per op | 1.082 | 1.080 |
+| goodput ops/s | 187.3 | 217.4 |
+| completed ops/s | 187.6 | 217.4 |
+| latency P50 ms (all ops) | 16.42 | 15.40 |
+| latency P95 ms (all ops) | 165.50 | 162.18 |
+| latency P99 ms (all ops) | 296.54 | 302.77 |
+| latency P95 ms (succeeded only) | 165.55 | 162.18 |
+| total jitter sleep ms | 0 | 362 |
+| succeeded by attempts used | {"1":3744,"2":202,"3":35,"4":12} | {"1":3744,"2":198,"3":53,"4":5} |
+| integrity / guarantees (all runs) | pass | pass |
+
+**Criteria** — C1 exhaustion: pooled Δ=0.18 pp (100.0% relative), 95% CI of (Hybrid−Immediate) = [-0.36, -0.04] pp, rounds passing 0/10 (need 8) → **fail**; C2 goodput ratio 1.161 (completed-ops ratio 1.159, informational) → **pass**; C3 P95 Δ=-3.33 ms (allowance 16.55 ms) → **pass**; C4 guarantees → **pass**; sufficient sample: NO.
+
+**Rule outcome for this cell:** `INCONCLUSIVE` — sample insufficient (rounds, ops per round, or Immediate exhausted operations below the pre-registered minimum).
+
+| round | first | Imm exh % | Hyb exh % | Δpp | rel | C1 | Imm goodput | Hyb goodput | Imm P95 | Hyb P95 |
+|---:|---|---:|---:|---:|---:|---|---:|---:|---:|---:|
+| 1 | I | 0.00 | 0.00 | 0.00 | 0% | — | 359.6 | 117.9 | 27.44 | 216.97 |
+| 2 | H | 0.00 | 0.00 | 0.00 | 0% | — | 176.7 | 62.1 | 165.50 | 328.65 |
+| 3 | I | 0.75 | 0.00 | 0.75 | 100% | — | 189.4 | 349.7 | 139.45 | 29.55 |
+| 4 | H | 0.00 | 0.00 | 0.00 | 0% | — | 271.9 | 291.5 | 40.40 | 37.19 |
+| 5 | I | 0.00 | 0.00 | 0.00 | 0% | — | 386.7 | 266.3 | 27.92 | 102.74 |
+| 6 | H | 0.75 | 0.00 | 0.75 | 100% | — | 512.6 | 440.1 | 19.58 | 24.24 |
+| 7 | I | 0.00 | 0.00 | 0.00 | 0% | — | 443.9 | 515.9 | 22.27 | 17.52 |
+| 8 | H | 0.00 | 0.00 | 0.00 | 0% | — | 381.2 | 516.1 | 25.35 | 16.75 |
+| 9 | I | 0.00 | 0.00 | 0.00 | 0% | — | 75.3 | 405.4 | 296.54 | 22.72 |
+| 10 | H | 0.25 | 0.00 | 0.25 | 100% | — | 75.2 | 362.0 | 254.57 | 29.83 |
+
+## `shuffled-wave` — 16 connections
+
+| metric (pooled over 10 rounds) | Immediate | Hybrid |
+|---|---:|---:|
+| operations | 4000 | 4000 |
+| succeeded | 3976 | 3993 |
+| exhausted (4 attempts all 1213) | 24 | 7 |
+| exhausted rate % | 0.60 | 0.18 |
+| exhausted rate 95% Wilson % | 0.40–0.89 | 0.08–0.36 |
+| original deadlocks (attempt 1) | 453 | 460 |
+| repeated deadlocks (attempt ≥ 2) | 166 | 154 |
+| attempts per op | 1.149 | 1.152 |
+| goodput ops/s | 347.9 | 260.0 |
+| completed ops/s | 350.0 | 260.4 |
+| latency P50 ms (all ops) | 20.60 | 21.73 |
+| latency P95 ms (all ops) | 83.97 | 200.87 |
+| latency P99 ms (all ops) | 356.16 | 360.96 |
+| latency P95 ms (succeeded only) | 81.45 | 200.87 |
+| total jitter sleep ms | 0 | 917 |
+| succeeded by attempts used | {"1":3547,"2":359,"3":46,"4":24} | {"1":3540,"2":338,"3":97,"4":18} |
+| integrity / guarantees (all runs) | pass | pass |
+
+**Criteria** — C1 exhaustion: pooled Δ=0.43 pp (70.8% relative), 95% CI of (Hybrid−Immediate) = [-0.73, -0.15] pp, rounds passing 3/10 (need 8) → **fail**; C2 goodput ratio 0.747 (completed-ops ratio 0.744, informational) → **fail**; C3 P95 Δ=116.90 ms (allowance 10.00 ms) → **fail**; C4 guarantees → **pass**; sufficient sample: NO.
+
+**Rule outcome for this cell:** `INCONCLUSIVE` — sample insufficient (rounds, ops per round, or Immediate exhausted operations below the pre-registered minimum).
+
+| round | first | Imm exh % | Hyb exh % | Δpp | rel | C1 | Imm goodput | Hyb goodput | Imm P95 | Hyb P95 |
+|---:|---|---:|---:|---:|---:|---|---:|---:|---:|---:|
+| 1 | I | 0.00 | 0.00 | 0.00 | 0% | — | 124.9 | 391.3 | 346.69 | 42.89 |
+| 2 | H | 0.00 | 0.25 | -0.25 | 0% | — | 484.2 | 451.6 | 64.06 | 35.91 |
+| 3 | I | 1.00 | 0.00 | 1.00 | 100% | win | 570.1 | 237.6 | 35.39 | 207.08 |
+| 4 | H | 0.50 | 0.25 | 0.25 | 50% | — | 293.1 | 276.2 | 56.06 | 197.83 |
+| 5 | I | 0.00 | 0.00 | 0.00 | 0% | — | 235.5 | 117.6 | 155.78 | 366.84 |
+| 6 | H | 0.00 | 0.00 | 0.00 | 0% | — | 528.0 | 200.8 | 60.07 | 258.72 |
+| 7 | I | 1.00 | 0.00 | 1.00 | 100% | win | 577.5 | 278.8 | 31.38 | 200.86 |
+| 8 | H | 0.00 | 0.00 | 0.00 | 0% | — | 578.6 | 222.4 | 34.07 | 188.60 |
+| 9 | I | 1.25 | 0.00 | 1.25 | 100% | win | 585.9 | 418.2 | 31.25 | 62.62 |
+| 10 | H | 2.25 | 1.25 | 1.00 | 44% | — | 464.2 | 531.3 | 50.77 | 52.83 |
+

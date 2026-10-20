@@ -1,0 +1,41 @@
+# F41-04 — run from a genuinely empty MySQL database (mysql:8.0.46, fresh container, database dropped+recreated empty before each GREEN step)
+
+## RED (HEAD 061b3c9, before the fix; empty database; captured earlier in the same session)
+$ php study.php run --out=/tmp/red1 --tag=t --levels=2 --rounds=1 --ops=4
+PHP Fatal error: Uncaught PDOException: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'i32_study.maa_product_products' doesn't exist in harness/study.php:138
+$ php study.php env --out=/tmp/red2   (first step of run-all.sh)
+PHP Fatal error: Uncaught PDOException: SQLSTATE[42S02]: ... 1146 Table 'i32_study.maa_product_products' doesn't exist in harness/study.php:138
+
+## GREEN 1: documented single-cell command
+empty DB: tables_in_db 0
+[sequential-wave c=2 r=1 immediate #1] ok=8 exhausted=0 err=0 deadlocks(client/server)=4/4 active=0.07s integrity=OK
+[sequential-wave c=2 r=1 hybrid    #2] ok=8 exhausted=0 err=0 deadlocks(client/server)=4/4 active=0.05s integrity=OK
+exit=
+
+## GREEN 2: run-all.sh (smoke profile, quiet gate off) from an empty database
+empty DB: tables_in_db 0
+run-all.sh exit=0
+31 tests, 0 failed
+[smoke c=2 r=1 immediate #1] ok=8 exhausted=0 err=0 deadlocks(client/server)=4/4 active=0.07s integrity=OK
+[smoke c=2 r=1 hybrid    #2] ok=8 exhausted=0 err=0 deadlocks(client/server)=4/4 active=0.06s integrity=OK
+[smoke c=8 r=1 immediate #1] ok=6 exhausted=2 err=0 deadlocks(client/server)=18/18 active=0.05s integrity=OK
+[smoke c=8 r=1 hybrid    #2] ok=8 exhausted=0 err=0 deadlocks(client/server)=14/14 active=0.08s integrity=OK
+Evidence validation: 4 declared run files present, matched and internally consistent.
+
+## Re-capture with exit codes (F41-09; HEAD 551781b + review-3 changes; the 'exit=' above was blank because PIPESTATUS was read inside a subshell)
+### single-cell command, empty database
+empty DB: tables_in_db 0
+[sequential-wave c=2 r=1 immediate #1] ok=8 exhausted=0 err=0 deadlocks(client/server)=4/4 active=0.09s integrity=OK
+[sequential-wave c=2 r=1 hybrid    #2] ok=8 exhausted=0 err=0 deadlocks(client/server)=4/4 active=0.06s integrity=OK
+exit=0
+### run-all.sh smoke (quiet gate off), empty database
+empty DB: tables_in_db 0
+run-all.sh exit=0
+host quiet gate: OFF (smoke profile)
+PASS observer sensitivity: preflight FAILS when events_transactions_current is disabled
+44 tests, 0 failed
+[smoke c=2 r=1 immediate #1] ok=8 exhausted=0 err=0 deadlocks(client/server)=4/4 active=0.09s integrity=OK
+[smoke c=2 r=1 hybrid    #2] ok=8 exhausted=0 err=0 deadlocks(client/server)=4/4 active=0.06s integrity=OK
+[smoke c=8 r=1 immediate #1] ok=8 exhausted=0 err=0 deadlocks(client/server)=14/14 active=0.05s integrity=OK
+[smoke c=8 r=1 hybrid    #2] ok=8 exhausted=0 err=0 deadlocks(client/server)=12/12 active=0.05s integrity=OK
+Evidence validation: 4 declared run files present, matched and internally consistent.
