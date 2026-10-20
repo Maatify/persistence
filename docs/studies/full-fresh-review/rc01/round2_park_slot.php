@@ -66,9 +66,9 @@ foreach ([['signed INT', false, 2147483647], ['unsigned INT', true, 4294967295]]
     rc_schema($pdo, true, $unsigned);
 
     foreach ([$max - 1, $max] as $top) {
-        foreach (['B2 park(locked max)+ORDER BY', 'BS2 B2+savepoint'] as $candidate) {
+        foreach (['B2 park(locked max)+ORDER BY', 'BS2 B2+savepoint', 'B3 park(locked max, all rows)+ORDER BY', 'BS3 B3+savepoint'] as $candidate) {
             rc_seed($pdo, [1, 2, 3, $top]);
-            printf("  %-13s highest active=%-10d %-22s owned : %s\n", $label, $top, $candidate, cell($pdo, $candidate, 1, 3));
+            printf("  %-13s highest active=%-10d %-40s owned : %s\n", $label, $top, $candidate, cell($pdo, $candidate, 1, 3));
         }
     }
 }
@@ -77,6 +77,10 @@ rc_seed($pdo, [1, 2, 3, 2147483647]);
 printf("  %-13s highest active=%-10d %-22s caller: %s\n", 'signed INT', 2147483647, 'B2 (no savepoint)', cell($pdo, 'B2 park(locked max)+ORDER BY', 1, 3, 'caller'));
 rc_seed($pdo, [1, 2, 3, 2147483647]);
 printf("  %-13s highest active=%-10d %-22s caller: %s\n", 'signed INT', 2147483647, 'BS2 (savepoint)', cell($pdo, 'BS2 B2+savepoint', 1, 3, 'caller'));
+foreach (['B3 park(locked max, all rows)+ORDER BY' => 'B3 (no savepoint)', 'BS3 B3+savepoint' => 'BS3 (savepoint)'] as $candidate => $label) {
+    rc_seed($pdo, [1, 2, 3, 2147483647]);
+    printf("  %-13s highest active=%-10d %-22s caller: %s\n", 'signed INT', 2147483647, $label, cell($pdo, $candidate, 1, 3, 'caller'));
+}
 
 echo "\n== 3. competing plain writer targeting the parking slot while the move transaction is open\n";
 $other = rc_pdo();
