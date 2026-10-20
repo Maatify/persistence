@@ -1,0 +1,15 @@
+== P6 8.0.46 innodb_snapshot_isolation=(absent)
+  B=fresh        A bumped tail 3->4 and committed; B returned: ERR 1213
+  B=plain-first  A bumped tail 3->4 and committed; B returned: ERR 1213
+== P6 8.4.10 innodb_snapshot_isolation=(absent)
+  B=fresh        A bumped tail 3->4 and committed; B returned: ERR 1213
+  B=plain-first  A bumped tail 3->4 and committed; B returned: ERR 1213
+== P6 10.11.18-MariaDB-ubu2204 innodb_snapshot_isolation=0
+  B=fresh        A bumped tail 3->4 and committed; B returned: ERR 1213
+  B=plain-first  A bumped tail 3->4 and committed; B returned: ERR 1213
+== P6 11.4.7-MariaDB-ubu2404 innodb_snapshot_isolation=0
+  B=fresh        A bumped tail 3->4 and committed; B returned: ERR 1213
+  B=plain-first  A bumped tail 3->4 and committed; B returned: ERR 1213
+== P6 11.8.9-MariaDB-ubu2404 innodb_snapshot_isolation=1
+  B=fresh        A bumped tail 3->4 and committed; B returned: ERR 1213
+  B=plain-first  A bumped tail 3->4 and committed; B returned: ERR 1213

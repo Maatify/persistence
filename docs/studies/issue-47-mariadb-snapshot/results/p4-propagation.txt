@@ -1,0 +1,25 @@
+== P4 8.0.46 innodb_snapshot_isolation=(absent)
+  direct                   thrown=none | PDO::inTransaction=true @@in_transaction=ERR 1193 | rows(scope 7 = earlier write) visible to others before caller rollBack=0 | after caller rollBack rows(7,8) surviving=0
+  inside savepoint runner  thrown=none | PDO::inTransaction=true @@in_transaction=ERR 1193 | rows(scope 7 = earlier write) visible to others before caller rollBack=0 | after caller rollBack rows(7,8) surviving=0
+  runner-owned txn         thrown=none | PDO::inTransaction after=false
+  deadlock-retry runner(3) thrown=none | callback attempts=1 (1 = not replayed)
+== P4 8.4.10 innodb_snapshot_isolation=(absent)
+  direct                   thrown=none | PDO::inTransaction=true @@in_transaction=ERR 1193 | rows(scope 7 = earlier write) visible to others before caller rollBack=0 | after caller rollBack rows(7,8) surviving=0
+  inside savepoint runner  thrown=none | PDO::inTransaction=true @@in_transaction=ERR 1193 | rows(scope 7 = earlier write) visible to others before caller rollBack=0 | after caller rollBack rows(7,8) surviving=0
+  runner-owned txn         thrown=none | PDO::inTransaction after=false
+  deadlock-retry runner(3) thrown=none | callback attempts=1 (1 = not replayed)
+== P4 10.11.18-MariaDB-ubu2204 innodb_snapshot_isolation=0
+  direct                   thrown=none | PDO::inTransaction=true @@in_transaction=ok: 1 | rows(scope 7 = earlier write) visible to others before caller rollBack=0 | after caller rollBack rows(7,8) surviving=0
+  inside savepoint runner  thrown=none | PDO::inTransaction=true @@in_transaction=ok: 1 | rows(scope 7 = earlier write) visible to others before caller rollBack=0 | after caller rollBack rows(7,8) surviving=0
+  runner-owned txn         thrown=none | PDO::inTransaction after=false
+  deadlock-retry runner(3) thrown=none | callback attempts=1 (1 = not replayed)
+== P4 11.4.7-MariaDB-ubu2404 innodb_snapshot_isolation=0
+  direct                   thrown=none | PDO::inTransaction=true @@in_transaction=ok: 1 | rows(scope 7 = earlier write) visible to others before caller rollBack=0 | after caller rollBack rows(7,8) surviving=0
+  inside savepoint runner  thrown=none | PDO::inTransaction=true @@in_transaction=ok: 1 | rows(scope 7 = earlier write) visible to others before caller rollBack=0 | after caller rollBack rows(7,8) surviving=0
+  runner-owned txn         thrown=none | PDO::inTransaction after=false
+  deadlock-retry runner(3) thrown=none | callback attempts=1 (1 = not replayed)
+== P4 11.8.9-MariaDB-ubu2404 innodb_snapshot_isolation=1
+  direct                   thrown=PDOException 1020 | PDO::inTransaction=true @@in_transaction=ok: 0 | rows(scope 7 = earlier write) visible to others before caller rollBack=0 | after caller rollBack rows(7,8) surviving=1
+  inside savepoint runner  thrown=PDOException 1020 | PDO::inTransaction=true @@in_transaction=ok: 0 | rows(scope 7 = earlier write) visible to others before caller rollBack=0 | after caller rollBack rows(7,8) surviving=1
+  runner-owned txn         thrown=PDOException 1020 | PDO::inTransaction after=false
+  deadlock-retry runner(3) thrown=PDOException 1020 | callback attempts=1 (1 = not replayed)

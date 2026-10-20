@@ -1,0 +1,32 @@
+== P3 8.0.46 innodb_snapshot_isolation=(absent)
+  prepared locking read -> ok: 4     PDO::inTransaction=true own-view marker rows=1 other-conn UPDATE of marker row -> ERR 1205
+  text     locking read -> ok: 4     PDO::inTransaction=true own-view marker rows=1 other-conn UPDATE of marker row -> ERR 1205
+  after-1020 hazard: first=ok: 4 PDO::inTransaction=true @@in_transaction=ERR 1193; write after the error then caller rollBack() -> row survives on other connection: no (rolled back)
+== P3 8.4.10 innodb_snapshot_isolation=(absent)
+  prepared locking read -> ok: 4     PDO::inTransaction=true own-view marker rows=1 other-conn UPDATE of marker row -> ERR 1205
+  text     locking read -> ok: 4     PDO::inTransaction=true own-view marker rows=1 other-conn UPDATE of marker row -> ERR 1205
+  after-1020 hazard: first=ok: 4 PDO::inTransaction=true @@in_transaction=ERR 1193; write after the error then caller rollBack() -> row survives on other connection: no (rolled back)
+== P3 10.11.18-MariaDB-ubu2204 innodb_snapshot_isolation=0
+  prepared locking read -> ok: 4     PDO::inTransaction=true own-view marker rows=1 other-conn UPDATE of marker row -> ERR 1205
+  text     locking read -> ok: 4     PDO::inTransaction=true own-view marker rows=1 other-conn UPDATE of marker row -> ERR 1205
+  after-1020 hazard: first=ok: 4 PDO::inTransaction=true @@in_transaction=ok: 1; write after the error then caller rollBack() -> row survives on other connection: no (rolled back)
+== P3 10.11.18-MariaDB-ubu2204 innodb_snapshot_isolation=1
+  prepared locking read -> ERR 1020  PDO::inTransaction=true own-view marker rows=0 other-conn UPDATE of marker row -> ok: 0
+  text     locking read -> ERR 1020  PDO::inTransaction=true own-view marker rows=0 other-conn UPDATE of marker row -> ok: 0
+  after-1020 hazard: first=ERR 1020 PDO::inTransaction=true @@in_transaction=ok: 0; write after the error then caller rollBack() -> row survives on other connection: YES (was autocommitted)
+== P3 11.4.7-MariaDB-ubu2404 innodb_snapshot_isolation=0
+  prepared locking read -> ok: 4     PDO::inTransaction=true own-view marker rows=1 other-conn UPDATE of marker row -> ERR 1205
+  text     locking read -> ok: 4     PDO::inTransaction=true own-view marker rows=1 other-conn UPDATE of marker row -> ERR 1205
+  after-1020 hazard: first=ok: 4 PDO::inTransaction=true @@in_transaction=ok: 1; write after the error then caller rollBack() -> row survives on other connection: no (rolled back)
+== P3 11.4.7-MariaDB-ubu2404 innodb_snapshot_isolation=1
+  prepared locking read -> ERR 1020  PDO::inTransaction=true own-view marker rows=0 other-conn UPDATE of marker row -> ok: 0
+  text     locking read -> ERR 1020  PDO::inTransaction=true own-view marker rows=0 other-conn UPDATE of marker row -> ok: 0
+  after-1020 hazard: first=ERR 1020 PDO::inTransaction=true @@in_transaction=ok: 1; write after the error then caller rollBack() -> row survives on other connection: no (rolled back)
+== P3 11.8.9-MariaDB-ubu2404 innodb_snapshot_isolation=1
+  prepared locking read -> ERR 1020  PDO::inTransaction=true own-view marker rows=0 other-conn UPDATE of marker row -> ok: 0
+  text     locking read -> ERR 1020  PDO::inTransaction=true own-view marker rows=0 other-conn UPDATE of marker row -> ok: 0
+  after-1020 hazard: first=ERR 1020 PDO::inTransaction=true @@in_transaction=ok: 0; write after the error then caller rollBack() -> row survives on other connection: YES (was autocommitted)
+== P3 11.8.9-MariaDB-ubu2404 innodb_snapshot_isolation=1
+  prepared locking read -> ERR 1020  PDO::inTransaction=true own-view marker rows=0 other-conn UPDATE of marker row -> ok: 0
+  text     locking read -> ERR 1020  PDO::inTransaction=true own-view marker rows=0 other-conn UPDATE of marker row -> ok: 0
+  after-1020 hazard: first=ERR 1020 PDO::inTransaction=true @@in_transaction=ok: 0; write after the error then caller rollBack() -> row survives on other connection: YES (was autocommitted)

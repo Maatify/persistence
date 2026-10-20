@@ -1,0 +1,44 @@
+== P1 8.0.46 innodb_snapshot_isolation=(absent)
+  getNextPositionForUpdate   ok: 6                        txn-active
+  moveWithinScope(1->5)      ok: true                     txn-active
+  moveWithinScope(1->5)      ok: true                     (owned txn, no prior snapshot)
+== P1 8.4.10 innodb_snapshot_isolation=(absent)
+  getNextPositionForUpdate   ok: 6                        txn-active
+  moveWithinScope(1->5)      ok: true                     txn-active
+  moveWithinScope(1->5)      ok: true                     (owned txn, no prior snapshot)
+== P1 10.11.18-MariaDB-ubu2204 innodb_snapshot_isolation=0
+  getNextPositionForUpdate   ok: 6                        txn-active
+  moveWithinScope(1->5)      ok: true                     txn-active
+  moveWithinScope(1->5)      ok: true                     (owned txn, no prior snapshot)
+== P1 10.11.18-MariaDB-ubu2204 innodb_snapshot_isolation=1
+  getNextPositionForUpdate   ERR 1020                     txn-active
+  moveWithinScope(1->5)      ERR 1020                     txn-active
+  moveWithinScope(1->5)      ok: true                     (owned txn, no prior snapshot)
+== P1 10.11.18-MariaDB-ubu2204 innodb_snapshot_isolation=0
+  getNextPositionForUpdate   ok: 6                        txn-active
+  moveWithinScope(1->5)      ok: true                     txn-active
+  moveWithinScope(1->5)      ok: true                     (owned txn, no prior snapshot)
+== P1 11.4.7-MariaDB-ubu2404 innodb_snapshot_isolation=0
+  getNextPositionForUpdate   ok: 6                        txn-active
+  moveWithinScope(1->5)      ok: true                     txn-active
+  moveWithinScope(1->5)      ok: true                     (owned txn, no prior snapshot)
+== P1 11.4.7-MariaDB-ubu2404 innodb_snapshot_isolation=1
+  getNextPositionForUpdate   ERR 1020                     txn-active
+  moveWithinScope(1->5)      ERR 1020                     txn-active
+  moveWithinScope(1->5)      ok: true                     (owned txn, no prior snapshot)
+== P1 11.4.7-MariaDB-ubu2404 innodb_snapshot_isolation=0
+  getNextPositionForUpdate   ok: 6                        txn-active
+  moveWithinScope(1->5)      ok: true                     txn-active
+  moveWithinScope(1->5)      ok: true                     (owned txn, no prior snapshot)
+== P1 11.8.9-MariaDB-ubu2404 innodb_snapshot_isolation=1
+  getNextPositionForUpdate   ERR 1020                     txn-active
+  moveWithinScope(1->5)      ERR 1020                     txn-active
+  moveWithinScope(1->5)      ok: true                     (owned txn, no prior snapshot)
+== P1 11.8.9-MariaDB-ubu2404 innodb_snapshot_isolation=1
+  getNextPositionForUpdate   ERR 1020                     txn-active
+  moveWithinScope(1->5)      ERR 1020                     txn-active
+  moveWithinScope(1->5)      ok: true                     (owned txn, no prior snapshot)
+== P1 11.8.9-MariaDB-ubu2404 innodb_snapshot_isolation=0
+  getNextPositionForUpdate   ok: 6                        txn-active
+  moveWithinScope(1->5)      ok: true                     txn-active
+  moveWithinScope(1->5)      ok: true                     (owned txn, no prior snapshot)

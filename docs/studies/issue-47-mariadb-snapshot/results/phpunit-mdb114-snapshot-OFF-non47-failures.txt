@@ -1,0 +1,21 @@
+# integration suite, mdb114, innodb_snapshot_isolation=OFF (Issue #47 effect removed), base 0685d77
+Tests: 163, Assertions: 1057, Errors: 2, Failures: 3.
+1) Maatify\Persistence\Tests\Integration\Pdo\Transaction\PdoDeadlockRetrySavepointTransactionRunnerParityIntegrationTest
+Failed asserting that '11.4.7-MariaDB-ubu2404' matches PCRE pattern "/^8\.4\./".
+
+2) Maatify\Persistence\Tests\Integration\Pdo\Transaction\PdoSavepointTransactionRunnerIntegrationTest
+Failed asserting that '11.4.7-MariaDB-ubu2404' matches PCRE pattern "/^8\.4\./".
+
+1) Maatify\Persistence\Tests\Integration\Examples\DeadlockRetryExamplesTest::testExampleRunsAgainstRealMySql with data set "02_caller_owned_no_replay.php" ('/Users/mohamedabdulalim/MEGA/...ay.php')
+Example failed: 02_caller_owned_no_replay.php
+
+Fatal error: Uncaught RuntimeException: Example expectation failed: inTransaction() after the next successful statement (expected false, got true) in /Users/mohamedabdulalim/MEGA/Libraries/2026/persistence/.claude/worktrees/full-fresh-review-7c0352/examples/deadlock-retry/_support.php on line 265
+
+2) Maatify\Persistence\Tests\Integration\Pdo\Transaction\PdoDeadlockRetryRunnerIntegrationTest::testRealDeadlockInsideCallerOwnedTransactionIsNeverReplayed with data set "PdoDeadlockRetryTransactionRunner" (Closure Object ())
+After a successful statement no transaction is reported.
+Failed asserting that true is false.
+
+3) Maatify\Persistence\Tests\Integration\Pdo\Transaction\PdoDeadlockRetryRunnerIntegrationTest::testRealDeadlockInsideCallerOwnedTransactionIsNeverReplayed with data set "PdoDeadlockRetrySavepointTransactionRunner" (Closure Object ())
+After a successful statement no transaction is reported.
+Failed asserting that true is false.
+

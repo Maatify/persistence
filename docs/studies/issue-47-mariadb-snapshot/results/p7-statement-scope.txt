@@ -1,0 +1,25 @@
+== P7 8.0.46 innodb_snapshot_isolation=(absent)
+  locking read  plain statement                    -> ok: 30       session value afterwards: ERR 1193
+  locking read  SET STATEMENT ... FOR (prepared)   -> ERR 1064     session value afterwards: ERR 1193
+  range UPDATE  plain statement                    -> ok: 2        session value afterwards: ERR 1193
+  range UPDATE  SET STATEMENT ... FOR (prepared)   -> ERR 1064     session value afterwards: ERR 1193
+== P7 8.4.10 innodb_snapshot_isolation=(absent)
+  locking read  plain statement                    -> ok: 30       session value afterwards: ERR 1193
+  locking read  SET STATEMENT ... FOR (prepared)   -> ERR 1064     session value afterwards: ERR 1193
+  range UPDATE  plain statement                    -> ok: 2        session value afterwards: ERR 1193
+  range UPDATE  SET STATEMENT ... FOR (prepared)   -> ERR 1064     session value afterwards: ERR 1193
+== P7 10.11.18-MariaDB-ubu2204 innodb_snapshot_isolation=0
+  locking read  plain statement                    -> ok: 30       session value afterwards: ok: 0
+  locking read  SET STATEMENT ... FOR (prepared)   -> ok: 30       session value afterwards: ok: 0
+  range UPDATE  plain statement                    -> ok: 2        session value afterwards: ok: 0
+  range UPDATE  SET STATEMENT ... FOR (prepared)   -> ok: 2        session value afterwards: ok: 0
+== P7 11.4.7-MariaDB-ubu2404 innodb_snapshot_isolation=0
+  locking read  plain statement                    -> ok: 30       session value afterwards: ok: 0
+  locking read  SET STATEMENT ... FOR (prepared)   -> ok: 30       session value afterwards: ok: 0
+  range UPDATE  plain statement                    -> ok: 2        session value afterwards: ok: 0
+  range UPDATE  SET STATEMENT ... FOR (prepared)   -> ok: 2        session value afterwards: ok: 0
+== P7 11.8.9-MariaDB-ubu2404 innodb_snapshot_isolation=1
+  locking read  plain statement                    -> ERR 1020     session value afterwards: ok: 1
+  locking read  SET STATEMENT ... FOR (prepared)   -> ok: 30       session value afterwards: ok: 1
+  range UPDATE  plain statement                    -> ERR 1020     session value afterwards: ok: 1
+  range UPDATE  SET STATEMENT ... FOR (prepared)   -> ok: 2        session value afterwards: ok: 1

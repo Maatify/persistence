@@ -1,0 +1,5 @@
+# mdb118-snapshot-OFF 0685d777783a1346c0ba29029c4d191544afa1ca
+ERRORS!
+Tests: 163, Assertions: 1065, Errors: 2.
+1) Maatify\Persistence\Tests\Integration\Pdo\Transaction\PdoDeadlockRetrySavepointTransactionRunnerParityIntegrationTest
+2) Maatify\Persistence\Tests\Integration\Pdo\Transaction\PdoSavepointTransactionRunnerIntegrationTest
