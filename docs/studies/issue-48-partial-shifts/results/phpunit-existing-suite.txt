@@ -1,0 +1,32 @@
+# Existing repository suite (vendor/bin/phpunit, 620 tests) on MySQL 8.4.10
+
+## unmodified base 01f59d6 (tail)
+.....................................................           620 / 620 (100%)
+
+Time: 00:41.387, Memory: 18.00 MB
+
+OK (620 tests, 4421 assertions)
+
+## adapter: moveWithinScope() inside an active transaction routed to the prototype (see d1-adapter.diff; src/Study48/SavepointMovePrototype.php added to the scratch copy only) — re-measured with the final prototype for the addendum
+Time: 00:42.930, Memory: 18.00 MB
+
+There was 1 failure:
+
+1) Maatify\Persistence\Tests\Integration\Pdo\Ordering\ScopedOrderingManagerTransactionTest::testParticipantFailureLeavesOuterTransactionActiveWithoutIndependentRollback
+Failed asserting that two arrays are identical.
+--- Expected
++++ Actual
+@@ @@
+ Array &0 [
+     1 => 1,
+-    2 => 3,
+-    3 => 4,
++    2 => 2,
++    3 => 3,
+     4 => 4,
+ ]
+
+tests/Integration/Pdo/Ordering/ScopedOrderingManagerTransactionTest.php:116
+
+FAILURES!
+Tests: 620, Assertions: 4430, Failures: 1.

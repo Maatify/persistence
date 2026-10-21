@@ -1,0 +1,11 @@
+# Local gates on the study branch after the F54 corrections (docs-only diff), MySQL 8.4.10, 2026-10-21T08:06:43Z
+./composer.json is valid
+ [OK] No errors                                                                 
+Found 0 of 93 files that can be fixed in 0.824 seconds, 20.00 MB memory used
+sh syntax ok
+diff-check ok
+files outside study dir: 0
+src/ and tests/ diff vs origin/main:        0 files
+
+OK (620 tests, 4434 assertions)
+composer.lock tracked:        0

@@ -1,0 +1,10 @@
+#### mariadb-11.4.7
+== real @ 11.4.7-MariaDB-ubu2404 innodb_snapshot_isolation=0 rollback_on_timeout=0
+source: src/Pdo/Ordering/ScopedOrderingManager.php
+C10-1213final real   EXC PDO 1213/40001 | ownView=ORIGINAL marker=0 txn=LOST  inTx=Y | Δsp/rt/rel=0/0/0 Δcommit/rollback=0/0 | afterCommit=ORIGINAL marker=0 partner=ACQUIRED (1.5s)
+C15-after-1213 real   EXC PDO 1213/40001,EXC PDO 1062/23000 | ownView=PARTIAL[1:1 2:3 3:4 4:5 5:5 CORRUPT] marker=0 txn=LOST  inTx=Y | Δsp/rt/rel=0/0/0 Δcommit/rollback=0/0 | afterCommit=PARTIAL[1:1 2:3 3:4 4:5 5:5 CORRUPT] marker=0 partner=ACQUIRED (1.5s)
+#### mariadb-11.4.7
+== proto @ 11.4.7-MariaDB-ubu2404 innodb_snapshot_isolation=0 rollback_on_timeout=0
+source: src/Pdo/Ordering/ScopedOrderingManager.php
+C10-1213final proto  EXC PDO 1213/40001 | ownView=ORIGINAL marker=0 txn=LOST  inTx=Y | Δsp/rt/rel=1/1/0 Δcommit/rollback=0/0 | afterCommit=ORIGINAL marker=0 partner=ACQUIRED (1.5s)
+C15-after-1213 proto  EXC PDO 1213/40001,EXC PDO 1062/23000 | ownView=ORIGINAL marker=0 txn=LOST  inTx=Y | Δsp/rt/rel=2/2/1 Δcommit/rollback=0/0 | afterCommit=ORIGINAL marker=0 partner=ACQUIRED (1.5s)

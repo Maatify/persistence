@@ -1,0 +1,25 @@
+--- a/src/Pdo/Ordering/ScopedOrderingManager.php
++++ b/src/Pdo/Ordering/ScopedOrderingManager.php
+@@ -247,7 +247,7 @@
+      * @throws InvalidOrderingOperationException When id/order/scope arguments are invalid.
+      * @throws Throwable When a PDO/database operation fails.
+      */
+-    public function moveWithinScope(
++    public function moveWithinScopeShipped(
+         PDO $pdo,
+         ScopedOrderingConfig $config,
+         int|string|null $scopeValue,
+@@ -686,4 +686,13 @@
+             );
+         }
+     }
++
++    public function moveWithinScope(PDO $pdo, ScopedOrderingConfig $config, int|string|null $scopeValue, int $id, int $newOrder, ?string $updatedAtValue = null): bool
++    {
++        if ($pdo->inTransaction()) {
++            return (new \Maatify\Persistence\Study48\SavepointMovePrototype($this))->moveWithinScope($pdo, $config, $scopeValue, $id, $newOrder, $updatedAtValue);
++        }
++
++        return $this->moveWithinScopeShipped($pdo, $config, $scopeValue, $id, $newOrder, $updatedAtValue);
++    }
+ }
