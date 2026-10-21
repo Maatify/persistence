@@ -260,17 +260,26 @@ $transactions->run(function () use ($pdo, $ordering, $config): void {
   whole transaction back, so partial updates do not survive.
 * **Caller-owned (a transaction is already active).** The runner and
   `moveWithinScope()` only participate: they never commit and never roll the
-  transaction back. If an operation fails part-way, **the changes it already
-  made stay in your transaction**. For `moveWithinScope()` that means the
-  shifted rows of an interrupted move (for example after a failure in the final
-  update of the target row, or after `false` from the final target update) can
-  remain visible and be committed by your own `commit()`. The caller must decide
-  to roll back the entire transaction (or to restart it).
-* **No savepoint guarantee in the ordering API.** `moveWithinScope()` does not
-  create a savepoint, so it does not undo its own partial work inside a
-  caller-owned transaction. Wrapping the call in the Savepoint runner (below)
-  isolates statement-level failures only, never a deadlock (`1213`), and is the
-  caller's choice, not a built-in guarantee of the ordering API.
+  transaction back. If a runner's operation fails part-way, **the changes it
+  already made stay in your transaction** and the caller decides on the rollback.
+* **`moveWithinScope()` undoes its own mutation window (Unreleased, Issue #55,
+  ADR 0005).** In a caller-owned transaction it takes an operation-local
+  savepoint after the scope lock, right before the first mutating statement. A
+  failure in the range shift or the target write (or `false` after the shifts)
+  rolls back to that savepoint (best effort), so the shifted rows of an
+  interrupted move no longer remain when the transaction is still alive and the
+  rollback to the savepoint succeeds; the original exception is rethrown
+  unchanged. If that cleanup itself fails, the original exception still wins but
+  the partial shifts **stay** and you must roll back. Your earlier work and
+  savepoints are not touched, and the scope lock is kept until you end your
+  transaction. You still own the final commit or rollback. A
+  mutating move adds exactly two statements (`SAVEPOINT`, `RELEASE SAVEPOINT`); a
+  no-op or a missing row adds none. This changes the failure-path state that
+  `v1.4.0` left behind. A deadlock (`1213`), MariaDB `1020` and `1205` with
+  `innodb_rollback_on_timeout=ON` end the whole transaction on the server, erasing
+  your earlier work too, and are not rescued; an exception from this call is not
+  proof of a clean, still-live transaction, so never swallow it and continue
+  unless you know the state.
 
 `TransactionRunnerInterface` exposes only `run(callable $callback)`, so a
 consumer service can depend on the shared transaction abstraction without
@@ -505,7 +514,7 @@ for that condition.
 * When `updatedAtColumn` is configured, updates that column on the target row in the same SQL statement and transaction as the final order update.
 * Does not globally normalize pre-existing gaps.
 * In a transaction it owns: rolls back and returns `false` if the final target update reports no affected row, and rolls back on any Throwable after starting the transaction, so no partial shift survives.
-* In a caller-owned transaction: it never rolls back. Rows it already shifted stay in the caller's transaction when it returns `false` after the shifts or throws; the caller decides on a full rollback. It creates no savepoint, so there is no savepoint-rollback guarantee.
+* In a caller-owned transaction (Unreleased, Issue #55, ADR 0005): it never commits or fully rolls back. It undoes its own shifts with an operation-local savepoint (taken after the scope lock, before the first mutating statement) when it returns `false` after the shifts or throws, and rethrows the original Throwable; if the undo itself fails, the shifts stay for the caller's rollback and the failure is not reported as `false`. The caller still owns the final commit or rollback, and a server-ended transaction (`1213`, MariaDB `1020`) is not restored.
 * Rethrows the original Throwable without arbitrary wrapping.
 
 ### Ordering Guarantees on MariaDB (`innodb_snapshot_isolation`)

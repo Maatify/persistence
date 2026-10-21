@@ -1,0 +1,20 @@
+There was 1 failure:
+
+1) Maatify\Persistence\Tests\Integration\Pdo\Ordering\ScopedOrderingManagerTransactionTest::testParticipantFailureUndoesItsOwnMutationWindowAndLeavesOuterTransactionActive
+Failed asserting that two arrays are identical.
+--- Expected
++++ Actual
+@@ @@
+ Array &0 [
+     1 => 1,
+-    2 => 2,
+-    3 => 3,
++    2 => 3,
++    3 => 4,
+     4 => 4,
+ ]
+
+/Users/mohamedabdulalim/MEGA/Libraries/2026/persistence/.claude/worktrees/retry-performance-mac-benchmark-f3a0fb/tests/Integration/Pdo/Ordering/ScopedOrderingManagerTransactionTest.php:116
+
+FAILURES!
+Tests: 1, Assertions: 3, Failures: 1.

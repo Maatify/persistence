@@ -92,9 +92,10 @@ try {
     // ... your own reads and writes on the same connection ...
     $moved = $ordering->moveWithinScope($pdo, $config, $playlistId, $itemId, 5);
 
-    // false means the row is missing or the final update changed nothing. In a
-    // transaction you own, rows it already shifted are still pending: never
-    // commit them, end the transaction (the catch below rolls it back).
+    // false means the row is missing or the final update changed nothing. The
+    // move has undone its own shifts (operation-local savepoint) or thrown, but
+    // the outcome of the rest of your unit of work is still yours: here we
+    // treat false as a failure and roll the whole transaction back.
     if ($moved === false) {
         throw new RuntimeException('moveWithinScope() returned false; rolling back.');
     }
@@ -118,9 +119,16 @@ try {
 
 Or call it without a transaction and the manager begins and commits one itself.
 
-If the call throws or returns `false` inside your own transaction, rows it has
-already shifted are still part of that transaction: roll the whole transaction
-back (as the `catch` above does) instead of committing it.
+If the call returns `false` inside your own transaction, or throws a recoverable
+statement-level error (for example `1062`, or `1205` without
+`innodb_rollback_on_timeout=ON`), the move has normally undone its own shifts
+(Unreleased, Issue #55) and your earlier work is untouched. That holds only when
+the transaction is still alive and the rollback to the move's savepoint
+succeeded. A thrown exception is **not proof** of that: if the cleanup failed the
+original exception still wins and the partial shifts stay; after `1213`, MariaDB
+`1020` or an aborting `1205` the server has already erased your whole
+transaction. So do not catch-and-continue unless you know the state; rolling the
+whole transaction back (as the `catch` above does) is always safe.
 
 ## Transaction ownership and lock boundaries
 
@@ -128,12 +136,17 @@ back (as the `catch` above does) instead of committing it.
   success, and rolls back on any failure or when it returns `false`, so no
   partial shift survives.
 * With an active transaction it participates and never commits, rolls back, or
-  ends it; you own the final commit or rollback. It does **not** undo its own
-  partial work there: if a failure (or `false` after the shifts) happens part-way,
-  the rows already shifted stay in your transaction until you roll back, and your
-  `commit()` would persist them. The ordering API creates no savepoint and gives
-  no savepoint-rollback guarantee. Use the same PDO connection for every
-  participant.
+  ends it; you own the final commit or rollback. It undoes its own partial work
+  there (Unreleased, Issue #55, [ADR 0005](../adr/0005-move-within-scope-lazy-operation-savepoint.md)):
+  it takes an operation-local savepoint after the scope lock and before the
+  first mutating statement, rolls back to it when the shift or the target write
+  throws (the original exception is rethrown) or returns `false`, and releases
+  it on success. Cleanup is best effort after an exception: if it fails, the
+  original exception still wins and the shifts stay for your rollback. If the
+  undo behind `false` fails, that failure is thrown (never `false` over partial
+  shifts). The scope lock is kept until you end your transaction. A mutating
+  move adds two statements (`SAVEPOINT`, `RELEASE SAVEPOINT`); a no-op or a
+  missing row adds none. Use the same PDO connection for every participant.
 * A deadlock (`1213`) rolls back your **entire** transaction on the server. Do not
   catch it and continue in the same transaction, and do not expect a savepoint to
   cover it; see the

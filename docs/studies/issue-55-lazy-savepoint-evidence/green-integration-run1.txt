@@ -1,0 +1,14 @@
+> phpunit --testsuite integration
+PHPUnit 11.5.57 by Sebastian Bergmann and contributors.
+
+Runtime:       PHP 8.4.4
+Configuration: /Users/mohamedabdulalim/MEGA/Libraries/2026/persistence/.claude/worktrees/retry-performance-mac-benchmark-f3a0fb/phpunit.xml
+
+...............................................................  63 / 200 ( 31%)
+............................................................... 126 / 200 ( 63%)
+............................................................... 189 / 200 ( 94%)
+...........                                                     200 / 200 (100%)
+
+Time: 00:51.277, Memory: 14.00 MB
+
+OK (200 tests, 1275 assertions)
