@@ -276,30 +276,32 @@ $transactions->run(function () use ($pdo, $ordering, $config): void {
   already made stay in your transaction** and the caller decides on the rollback.
 * **`moveWithinScope()` undoes its own mutation window (Unreleased, Issue #55,
   ADR 0005).** In a caller-owned transaction it takes an operation-local
-  savepoint after the scope lock, right before the first mutating statement. A
-  failure in the range shift or the target write (or `false` after the shifts)
-  rolls back to that savepoint (best effort), so the shifted rows of an
-  interrupted move no longer remain when the transaction is still alive and the
-  rollback to the savepoint succeeds; the original exception is rethrown
-  unchanged. If that cleanup itself fails, the original exception still wins but
-  the partial shifts **stay** and you must roll back. Your earlier work and
-  savepoints are not touched, and the scope lock is kept until you end your
-  transaction. You still own the final commit or rollback. On the
-  success path a mutating move adds exactly two statements (`SAVEPOINT`,
-  `RELEASE SAVEPOINT`). Only a failure after the savepoint was established
-  adds cleanup: `ROLLBACK TO SAVEPOINT`, then an attempted `RELEASE SAVEPOINT`
-  (skipped when the driver reports no active transaction, and a failing cleanup
-  statement changes the count); no universal count is promised. A no-op, a
-  missing row, an invalid argument or a failing `SAVEPOINT` add no `ROLLBACK TO`
-  or `RELEASE`. The call can now throw `TransactionExecutionException` (a class
-  that exists in `v1.4.0`) when its own savepoint control statement fails, the
-  guard fires, or an undo or `RELEASE` fails; the `v1.4.0` method issued no such
-  statement. This
-  changes the failure-path state that `v1.4.0` left behind. A deadlock (`1213`), MariaDB `1020` and `1205` with
-  `innodb_rollback_on_timeout=ON` end the whole transaction on the server, erasing
-  your earlier work too, and are not rescued; an exception from this call is not
-  proof of a clean, still-live transaction, so never swallow it and continue
-  unless you know the state.
+  savepoint after the scope lock, right before the first mutating statement.
+  Two outcomes are distinct. If the range shift or the target write **throws**,
+  it attempts a best-effort `ROLLBACK TO SAVEPOINT` and rethrows the original
+  exception unchanged; when the transaction is still alive and that rollback
+  succeeds, the shifted rows of the interrupted move no longer remain, and if
+  that cleanup itself fails the original exception still wins but the partial
+  shifts **stay** and you must roll back. If the target write **changes no row**
+  (no exception exists), the rollback to the savepoint must succeed and the call
+  returns `false`; if it fails, that failure is thrown instead of `false`, so a
+  `false` never sits over partial shifts. Your earlier work and savepoints are
+  not touched, and the scope lock is kept until you end your transaction. You
+  still own the final commit or rollback. On the success path a mutating move
+  adds exactly two statements (`SAVEPOINT`, `RELEASE SAVEPOINT`). Only a failure
+  after the savepoint was established adds cleanup: `ROLLBACK TO SAVEPOINT`,
+  then an attempted `RELEASE SAVEPOINT` (skipped when the driver reports no
+  active transaction, and a failing cleanup statement changes the count); no
+  universal count is promised. A no-op, a missing row, an invalid argument or a
+  failing `SAVEPOINT` add no `ROLLBACK TO` or `RELEASE`. The call can now throw
+  `TransactionExecutionException` (a class that exists in `v1.4.0`) when its own
+  savepoint control statement fails, the guard fires, or an undo or `RELEASE`
+  fails; the `v1.4.0` method issued no such statement. This changes the
+  failure-path state that `v1.4.0` left behind. A deadlock (`1213`), MariaDB
+  `1020` and `1205` with `innodb_rollback_on_timeout=ON` end the whole
+  transaction on the server, erasing your earlier work too, and are not rescued;
+  an exception from this call is not proof of a clean, still-live transaction,
+  so never swallow it and continue unless you know the state.
 
 `TransactionRunnerInterface` exposes only `run(callable $callback)`, so a
 consumer service can depend on the shared transaction abstraction without
@@ -534,7 +536,7 @@ for that condition.
 * When `updatedAtColumn` is configured, updates that column on the target row in the same SQL statement and transaction as the final order update.
 * Does not globally normalize pre-existing gaps.
 * In a transaction it owns: rolls back and returns `false` if the final target update reports no affected row, and rolls back on any Throwable after starting the transaction, so no partial shift survives.
-* In a caller-owned transaction (Unreleased, Issue #55, ADR 0005): it never commits or fully rolls back. It undoes its own shifts with an operation-local savepoint (taken after the scope lock, before the first mutating statement) when it returns `false` after the shifts or throws, and rethrows the original Throwable; if the undo itself fails, the shifts stay for the caller's rollback and the failure is not reported as `false`. The caller still owns the final commit or rollback, and a server-ended transaction (`1213`, MariaDB `1020`) is not restored.
+* In a caller-owned transaction (Unreleased, Issue #55, ADR 0005): it never commits or fully rolls back. It undoes its own shifts with an operation-local savepoint (taken after the scope lock, before the first mutating statement) when it throws (the original Throwable is rethrown) or returns `false` after the shifts (no exception exists; `false` is returned only if the undo succeeded); if the undo itself fails, the shifts stay for the caller's rollback, the original Throwable still wins on the throwing path, and on the `false` path the undo failure is thrown instead of `false`. The caller still owns the final commit or rollback, and a server-ended transaction (`1213`, MariaDB `1020`) is not restored.
 * Rethrows the original Throwable without arbitrary wrapping.
 
 ### Ordering Guarantees on MariaDB (`innodb_snapshot_isolation`)

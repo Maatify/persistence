@@ -145,7 +145,8 @@ whole transaction back (as the `catch` above does) is always safe.
   there (Unreleased, Issue #55, [ADR 0005](../adr/0005-move-within-scope-lazy-operation-savepoint.md)):
   it takes an operation-local savepoint after the scope lock and before the
   first mutating statement, rolls back to it when the shift or the target write
-  throws (the original exception is rethrown) or returns `false`, and releases
+  throws (the original exception is rethrown) or changes no row (no exception
+  exists; `false` is returned once the undo succeeded), and releases
   it on success. Cleanup is best effort after an exception: if it fails, the
   original exception still wins and the shifts stay for your rollback. If the
   undo behind `false` fails, that failure is thrown (never `false` over partial

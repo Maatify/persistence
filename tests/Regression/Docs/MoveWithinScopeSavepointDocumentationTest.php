@@ -175,6 +175,58 @@ final class MoveWithinScopeSavepointDocumentationTest extends TestCase
         self::assertStringContainsString('If shifts had already been executed and the caller\'s transaction survives', $readme);
     }
 
+    public function testReadmeRollbackOwnershipBulletSeparatesThrownFailuresFromTheFalseReturn(): void
+    {
+        $readme = $this->read('README.md');
+        $start = (int) strpos($readme, '* **`moveWithinScope()` undoes its own mutation window');
+        $end = (int) strpos($readme, "\n\n", $start);
+        $bullet = $this->flatten(substr($readme, $start, $end - $start));
+
+        self::assertNotSame(0, $start);
+        self::assertStringNotContainsString('(or `false` after the shifts)', $bullet);
+        self::assertStringNotContainsString('the original exception is rethrown unchanged. If that cleanup itself fails, the original exception still wins', $bullet);
+
+        $throws = strpos($bullet, 'the range shift or the target write **throws**');
+        $noRow = strpos($bullet, '**changes no row** (no exception exists)');
+
+        self::assertIsInt($throws, 'The thrown-failure outcome is missing.');
+        self::assertIsInt($noRow, 'The false-return outcome is missing.');
+        self::assertGreaterThan($throws, $noRow);
+
+        // "original exception" may only be used for the thrown outcome, i.e. before the false-return outcome.
+        self::assertSame(false, strpos(substr($bullet, $noRow), 'original exception'), 'The false path must not mention an original exception.');
+        self::assertStringContainsString('that failure is thrown instead of `false`', substr($bullet, $noRow));
+    }
+
+    public function testChangelogEntryOpeningDoesNotGiveTheFalsePathAnOriginalException(): void
+    {
+        $entry = $this->flatten($this->issue55ChangelogSection()[1]);
+
+        self::assertStringNotContainsString('or the target write changes no row (`false`), it rolls back', $entry);
+        self::assertStringContainsString('when the target write changes no row, there is no exception', $entry);
+
+        $noException = (int) strpos($entry, 'there is no exception');
+        self::assertSame(false, strpos(substr($entry, $noException, 200), 'original exception'));
+    }
+
+    public function testChangelogDoesNotPresentSupersededOrGloballyUnchangedCallerOwnedClaimsAsCurrent(): void
+    {
+        $unreleased = $this->flatten($this->unreleasedChangelog());
+
+        self::assertStringNotContainsString('(partial work remains until the caller rolls back; no savepoint guarantee in the ordering API)', $unreleased);
+        self::assertStringContainsString('at that interim documentation state', $unreleased);
+        self::assertStringContainsString('supersedes this for `moveWithinScope()`', $unreleased);
+        self::assertStringNotContainsString('`moveWithinScope()` keeps its behavior', $unreleased);
+        self::assertStringContainsString('This runner-generation change does not alter `ScopedOrderingManager::moveWithinScope()`', $unreleased);
+    }
+
+    public function testReferenceAndReadmeSummariesDoNotGiveTheFalseReturnAnOriginalException(): void
+    {
+        self::assertStringContainsString('a `false` result has none and is returned only if the undo succeeded', $this->flatten($this->read('PERSISTENCE_PACKAGE_REFERENCE.md')));
+        self::assertStringContainsString('(no exception exists; `false` is returned only if the undo succeeded)', $this->flatten($this->read('README.md')));
+        self::assertStringNotContainsString('(original exception kept; an undo failure is thrown rather than `false`)', $this->read('PERSISTENCE_PACKAGE_REFERENCE.md'));
+    }
+
     public function testReferenceSeparatesUnreleasedApiFromTheUnreleasedDeprecationOfReleasedClasses(): void
     {
         $head = $this->flatten((string) substr($this->read('PERSISTENCE_PACKAGE_REFERENCE.md'), 0, 5000));
@@ -259,7 +311,7 @@ final class MoveWithinScopeSavepointDocumentationTest extends TestCase
         return $sections['[Unreleased]'];
     }
 
-    /** @return array{string, string} heading and body of the one section holding the Issue #55 entry */
+    /** @return array{string, string} heading of the one section holding the Issue #55 entry, and that entry bullet alone */
     private function issue55ChangelogSection(): array
     {
         $holders = [];
@@ -273,7 +325,11 @@ final class MoveWithinScopeSavepointDocumentationTest extends TestCase
         self::assertCount(1, $holders, 'The Issue #55 entry must live in exactly one changelog section.');
         $heading = (string) array_key_first($holders);
 
-        return [$heading, $holders[$heading]];
+        $body = $holders[$heading];
+        $start = (int) strpos($body, '* **Behavior change on failure paths (Issue #55');
+        $end = preg_match('/\n(?:\* |### )/', $body, $next, PREG_OFFSET_CAPTURE, $start + 1) === 1 ? $next[0][1] : strlen($body);
+
+        return [$heading, substr($body, $start, $end - $start)];
     }
 
     private function flatten(string $text): string
