@@ -1,5 +1,7 @@
 # Issue #42 — isolated-host C2/C3 confirmation: report
 
+> **Distribution note:** the raw-data directory `results/` referenced below is excluded from Composer/GitHub package archives (`.gitattributes` `export-ignore`, Issue #60) to keep the installed package small. It is unchanged in the Git repository: [browse `results/`](https://github.com/Maatify/persistence/tree/e4aba2043fe0956d7097621d22dfb23e4efbbcfa/docs/studies/issue-32-retry-comparison/results). Relative `results/...` links and commands in this document resolve only in a Git checkout.
+
 Study only ([Issue #42](https://github.com/Maatify/persistence/issues/42), follow-up to
 [Issue #32](https://github.com/Maatify/persistence/issues/32) and merged [PR #41](https://github.com/Maatify/persistence/pull/41)).
 No change to `src/`, `tests/`, the public API, the harness, the decision rule ([`METHODOLOGY.md`](METHODOLOGY.md) §6) or

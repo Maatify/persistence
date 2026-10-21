@@ -1,5 +1,7 @@
 # Issue #32 — Immediate vs Hybrid retry: methodology (pre-registered)
 
+> **Distribution note:** the raw-data directory `results/` referenced below is excluded from Composer/GitHub package archives (`.gitattributes` `export-ignore`, Issue #60) to keep the installed package small. It is unchanged in the Git repository: [browse `results/`](https://github.com/Maatify/persistence/tree/e4aba2043fe0956d7097621d22dfb23e4efbbcfa/docs/studies/issue-32-retry-comparison/results). Relative `results/...` links and commands in this document resolve only in a Git checkout.
+
 Status: written and committed **before** the main measurement runs. Scope: study only; no change to `src/`, the public API, contracts, or production behaviour documentation. Nothing here implements a Retry feature.
 
 ## 1. Question
