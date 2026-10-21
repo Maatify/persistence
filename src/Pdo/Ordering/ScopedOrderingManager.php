@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Maatify\Persistence\Pdo\Ordering;
 
 use Maatify\Persistence\Exception\InvalidOrderingOperationException;
+use Maatify\Persistence\Pdo\Ordering\Internal\OperationSavepoint;
 use Maatify\Persistence\Pdo\Transaction\PdoTransactionRunner;
 use PDO;
 use Throwable;
@@ -20,7 +21,10 @@ use Throwable;
  * Transaction model:
  * - moveWithinScope() uses the shared PDO transaction runner.
  * - It owns the transaction when called outside an active PDO transaction.
- * - It participates in an active caller-owned PDO transaction.
+ * - It participates in an active caller-owned PDO transaction without
+ *   committing or fully rolling it back. There it undoes its own mutation
+ *   window with an operation-local savepoint, taken after the scope lock and
+ *   the read-only checks and before the first mutating statement (ADR 0005).
  *
  * Ordering model:
  * - getNextPosition() returns max(order) + 1 with a plain read and no lock.
@@ -229,6 +233,22 @@ final readonly class ScopedOrderingManager
      * - true when the target row is already at the requested/clamped position.
      * - false when the target row does not exist in the given scope.
      *
+     * Caller-owned transaction (Unreleased behavior change, Issue #55): a Throwable
+     * in the range shift or the target write, or `false` after the shifts, is
+     * followed by ROLLBACK TO SAVEPOINT of an operation-local savepoint, so the
+     * shifted rows do not remain; the original Throwable is rethrown unchanged and
+     * a cleanup failure never replaces it. If the undo behind `false` itself fails,
+     * that failure is thrown instead of `false`. A no-op move and a missing row
+     * issue no savepoint statement; a mutating move adds SAVEPOINT and RELEASE.
+     * The scope lock is kept, earlier work and the caller's own savepoints are
+     * untouched, and the caller still owns commit and rollback. A deadlock (1213),
+     * MariaDB 1020 and 1205 with innodb_rollback_on_timeout=ON end the caller's
+     * whole transaction on the server: they surface as the original exception, are
+     * not rescued, and must not be swallowed. A best-effort guard throws
+     * TransactionExecutionException before the first mutation when the SAVEPOINT
+     * reply shows that the transaction has ended; it is not a proof of
+     * transaction identity.
+     *
      * MariaDB innodb_snapshot_isolation: inside a caller-owned REPEATABLE READ
      * transaction with an older snapshot, the scope lock needs a current read
      * (also in the stable v1.4.0). With the setting ON (the 11.8 default) and a
@@ -270,9 +290,13 @@ final readonly class ScopedOrderingManager
         $rollbackResult = new class () extends \RuntimeException {
         };
 
+        // Read before the runner decides and with no statement in between: a participating call (caller-owned
+        // transaction) undoes its own mutation window with an operation-local savepoint; the owned path is unchanged.
+        $participating = $pdo->inTransaction();
+
         try {
             return (new PdoTransactionRunner($pdo))->run(
-                function () use ($pdo, $config, $scopeValue, $id, $newOrder, $updatedAtValue, $rollbackResult): bool {
+                function () use ($pdo, $config, $scopeValue, $id, $newOrder, $updatedAtValue, $rollbackResult, $participating): bool {
                     $maxOrder = $this->lockScopeForUpdate($pdo, $config, $scopeValue);
 
                     $currentOrder = $this->getCurrentOrderForUpdate($pdo, $config, $scopeValue, $id);
@@ -287,24 +311,37 @@ final readonly class ScopedOrderingManager
                         return true;
                     }
 
-                    if ($newOrder < $currentOrder) {
-                        $this->shiftOrdersUp($pdo, $config, $scopeValue, $newOrder, $currentOrder);
-                    } else {
-                        $this->shiftOrdersDown($pdo, $config, $scopeValue, $newOrder, $currentOrder);
-                    }
+                    // Lazy savepoint: after the scope lock and the read-only checks, before the first mutating statement.
+                    $savepoint = $participating ? OperationSavepoint::begin($pdo) : null;
 
-                    $updated = $this->updateTargetOrder(
-                        $pdo,
-                        $config,
-                        $scopeValue,
-                        $id,
-                        $newOrder,
-                        $updatedAtValue,
-                    );
+                    try {
+                        if ($newOrder < $currentOrder) {
+                            $this->shiftOrdersUp($pdo, $config, $scopeValue, $newOrder, $currentOrder);
+                        } else {
+                            $this->shiftOrdersDown($pdo, $config, $scopeValue, $newOrder, $currentOrder);
+                        }
+
+                        $updated = $this->updateTargetOrder(
+                            $pdo,
+                            $config,
+                            $scopeValue,
+                            $id,
+                            $newOrder,
+                            $updatedAtValue,
+                        );
+                    } catch (Throwable $throwable) {
+                        $savepoint?->cleanupAfterFailure();
+
+                        throw $throwable;
+                    }
 
                     if (!$updated) {
+                        $savepoint?->undoOrFail();
+
                         throw $rollbackResult;
                     }
+
+                    $savepoint?->releaseOrUndo();
 
                     return true;
                 },

@@ -97,7 +97,7 @@ final class ScopedOrderingManagerTransactionTest extends MySqlIntegrationTestCas
         self::assertSame([$ids[0] => 1, $ids[1] => 2, $ids[2] => 4, $ids[3] => 3], $this->controlReader->globalOrdersById());
     }
 
-    public function testParticipantFailureLeavesOuterTransactionActiveWithoutIndependentRollback(): void
+    public function testParticipantFailureUndoesItsOwnMutationWindowAndLeavesOuterTransactionActive(): void
     {
         $ids = $this->insertGlobalOrders(1, 2, 3, 4);
         $before = $this->reader->globalOrdersById();
@@ -113,7 +113,7 @@ final class ScopedOrderingManagerTransactionTest extends MySqlIntegrationTestCas
             } catch (PDOException $throwable) {
                 self::assertSame('45000', $throwable->getCode());
                 self::assertTrue($this->pdo()->inTransaction());
-                self::assertSame([$ids[0] => 1, $ids[1] => 3, $ids[2] => 4, $ids[3] => 4], $this->reader->globalOrdersById());
+                self::assertSame($before, $this->reader->globalOrdersById());
             }
 
             $this->pdo()->rollBack();

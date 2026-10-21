@@ -1,0 +1,62 @@
+> php tests/Consumer/run.php
+Allocated positions 4 and 5 and committed both inserts.
+OK: 01_allocate_and_insert
+Both failures rolled back; position 4 is still free.
+OK: 02_rollback_on_failure
+1. getNextPosition() under REPEATABLE READ: stale position 4 -> duplicate [1, 2, 3, 4, 4].
+2. getNextPositionForUpdate() under REPEATABLE READ: position 5 -> [1, 2, 3, 4, 5].
+3. getNextPosition() under READ COMMITTED: position 5 -> [1, 2, 3, 4, 5] (still unserialized).
+OK: 03_stale_snapshot_vs_plain_read
+A. Calling getNextPositionForUpdate() outside a transaction is rejected.
+B. Empty scope serialized by a parent-row lock: positions 1 and 2.
+C. Unserialized empty scope: UNIQUE index rejected the second writer (1062).
+D. The runner participated in the outer transaction; the caller rolled everything back.
+OK: 04_empty_scope_and_ownership
+1. A blocked attempt failed with the original PDOException 1205 and was rolled back.
+2. Retries are bounded: 2 attempts, original 1205 rethrown, no lock leaked.
+3. Constraint errors and host failures are not retried; the original Throwable propagates.
+4. The helper refused to retry inside a caller-owned transaction.
+5. A deadlock (1213, simulated) is classified as retryable.
+   attempt 1 hit a lock failure; the other transaction commits, then retry.
+6. The retry in a new transaction allocated position 5; the external effect ran once.
+OK: 05_lock_timeout_and_retry
+1. Older snapshot (a,b,c), d and e committed meanwhile: a moved to 5 -> [b, c, d, e, a].
+2. Caller rollback: [a, b, c, d, e] again; the manager never ended the caller transaction.
+3. No caller transaction: owned transaction committed -> [b, c, a].
+OK: 01_move_after_older_snapshot
+Attempt 1 was a real deadlock victim; the runner replayed the transaction and committed once.
+OK: 01_owned_transaction_replay
+The caller-owned transaction was the deadlock victim; the runner did not replay it.
+OK: 02_caller_owned_no_replay
+Consumer run 1 passed.
+Allocated positions 4 and 5 and committed both inserts.
+OK: 01_allocate_and_insert
+Both failures rolled back; position 4 is still free.
+OK: 02_rollback_on_failure
+1. getNextPosition() under REPEATABLE READ: stale position 4 -> duplicate [1, 2, 3, 4, 4].
+2. getNextPositionForUpdate() under REPEATABLE READ: position 5 -> [1, 2, 3, 4, 5].
+3. getNextPosition() under READ COMMITTED: position 5 -> [1, 2, 3, 4, 5] (still unserialized).
+OK: 03_stale_snapshot_vs_plain_read
+A. Calling getNextPositionForUpdate() outside a transaction is rejected.
+B. Empty scope serialized by a parent-row lock: positions 1 and 2.
+C. Unserialized empty scope: UNIQUE index rejected the second writer (1062).
+D. The runner participated in the outer transaction; the caller rolled everything back.
+OK: 04_empty_scope_and_ownership
+1. A blocked attempt failed with the original PDOException 1205 and was rolled back.
+2. Retries are bounded: 2 attempts, original 1205 rethrown, no lock leaked.
+3. Constraint errors and host failures are not retried; the original Throwable propagates.
+4. The helper refused to retry inside a caller-owned transaction.
+5. A deadlock (1213, simulated) is classified as retryable.
+   attempt 1 hit a lock failure; the other transaction commits, then retry.
+6. The retry in a new transaction allocated position 5; the external effect ran once.
+OK: 05_lock_timeout_and_retry
+1. Older snapshot (a,b,c), d and e committed meanwhile: a moved to 5 -> [b, c, d, e, a].
+2. Caller rollback: [a, b, c, d, e] again; the manager never ended the caller transaction.
+3. No caller transaction: owned transaction committed -> [b, c, a].
+OK: 01_move_after_older_snapshot
+Attempt 1 was a real deadlock victim; the runner replayed the transaction and committed once.
+OK: 01_owned_transaction_replay
+The caller-owned transaction was the deadlock victim; the runner did not replay it.
+OK: 02_caller_owned_no_replay
+Consumer run 2 passed.
+Consumer Verification Harness passed: two clean Composer consumer and MySQL runs completed.

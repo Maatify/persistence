@@ -133,8 +133,9 @@ The package-level schema notes are in [schema/README.md](schema/README.md).
     * Shifts only the affected range.
     * When `updatedAtColumn` is configured, `$updatedAtValue` is written with the target order in the same update and transaction.
     * Does not globally normalize pre-existing gaps.
-    * Returns `false` if the final target update reports no affected row. In a transaction the method owns, it rolls that transaction back first; in a caller-owned transaction it does **not** roll back, and rows already shifted stay in the caller's transaction (see [Rollback Ownership](#rollback-ownership)).
-    * Rolls back an owned transaction when a throwable occurs after transaction startup. In a caller-owned transaction a throwable leaves the already executed shifts in place; the caller decides on a full rollback. There is no savepoint and no savepoint-rollback guarantee in this method.
+    * Returns `false` if the final target update reports no affected row. In a transaction the method owns, it rolls that transaction back first; in a caller-owned transaction it undoes its own range shifts with an operation-local savepoint and returns `false`, never committing or fully rolling back the caller's transaction (see [Rollback Ownership](#rollback-ownership)). If that undo itself fails, the failure is thrown instead of `false`.
+    * Rolls back an owned transaction when a throwable occurs after transaction startup. In a caller-owned transaction (Unreleased behavior change, Issue #55, [ADR 0005](docs/adr/0005-move-within-scope-lazy-operation-savepoint.md)) the call takes an operation-local savepoint after the scope lock and the read-only checks, immediately before the first mutating statement: a throwable in the range shift or the target write is followed by a best-effort `ROLLBACK TO SAVEPOINT` and `RELEASE SAVEPOINT`, and the **original** throwable is rethrown (a cleanup failure never replaces it, and then the shifts stay for the caller's rollback). A no-op move and a missing row issue no savepoint statement; a mutating move adds exactly `SAVEPOINT` and `RELEASE SAVEPOINT`. The scope lock is kept, the caller's earlier work and its own savepoints are untouched, and the caller still owns the final commit or rollback. The package never commits, fully rolls back or retries the caller's transaction.
+    * Not rescuable, and never special-cased: a deadlock (`1213`), MariaDB `1020` and `1205` with `innodb_rollback_on_timeout=ON` end the caller's whole transaction on the server; the original exception surfaces and the caller must not catch it and continue. A best-effort guard fails closed with `TransactionExecutionException` before the first mutation when the `SAVEPOINT` reply shows that the transaction is already gone (measured on MySQL 8.0.46/8.4.10 and MariaDB 11.8.9; not detected on MariaDB 11.4.7). It is not a proof of transaction identity.
     * Rethrows the same original throwable.
     * Does not universally wrap PDO failures as package exceptions.
 
@@ -476,7 +477,8 @@ and not part of the stable `v1.4.0`.
   `moveWithinScope()` participate in it without committing or rolling it back.
 * The caller owns the final commit or rollback for an active outer transaction.
   A failure inside a caller-owned transaction does not undo the participant's
-  earlier changes automatically (see [Rollback Ownership](#rollback-ownership)).
+  earlier changes automatically, except that `moveWithinScope()` undoes its own
+  partial mutation window (see [Rollback Ownership](#rollback-ownership)).
 * Atomic composition is supported only when ordinary PDO mutations and all
   package participants use the same PDO connection.
 * `getNextPosition()` does not start a transaction or lock its scope. The
@@ -511,13 +513,17 @@ and not part of the stable `v1.4.0`.
 | Situation | Who rolls back | What happens to partial work |
 |---|---|---|
 | No transaction active; a runner or `moveWithinScope()` begins one | The runner / `moveWithinScope()` | The whole owned transaction is rolled back (`moveWithinScope()` also rolls back before returning `false`). Nothing partial remains. |
-| Transaction already active (caller-owned); a runner or `moveWithinScope()` participates | The caller | Not rolled back by the package. Changes already executed in the caller's transaction (for `moveWithinScope()`: rows already shifted) remain until the caller rolls back, and a caller `commit()` makes them permanent. |
+| Transaction already active (caller-owned); a runner participates | The caller | Not rolled back by the package. Changes already executed in the caller's transaction remain until the caller rolls back, and a caller `commit()` makes them permanent. |
+| Transaction already active (caller-owned); `moveWithinScope()` participates (Unreleased, Issue #55) | The call, to its own operation-local savepoint only; the caller owns the final outcome | Rows shifted by a failed or `false` move are undone with `ROLLBACK TO SAVEPOINT` (original exception kept; an undo failure is thrown rather than `false`). The caller's earlier work and savepoints stay. Not applicable to `1213`, `1020`, `1205` with `innodb_rollback_on_timeout=ON`. |
 | Caller-owned transaction + savepoint runner (`PdoSavepointTransactionRunner`; Unreleased: `PdoDeadlockRetrySavepointTransactionRunner`) | The runner, to its own savepoint only | Statement-level failures are rolled back to the operation savepoint; the outer transaction stays active and the caller still owns the final outcome. Not applicable to `1213`. |
 
-`moveWithinScope()` creates no savepoint. Wrapping it in a savepoint runner is
-possible for statement-level errors but is the caller's choice and not part of
-the ordering API contract; the package gives no savepoint-rollback guarantee for
-ordering calls.
+In a caller-owned transaction `moveWithinScope()` creates its own
+operation-local savepoint (after the scope lock, before the first mutating
+statement) and releases it on success, so wrapping it in a savepoint runner is
+no longer needed to undo its partial shifts. This is a failure-path behavior
+change of the published method (ADR 0005); it does not restore a transaction
+that the server already ended, and it is not a guarantee against non-transactional
+side effects.
 
 ### Deadlock `1213` and Caller-Owned Transactions
 

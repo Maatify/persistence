@@ -20,8 +20,9 @@ declare(strict_types=1);
  *
  * Part 2 shows that the caller keeps ownership: the manager neither commits nor
  * rolls back the caller's transaction, so a caller rollback restores the rows.
- * The manager also does not undo its own partial work inside a caller-owned
- * transaction (no savepoint): after a failure the caller must roll back.
+ * Inside a caller-owned transaction the manager undoes its own partial work
+ * with an operation-local savepoint (Issue #55); the caller still owns the
+ * final commit or rollback.
  * This script uses a non-unique ordering index; moveWithinScope() is not
  * compatible with a UNIQUE (scope, order) index.
  * Part 3 shows the same call without a caller transaction (runner-owned).

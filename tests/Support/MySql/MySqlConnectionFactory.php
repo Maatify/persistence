@@ -16,12 +16,29 @@ final class MySqlConnectionFactory
 
     public function create(): PDO
     {
+        return $this->build(PDO::class);
+    }
+
+    public function createFaultInjecting(): FaultInjectingPdo
+    {
+        return $this->build(FaultInjectingPdo::class);
+    }
+
+    /**
+     * @template TPdo of PDO
+     *
+     * @param class-string<TPdo> $class
+     *
+     * @return TPdo
+     */
+    private function build(string $class): PDO
+    {
         $dsn = $this->requiredEnv(self::DSN_ENV);
         $user = $this->requiredEnv(self::USER_ENV);
         $password = $this->optionalEnv(self::PASSWORD_ENV);
 
         try {
-            $pdo = new PDO($dsn, $user, $password, [
+            $pdo = new $class($dsn, $user, $password, [
                 PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
                 PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
                 PDO::ATTR_EMULATE_PREPARES   => false,

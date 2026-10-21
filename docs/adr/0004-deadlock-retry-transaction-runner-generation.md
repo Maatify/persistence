@@ -35,7 +35,7 @@ The existing runners are `final readonly`, take only `PDO`, and their behavior i
 
 - Consumers can opt in to bounded deadlock replay for transactions the runner owns, without any change for existing code or for the default configuration.
 - A replay-enabled callback may run up to four times: consumers own the idempotency of anything outside the transaction (documented prominently). Keeping the runner-owned transaction intact inside the callback is a mandatory precondition of replay (next section).
-- `ScopedOrderingManager::moveWithinScope()` keeps using `PdoTransactionRunner` internally; its behavior is unchanged and it does not replay deadlocks.
+- `ScopedOrderingManager::moveWithinScope()` keeps using `PdoTransactionRunner` internally; its behavior is unchanged and it does not replay deadlocks. (Amended by [ADR 0005](0005-move-within-scope-lazy-operation-savepoint.md): in a caller-owned transaction it now undoes its own mutation window with an operation-local savepoint; it still does not replay.)
 - Two deprecated public classes remain in the `1.x` line until a future Major release.
 
 ## Accepted limitation: callback transaction-ownership precondition

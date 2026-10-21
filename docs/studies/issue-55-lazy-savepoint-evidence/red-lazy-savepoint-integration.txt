@@ -1,0 +1,147 @@
+PHPUnit 11.5.57 by Sebastian Bergmann and contributors.
+
+Runtime:       PHP 8.4.4
+Configuration: /Users/mohamedabdulalim/MEGA/Libraries/2026/persistence/.claude/worktrees/retry-performance-mac-benchmark-f3a0fb/phpunit.xml
+
+FFF.EF..F.....FF..FFFF                                            22 / 22 (100%)
+
+Time: 00:03.560, Memory: 14.00 MB
+
+There was 1 error:
+
+1) Maatify\Persistence\Tests\Integration\Pdo\Ordering\ScopedOrderingManagerLazySavepointTest::testCallAfterSwallowedDeadlockFailsClosedBeforeAnyMutation
+PDOException: SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry '2026-01-01 00:00:00' for key 'maa_persistence_test_lsp_unique.u_updated'
+
+/Users/mohamedabdulalim/MEGA/Libraries/2026/persistence/.claude/worktrees/retry-performance-mac-benchmark-f3a0fb/src/Pdo/Ordering/ScopedOrderingManager.php:562
+/Users/mohamedabdulalim/MEGA/Libraries/2026/persistence/.claude/worktrees/retry-performance-mac-benchmark-f3a0fb/src/Pdo/Ordering/ScopedOrderingManager.php:296
+/Users/mohamedabdulalim/MEGA/Libraries/2026/persistence/.claude/worktrees/retry-performance-mac-benchmark-f3a0fb/src/Pdo/Transaction/PdoTransactionRunner.php:35
+/Users/mohamedabdulalim/MEGA/Libraries/2026/persistence/.claude/worktrees/retry-performance-mac-benchmark-f3a0fb/src/Pdo/Ordering/ScopedOrderingManager.php:274
+/Users/mohamedabdulalim/MEGA/Libraries/2026/persistence/.claude/worktrees/retry-performance-mac-benchmark-f3a0fb/tests/Integration/Pdo/Ordering/ScopedOrderingManagerLazySavepointTest.php:489
+/Users/mohamedabdulalim/MEGA/Libraries/2026/persistence/.claude/worktrees/retry-performance-mac-benchmark-f3a0fb/tests/Integration/Pdo/Ordering/ScopedOrderingManagerLazySavepointTest.php:484
+/Users/mohamedabdulalim/MEGA/Libraries/2026/persistence/.claude/worktrees/retry-performance-mac-benchmark-f3a0fb/tests/Integration/Pdo/Ordering/ScopedOrderingManagerLazySavepointTest.php:195
+
+--
+
+There were 11 failures:
+
+1) Maatify\Persistence\Tests\Integration\Pdo\Ordering\ScopedOrderingManagerLazySavepointTest::testFalseAfterShiftsUndoesTheShiftsAndKeepsCallerWork
+Failed asserting that two arrays are identical.
+--- Expected
++++ Actual
+@@ @@
+ Array &0 [
+     1 => 1,
+-    2 => 2,
+-    3 => 3,
+-    4 => 4,
++    2 => 3,
++    3 => 4,
++    4 => 5,
+     5 => 5,
+ ]
+
+/Users/mohamedabdulalim/MEGA/Libraries/2026/persistence/.claude/worktrees/retry-performance-mac-benchmark-f3a0fb/tests/Integration/Pdo/Ordering/ScopedOrderingManagerLazySavepointTest.php:97
+
+2) Maatify\Persistence\Tests\Integration\Pdo\Ordering\ScopedOrderingManagerLazySavepointTest::testDuplicateKeyOnTargetWriteUndoesShiftsAndRethrowsTheOriginal
+Failed asserting that two arrays are identical.
+--- Expected
++++ Actual
+@@ @@
+ Array &0 [
+     1 => 1,
+-    2 => 2,
+-    3 => 3,
+-    4 => 4,
++    2 => 3,
++    3 => 4,
++    4 => 5,
+     5 => 5,
+ ]
+
+/Users/mohamedabdulalim/MEGA/Libraries/2026/persistence/.claude/worktrees/retry-performance-mac-benchmark-f3a0fb/tests/Integration/Pdo/Ordering/ScopedOrderingManagerLazySavepointTest.php:118
+
+3) Maatify\Persistence\Tests\Integration\Pdo\Ordering\ScopedOrderingManagerLazySavepointTest::testLockWaitTimeoutOnTargetWriteUndoesShiftsAndRethrowsTheOriginal
+Failed asserting that two arrays are identical.
+--- Expected
++++ Actual
+@@ @@
+ Array &0 [
+     1 => 1,
+-    2 => 2,
+-    3 => 3,
+-    4 => 4,
++    2 => 3,
++    3 => 4,
++    4 => 5,
+     5 => 5,
+ ]
+
+/Users/mohamedabdulalim/MEGA/Libraries/2026/persistence/.claude/worktrees/retry-performance-mac-benchmark-f3a0fb/tests/Integration/Pdo/Ordering/ScopedOrderingManagerLazySavepointTest.php:145
+
+4) Maatify\Persistence\Tests\Integration\Pdo\Ordering\ScopedOrderingManagerLazySavepointTest::testFailedSecondMoveKeepsTheFirstMoveOfTheSameTransaction
+Failed asserting that two arrays are identical.
+--- Expected
++++ Actual
+@@ @@
+ Array &0 [
+     1 => 1,
+-    2 => 3,
+-    3 => 4,
++    2 => 2,
++    3 => 3,
+     4 => 5,
+-    5 => 2,
++    5 => 1,
+ ]
+
+/Users/mohamedabdulalim/MEGA/Libraries/2026/persistence/.claude/worktrees/retry-performance-mac-benchmark-f3a0fb/tests/Integration/Pdo/Ordering/ScopedOrderingManagerLazySavepointTest.php:220
+
+5) Maatify\Persistence\Tests\Integration\Pdo\Ordering\ScopedOrderingManagerLazySavepointTest::testSuccessfulMutatingMoveAddsExactlyOneSavepointAndOneRelease
+Failed asserting that two arrays are identical.
+--- Expected
++++ Actual
+@@ @@
+ Array &0 [
+     'commit' => 0,
+     'rollback' => 0,
+-    'savepoint' => 1,
+-    'release' => 1,
++    'savepoint' => 0,
++    'release' => 0,
+     'rollback_to' => 0,
+ ]
+
+/Users/mohamedabdulalim/MEGA/Libraries/2026/persistence/.claude/worktrees/retry-performance-mac-benchmark-f3a0fb/tests/Integration/Pdo/Ordering/ScopedOrderingManagerLazySavepointTest.php:278
+
+6) Maatify\Persistence\Tests\Integration\Pdo\Ordering\ScopedOrderingManagerLazySavepointTest::testS1SavepointReturningFalseFailsClosedBeforeAnyMutation
+Expected TransactionExecutionException.
+
+/Users/mohamedabdulalim/MEGA/Libraries/2026/persistence/.claude/worktrees/retry-performance-mac-benchmark-f3a0fb/tests/Integration/Pdo/Ordering/ScopedOrderingManagerLazySavepointTest.php:360
+
+7) Maatify\Persistence\Tests\Integration\Pdo\Ordering\ScopedOrderingManagerLazySavepointTest::testS2SavepointThrowingPropagatesBeforeAnyMutation
+Expected the injected PDOException.
+
+/Users/mohamedabdulalim/MEGA/Libraries/2026/persistence/.claude/worktrees/retry-performance-mac-benchmark-f3a0fb/tests/Integration/Pdo/Ordering/ScopedOrderingManagerLazySavepointTest.php:375
+
+8) Maatify\Persistence\Tests\Integration\Pdo\Ordering\ScopedOrderingManagerLazySavepointTest::testS5FalseResultNeverSurvivesAFailedUndo
+Expected TransactionExecutionException, got false.
+
+/Users/mohamedabdulalim/MEGA/Libraries/2026/persistence/.claude/worktrees/retry-performance-mac-benchmark-f3a0fb/tests/Integration/Pdo/Ordering/ScopedOrderingManagerLazySavepointTest.php:425
+
+9) Maatify\Persistence\Tests\Integration\Pdo\Ordering\ScopedOrderingManagerLazySavepointTest::testS6ReleaseReturningFalseUndoesTheMoveAndFails
+Expected TransactionExecutionException.
+
+/Users/mohamedabdulalim/MEGA/Libraries/2026/persistence/.claude/worktrees/retry-performance-mac-benchmark-f3a0fb/tests/Integration/Pdo/Ordering/ScopedOrderingManagerLazySavepointTest.php:439
+
+10) Maatify\Persistence\Tests\Integration\Pdo\Ordering\ScopedOrderingManagerLazySavepointTest::testS7ReleaseThrowingUndoesTheMoveAndRethrowsTheReleaseFailure
+Expected the injected PDOException.
+
+/Users/mohamedabdulalim/MEGA/Libraries/2026/persistence/.claude/worktrees/retry-performance-mac-benchmark-f3a0fb/tests/Integration/Pdo/Ordering/ScopedOrderingManagerLazySavepointTest.php:454
+
+11) Maatify\Persistence\Tests\Integration\Pdo\Ordering\ScopedOrderingManagerLazySavepointTest::testSavepointNameFollowsTheAdr0003Contract
+Failed asserting that actual size 0 matches expected size 2.
+
+/Users/mohamedabdulalim/MEGA/Libraries/2026/persistence/.claude/worktrees/retry-performance-mac-benchmark-f3a0fb/tests/Integration/Pdo/Ordering/ScopedOrderingManagerLazySavepointTest.php:469
+
+ERRORS!
+Tests: 22, Assertions: 171, Errors: 1, Failures: 11.
