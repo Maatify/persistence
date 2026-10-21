@@ -197,6 +197,34 @@ The exact footprint and limits are specified in the
 [Package Reference](../../PERSISTENCE_PACKAGE_REFERENCE.md); do not rely on
 this summary alone.
 
+### MariaDB: `innodb_snapshot_isolation=ON` makes the stale-snapshot case fail with `1020`
+
+`getNextPositionForUpdate()` returns the latest committed position inside an
+older `REPEATABLE READ` snapshot because the engine performs a *current read* for
+the locking statement. MySQL 8.0/8.4 and MariaDB with
+`innodb_snapshot_isolation=OFF` do (tested). MariaDB with the setting `ON` (the
+11.8 default) refuses and raises `PDOException` with driver code `1020`, which
+propagates unchanged. The error appears only when the locking read visits a row
+another connection committed after your snapshot; with no concurrent change, or a
+change in another scope, nothing fails.
+
+* **`1020` ends your whole transaction.** The server has already rolled back all
+  of it, including writes made before the call, and released the locks, while
+  `inTransaction()` may still return `true`. Never catch it and continue: later
+  statements may run in autocommit and survive your `rollBack()`. Propagate it to
+  the code that owns the transaction and restart the whole unit of work from a
+  fresh `BEGIN` (see the retry rules below; `1020` is not covered by the opt-in
+  deadlock replay).
+* **Safe options**, in order of preference: take your serialization lock before
+  the transaction's first plain read (then no stale snapshot exists); run the
+  transaction under `READ COMMITTED` (every read in it becomes non-repeatable);
+  or set `innodb_snapshot_isolation=OFF` for the connection if you accept that it
+  disables the engine's lost-update protection for all its statements. In every
+  case restart on `1020`.
+* The package does not set the variable, switch isolation, retry, or fall back
+  to the plain read for you. Evidence, tested cells and the untested ones:
+  [Package Reference](../../PERSISTENCE_PACKAGE_REFERENCE.md#ordering-guarantees-and-mariadb-innodb_snapshot_isolation).
+
 ### Deadlocks and lock wait timeouts are the consumer's responsibility
 
 Waiting for a lock can fail with `PDOException` (MySQL error 1205 for a lock
@@ -273,9 +301,10 @@ Deliberately not demonstrated by the examples:
 * **Soft-delete lock footprint and index-less scans.** Described above and in
   the Package Reference, not benchmarked.
 * **MariaDB, SQLite, and other isolation levels** (`READ UNCOMMITTED`,
-  `SERIALIZABLE`). Not part of this repository's verified matrix. (MariaDB 11.8's
-  default snapshot isolation can raise `1020` in locking reads; tracked in
-  [Issue #47](https://github.com/Maatify/persistence/issues/47).)
+  `SERIALIZABLE`). Not part of this repository's verified matrix. The examples
+  run on MySQL only; the MariaDB `1020` behavior above comes from the
+  [Issue #47 study](../studies/issue-47-mariadb-snapshot/REPORT.md), not from
+  these examples.
 * **The `v1.4.0` release itself.** The examples that call
   `getNextPositionForUpdate()` require the Unreleased code on `main`.
 
