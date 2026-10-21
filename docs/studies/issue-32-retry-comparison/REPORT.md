@@ -1,6 +1,6 @@
 # Issue #32 — Immediate vs Hybrid retry: evidence report
 
-> **Distribution note:** the raw-data directory `results/` referenced below is excluded from Composer/GitHub package archives (`.gitattributes` `export-ignore`, Issue #60) to keep the installed package small. It is unchanged in the Git repository: [browse `results/`](https://github.com/Maatify/persistence/tree/e4aba2043fe0956d7097621d22dfb23e4efbbcfa/docs/studies/issue-32-retry-comparison/results). Relative `results/...` links and commands in this document resolve only in a Git checkout.
+> **Distribution note:** the raw-data directory `results/` referenced below is excluded from Composer/GitHub package archives (`.gitattributes` `export-ignore`, Issue #60) to keep the installed package small. It is unchanged in the Git repository: [browse `results/`](https://github.com/Maatify/persistence/tree/e4aba2043fe0956d7097621d22dfb23e4efbbcfa/docs/studies/issue-32-retry-comparison/results). Relative `results/...` links work in GitHub's repository web view and in a full Git checkout, but are dead in a Composer `--prefer-dist` installation or any extracted package archive. Commands in this document that read or write raw data need a full Git checkout (or an independently obtained copy of `results/`).
 
 > **Follow-up (Issue #42):** the `EVIDENCE REQUIRED` status of C2/C3 below was addressed by two pre-planned clean runs
 > on an independent, qualified host (run-6, run-7): C2/C3 accepted under controlled conditions for the decision cell —

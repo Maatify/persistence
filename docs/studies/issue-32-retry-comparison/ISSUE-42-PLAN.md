@@ -1,6 +1,6 @@
 # Issue #42 — frozen Phase B plan (committed before measuring)
 
-> **Distribution note:** the raw-data directory `results/` referenced below is excluded from Composer/GitHub package archives (`.gitattributes` `export-ignore`, Issue #60) to keep the installed package small. It is unchanged in the Git repository: [browse `results/`](https://github.com/Maatify/persistence/tree/e4aba2043fe0956d7097621d22dfb23e4efbbcfa/docs/studies/issue-32-retry-comparison/results). Relative `results/...` links and commands in this document resolve only in a Git checkout.
+> **Distribution note:** the raw-data directory `results/` referenced below is excluded from Composer/GitHub package archives (`.gitattributes` `export-ignore`, Issue #60) to keep the installed package small. It is unchanged in the Git repository: [browse `results/`](https://github.com/Maatify/persistence/tree/e4aba2043fe0956d7097621d22dfb23e4efbbcfa/docs/studies/issue-32-retry-comparison/results). Relative `results/...` links work in GitHub's repository web view and in a full Git checkout, but are dead in a Composer `--prefer-dist` installation or any extracted package archive. Commands in this document that read or write raw data need a full Git checkout (or an independently obtained copy of `results/`).
 
 Scope: [Issue #42](https://github.com/Maatify/persistence/issues/42) — controlled-host confirmation of C2 (goodput) and C3
 (P95) for [Issue #32](https://github.com/Maatify/persistence/issues/32). Study only: no change to `src/`, `tests/`, the
