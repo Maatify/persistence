@@ -1,0 +1,44 @@
+#### mysql-8.0.46
+== S5 8.0.46 innodb_snapshot_isolation=(absent) rollback_on_timeout=0
+  L1 SELECT ... FOR UPDATE after SAVEPOINT, then ROLLBACK TO SAVEPOINT: row 6 is free
+  L1 UPDATE after SAVEPOINT, then ROLLBACK TO SAVEPOINT: row 6 is free
+  L1 UPDATE changing the row after SAVEPOINT, then ROLLBACK TO SAVEPOINT: row 6 is free
+  L2 real  after failed move (state PARTIAL[1:1 2:3 3:4 4:5 5:5 CORRUPT]): scope rows 1,3,5 are locked(1205)/locked(1205)/locked(1205); other scope row 6 is free
+  L3 real  after successful move: scope rows 1,3,5 are locked(1205)/locked(1205)/locked(1205); other scope row 6 is free
+  L2 proto after failed move (state ORIGINAL): scope rows 1,3,5 are locked(1205)/locked(1205)/locked(1205); other scope row 6 is free
+  L3 proto after successful move: scope rows 1,3,5 are locked(1205)/locked(1205)/locked(1205); other scope row 6 is free
+  L2 recipe after failed move (state ORIGINAL): scope rows 1,3,5 are free/free/free; other scope row 6 is free
+  L3 recipe after successful move: scope rows 1,3,5 are locked(1205)/locked(1205)/locked(1205); other scope row 6 is free
+#### mysql-8.4.10
+== S5 8.4.10 innodb_snapshot_isolation=(absent) rollback_on_timeout=0
+  L1 SELECT ... FOR UPDATE after SAVEPOINT, then ROLLBACK TO SAVEPOINT: row 6 is free
+  L1 UPDATE after SAVEPOINT, then ROLLBACK TO SAVEPOINT: row 6 is free
+  L1 UPDATE changing the row after SAVEPOINT, then ROLLBACK TO SAVEPOINT: row 6 is free
+  L2 real  after failed move (state PARTIAL[1:1 2:3 3:4 4:5 5:5 CORRUPT]): scope rows 1,3,5 are locked(1205)/locked(1205)/locked(1205); other scope row 6 is free
+  L3 real  after successful move: scope rows 1,3,5 are locked(1205)/locked(1205)/locked(1205); other scope row 6 is free
+  L2 proto after failed move (state ORIGINAL): scope rows 1,3,5 are locked(1205)/locked(1205)/locked(1205); other scope row 6 is free
+  L3 proto after successful move: scope rows 1,3,5 are locked(1205)/locked(1205)/locked(1205); other scope row 6 is free
+  L2 recipe after failed move (state ORIGINAL): scope rows 1,3,5 are free/free/free; other scope row 6 is free
+  L3 recipe after successful move: scope rows 1,3,5 are locked(1205)/locked(1205)/locked(1205); other scope row 6 is free
+#### mysql-8.4.10-rollback-on-timeout
+== S5 8.4.10 innodb_snapshot_isolation=(absent) rollback_on_timeout=1
+  L1 SELECT ... FOR UPDATE after SAVEPOINT, then ROLLBACK TO SAVEPOINT: row 6 is free
+  L1 UPDATE after SAVEPOINT, then ROLLBACK TO SAVEPOINT: row 6 is free
+  L1 UPDATE changing the row after SAVEPOINT, then ROLLBACK TO SAVEPOINT: row 6 is free
+  L2 real  after failed move (state PARTIAL[1:1 2:3 3:4 4:5 5:5 CORRUPT]): scope rows 1,3,5 are locked(1205)/locked(1205)/locked(1205); other scope row 6 is free
+  L3 real  after successful move: scope rows 1,3,5 are locked(1205)/locked(1205)/locked(1205); other scope row 6 is free
+  L2 proto after failed move (state ORIGINAL): scope rows 1,3,5 are locked(1205)/locked(1205)/locked(1205); other scope row 6 is free
+  L3 proto after successful move: scope rows 1,3,5 are locked(1205)/locked(1205)/locked(1205); other scope row 6 is free
+  L2 recipe after failed move (state ORIGINAL): scope rows 1,3,5 are free/free/free; other scope row 6 is free
+  L3 recipe after successful move: scope rows 1,3,5 are locked(1205)/locked(1205)/locked(1205); other scope row 6 is free
+#### mariadb-11.8.9
+== S5 11.8.9-MariaDB-ubu2404 innodb_snapshot_isolation=1 rollback_on_timeout=0
+  L1 SELECT ... FOR UPDATE after SAVEPOINT, then ROLLBACK TO SAVEPOINT: row 6 is free
+  L1 UPDATE after SAVEPOINT, then ROLLBACK TO SAVEPOINT: row 6 is free
+  L1 UPDATE changing the row after SAVEPOINT, then ROLLBACK TO SAVEPOINT: row 6 is free
+  L2 real  after failed move (state PARTIAL[1:1 2:3 3:4 4:5 5:5 CORRUPT]): scope rows 1,3,5 are locked(1205)/locked(1205)/locked(1205); other scope row 6 is free
+  L3 real  after successful move: scope rows 1,3,5 are locked(1205)/locked(1205)/locked(1205); other scope row 6 is free
+  L2 proto after failed move (state ORIGINAL): scope rows 1,3,5 are locked(1205)/locked(1205)/locked(1205); other scope row 6 is free
+  L3 proto after successful move: scope rows 1,3,5 are locked(1205)/locked(1205)/locked(1205); other scope row 6 is free
+  L2 recipe after failed move (state ORIGINAL): scope rows 1,3,5 are free/free/free; other scope row 6 is free
+  L3 recipe after successful move: scope rows 1,3,5 are locked(1205)/locked(1205)/locked(1205); other scope row 6 is free

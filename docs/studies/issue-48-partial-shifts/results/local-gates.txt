@@ -1,0 +1,11 @@
+# Local gates on the study branch (docs-only diff), MySQL 8.4.10, 2026-10-21T07:17:31Z
+# composer validate --strict; phpstan -c phpstan.neon; php-cs-fixer --dry-run; php -l on study PHP; bash -n on study scripts; git diff --check; vendor/bin/phpunit
+./composer.json is valid
+ [OK] No errors                                                                 
+Found 0 of 93 files that can be fixed in 1.279 seconds, 148.00 MB memory used
+sh syntax ok
+diff-check ok
+Time: 00:41.230, Memory: 18.00 MB
+OK (620 tests, 4421 assertions)
+composer.lock
+composer.lock tracked:        0

@@ -1,0 +1,24 @@
+#### mysql-8.0.46
+== S4 8.0.46 innodb_snapshot_isolation=(absent) rollback_on_timeout=0
+  scoped caller-owned  ops=400 true=107 false=293 mismatches=0 prototypeSavepointStatements=96
+  scoped package-owned ops=400 true=107 false=293 mismatches=0 prototypeSavepointStatements=0
+  global caller-owned  ops=400 true=310 false=90 mismatches=0 prototypeSavepointStatements=291
+  global package-owned ops=400 true=310 false=90 mismatches=0 prototypeSavepointStatements=0
+#### mysql-8.4.10
+== S4 8.4.10 innodb_snapshot_isolation=(absent) rollback_on_timeout=0
+  scoped caller-owned  ops=400 true=107 false=293 mismatches=0 prototypeSavepointStatements=96
+  scoped package-owned ops=400 true=107 false=293 mismatches=0 prototypeSavepointStatements=0
+  global caller-owned  ops=400 true=310 false=90 mismatches=0 prototypeSavepointStatements=291
+  global package-owned ops=400 true=310 false=90 mismatches=0 prototypeSavepointStatements=0
+#### mysql-8.4.10-rollback-on-timeout
+== S4 8.4.10 innodb_snapshot_isolation=(absent) rollback_on_timeout=1
+  scoped caller-owned  ops=400 true=107 false=293 mismatches=0 prototypeSavepointStatements=96
+  scoped package-owned ops=400 true=107 false=293 mismatches=0 prototypeSavepointStatements=0
+  global caller-owned  ops=400 true=310 false=90 mismatches=0 prototypeSavepointStatements=291
+  global package-owned ops=400 true=310 false=90 mismatches=0 prototypeSavepointStatements=0
+#### mariadb-11.8.9
+== S4 11.8.9-MariaDB-ubu2404 innodb_snapshot_isolation=1 rollback_on_timeout=0
+  scoped caller-owned  ops=400 true=107 false=293 mismatches=0 prototypeSavepointStatements=96
+  scoped package-owned ops=400 true=107 false=293 mismatches=0 prototypeSavepointStatements=0
+  global caller-owned  ops=400 true=310 false=90 mismatches=0 prototypeSavepointStatements=291
+  global package-owned ops=400 true=310 false=90 mismatches=0 prototypeSavepointStatements=0
