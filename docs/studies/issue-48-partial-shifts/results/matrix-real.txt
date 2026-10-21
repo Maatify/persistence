@@ -1,5 +1,6 @@
 #### mysql-8.0.46
 == real @ 8.0.46 innodb_snapshot_isolation=(absent) rollback_on_timeout=0
+source: src/Pdo/Ordering/ScopedOrderingManager.php
 C01-ok   real   true           | ownView=MOVED marker=1 txn=alive inTx=Y | Δsp/rt/rel=0/0/0 Δcommit/rollback=0/0 | afterCommit=MOVED marker=1 (0.0s)
 C02-noop real   true           | ownView=ORIGINAL marker=1 txn=alive inTx=Y | Δsp/rt/rel=0/0/0 Δcommit/rollback=0/0 | afterCommit=ORIGINAL marker=1 (0.0s)
 C03-missing real   false          | ownView=ORIGINAL marker=1 txn=alive inTx=Y | Δsp/rt/rel=0/0/0 Δcommit/rollback=0/0 | afterCommit=ORIGINAL marker=1 (0.0s)
@@ -19,6 +20,7 @@ O2-false real   false          | ownView=ORIGINAL marker=0 txn=n/a   inTx=N | Δ
 O3-1062final real   EXC PDO 1062/23000 | ownView=ORIGINAL marker=0 txn=n/a   inTx=N | Δsp/rt/rel=0/0/0 Δcommit/rollback=0/1 | afterCommit=ORIGINAL marker=0 (0.0s)
 #### mysql-8.4.10
 == real @ 8.4.10 innodb_snapshot_isolation=(absent) rollback_on_timeout=0
+source: src/Pdo/Ordering/ScopedOrderingManager.php
 C01-ok   real   true           | ownView=MOVED marker=1 txn=alive inTx=Y | Δsp/rt/rel=0/0/0 Δcommit/rollback=0/0 | afterCommit=MOVED marker=1 (0.0s)
 C02-noop real   true           | ownView=ORIGINAL marker=1 txn=alive inTx=Y | Δsp/rt/rel=0/0/0 Δcommit/rollback=0/0 | afterCommit=ORIGINAL marker=1 (0.0s)
 C03-missing real   false          | ownView=ORIGINAL marker=1 txn=alive inTx=Y | Δsp/rt/rel=0/0/0 Δcommit/rollback=0/0 | afterCommit=ORIGINAL marker=1 (0.0s)
@@ -38,6 +40,7 @@ O2-false real   false          | ownView=ORIGINAL marker=0 txn=n/a   inTx=N | Δ
 O3-1062final real   EXC PDO 1062/23000 | ownView=ORIGINAL marker=0 txn=n/a   inTx=N | Δsp/rt/rel=0/0/0 Δcommit/rollback=0/1 | afterCommit=ORIGINAL marker=0 (0.0s)
 #### mysql-8.4.10-rollback-on-timeout
 == real @ 8.4.10 innodb_snapshot_isolation=(absent) rollback_on_timeout=1
+source: src/Pdo/Ordering/ScopedOrderingManager.php
 C01-ok   real   true           | ownView=MOVED marker=1 txn=alive inTx=Y | Δsp/rt/rel=0/0/0 Δcommit/rollback=0/0 | afterCommit=MOVED marker=1 (0.0s)
 C02-noop real   true           | ownView=ORIGINAL marker=1 txn=alive inTx=Y | Δsp/rt/rel=0/0/0 Δcommit/rollback=0/0 | afterCommit=ORIGINAL marker=1 (0.0s)
 C03-missing real   false          | ownView=ORIGINAL marker=1 txn=alive inTx=Y | Δsp/rt/rel=0/0/0 Δcommit/rollback=0/0 | afterCommit=ORIGINAL marker=1 (0.0s)
@@ -57,6 +60,7 @@ O2-false real   false          | ownView=ORIGINAL marker=0 txn=n/a   inTx=N | Δ
 O3-1062final real   EXC PDO 1062/23000 | ownView=ORIGINAL marker=0 txn=n/a   inTx=N | Δsp/rt/rel=0/0/0 Δcommit/rollback=0/1 | afterCommit=ORIGINAL marker=0 (0.0s)
 #### mariadb-11.8.9
 == real @ 11.8.9-MariaDB-ubu2404 innodb_snapshot_isolation=1 rollback_on_timeout=0
+source: src/Pdo/Ordering/ScopedOrderingManager.php
 C01-ok   real   true           | ownView=MOVED marker=1 txn=alive inTx=Y | Δsp/rt/rel=0/0/0 Δcommit/rollback=0/0 | afterCommit=MOVED marker=1 (0.0s)
 C02-noop real   true           | ownView=ORIGINAL marker=1 txn=alive inTx=Y | Δsp/rt/rel=0/0/0 Δcommit/rollback=0/0 | afterCommit=ORIGINAL marker=1 (0.0s)
 C03-missing real   false          | ownView=ORIGINAL marker=1 txn=alive inTx=Y | Δsp/rt/rel=0/0/0 Δcommit/rollback=0/0 | afterCommit=ORIGINAL marker=1 (0.0s)

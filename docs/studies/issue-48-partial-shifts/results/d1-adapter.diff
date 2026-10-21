@@ -9,23 +9,15 @@
          PDO $pdo,
          ScopedOrderingConfig $config,
          int|string|null $scopeValue,
-@@ -686,4 +686,21 @@
+@@ -686,4 +686,13 @@
              );
          }
      }
 +
-+    public function moveWithinScope(
-+        PDO $pdo,
-+        ScopedOrderingConfig $config,
-+        int|string|null $scopeValue,
-+        int $id,
-+        int $newOrder,
-+        ?string $updatedAtValue = null,
-+    ): bool {
++    public function moveWithinScope(PDO $pdo, ScopedOrderingConfig $config, int|string|null $scopeValue, int $id, int $newOrder, ?string $updatedAtValue = null): bool
++    {
 +        if ($pdo->inTransaction()) {
-+            return (new \Maatify\Persistence\Study48\SavepointMovePrototype($this))->moveWithinScope(
-+                $pdo, $config, $scopeValue, $id, $newOrder, $updatedAtValue
-+            );
++            return (new \Maatify\Persistence\Study48\SavepointMovePrototype($this))->moveWithinScope($pdo, $config, $scopeValue, $id, $newOrder, $updatedAtValue);
 +        }
 +
 +        return $this->moveWithinScopeShipped($pdo, $config, $scopeValue, $id, $newOrder, $updatedAtValue);

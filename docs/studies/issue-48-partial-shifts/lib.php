@@ -17,6 +17,19 @@ declare(strict_types=1);
 require dirname(__DIR__, 3) . '/vendor/autoload.php';
 require __DIR__ . '/SavepointMovePrototype.php';
 
+// PROBE_SRC=<dir containing src/> runs the probes against another source tree (for example the released v1.4.0 tag).
+if (is_string(getenv('PROBE_SRC')) && getenv('PROBE_SRC') !== '') {
+    spl_autoload_register(static function (string $class): void {
+        $prefix = 'Maatify\\Persistence\\';
+        if (str_starts_with($class, $prefix)) {
+            $file = getenv('PROBE_SRC') . '/src/' . str_replace('\\', '/', substr($class, strlen($prefix))) . '.php';
+            if (is_file($file)) {
+                require $file;
+            }
+        }
+    }, true, true);
+}
+
 use Maatify\Persistence\Pdo\Ordering\ScopedOrderingConfig;
 use Maatify\Persistence\Pdo\Ordering\ScopedOrderingManager;
 use Maatify\Persistence\Pdo\Transaction\PdoDeadlockRetrySavepointTransactionRunner;
@@ -223,6 +236,7 @@ function p48_subject(string $subject): callable
                 return false;
             }
         },
+        'reuse' => static fn (PDO $pdo, int $id, int $to, string $stamp): bool => (new SavepointMovePrototype($real, 'runner'))->moveWithinScope($pdo, p48_config(), 1, $id, $to, $stamp),
         'nested' => static fn (PDO $pdo, int $id, int $to, string $stamp): bool => (new PdoDeadlockRetrySavepointTransactionRunner($pdo))->run(
             static fn (): bool => $proto->moveWithinScope($pdo, p48_config(), 1, $id, $to, $stamp),
         ),

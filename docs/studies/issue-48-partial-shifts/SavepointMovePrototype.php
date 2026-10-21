@@ -8,6 +8,7 @@ use Maatify\Persistence\Exception\InvalidOrderingOperationException;
 use Maatify\Persistence\Exception\TransactionExecutionException;
 use Maatify\Persistence\Pdo\Ordering\ScopedOrderingConfig;
 use Maatify\Persistence\Pdo\Ordering\ScopedOrderingManager;
+use Maatify\Persistence\Pdo\Transaction\PdoDeadlockRetrySavepointTransactionRunner;
 use PDO;
 use Throwable;
 
@@ -34,7 +35,12 @@ final readonly class SavepointMovePrototype
 {
     private const SAVEPOINT_PREFIX = 'maatify_persistence_sp_';
 
-    public function __construct(private ScopedOrderingManager $owned = new ScopedOrderingManager())
+    /**
+     * @param 'inline'|'runner' $window 'inline' (recommended): savepoint statements owned by this class (a few
+     *        @internal control helpers in an implementation). 'runner': study variant that reuses the existing
+     *        PdoDeadlockRetrySavepointTransactionRunner for the mutation window, to measure what reuse costs.
+     */
+    public function __construct(private ScopedOrderingManager $owned = new ScopedOrderingManager(), private string $window = 'inline')
     {
     }
 
@@ -76,6 +82,10 @@ final readonly class SavepointMovePrototype
 
         if ($currentOrder === $newOrder) {
             return true;
+        }
+
+        if ($this->window === 'runner') {
+            return $this->mutateThroughRunner($pdo, $config, $scopeValue, $id, $newOrder, $currentOrder, $updatedAtValue);
         }
 
         // Mutation window: from here on a partial result is possible.
@@ -121,6 +131,48 @@ final readonly class SavepointMovePrototype
         }
 
         return true;
+    }
+
+    /** Study variant: the mutation window runs inside the existing savepoint runner, unchanged. */
+    private function mutateThroughRunner(
+        PDO $pdo,
+        ScopedOrderingConfig $config,
+        int|string|null $scopeValue,
+        int $id,
+        int $newOrder,
+        int $currentOrder,
+        ?string $updatedAtValue,
+    ): bool {
+        $noRow = new class () extends \RuntimeException {
+        };
+
+        try {
+            return (new PdoDeadlockRetrySavepointTransactionRunner($pdo))->run(
+                function () use ($pdo, $config, $scopeValue, $id, $newOrder, $currentOrder, $updatedAtValue, $noRow): bool {
+                    if (!$pdo->inTransaction()) {
+                        throw new TransactionExecutionException('The caller-owned transaction is no longer active; the move was not started.');
+                    }
+
+                    if ($newOrder < $currentOrder) {
+                        $this->shiftOrders($pdo, $config, $scopeValue, $newOrder, $currentOrder, '+', '>=', '<');
+                    } else {
+                        $this->shiftOrders($pdo, $config, $scopeValue, $newOrder, $currentOrder, '-', '<=', '>');
+                    }
+
+                    if (!$this->updateTargetOrder($pdo, $config, $scopeValue, $id, $newOrder, $updatedAtValue)) {
+                        throw $noRow;
+                    }
+
+                    return true;
+                },
+            );
+        } catch (Throwable $throwable) {
+            if ($throwable === $noRow) {
+                return false;
+            }
+
+            throw $throwable;
+        }
     }
 
     private function cleanupAfterFailure(PDO $pdo, string $savepoint): void

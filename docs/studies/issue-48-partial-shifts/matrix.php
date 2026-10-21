@@ -13,8 +13,8 @@ declare(strict_types=1);
 require __DIR__ . '/lib.php';
 
 $subject = $argv[1] ?? '';
-if (!in_array($subject, ['real', 'recipe', 'proto', 'nested'], true)) {
-    fwrite(STDERR, "usage: matrix.php real|recipe|proto|nested [cell prefix...]\n");
+if (!in_array($subject, ['real', 'recipe', 'proto', 'nested', 'reuse'], true)) {
+    fwrite(STDERR, "usage: matrix.php real|recipe|proto|nested|reuse [cell prefix...]\n");
     exit(2);
 }
 $only = array_slice($argv, 2);
@@ -22,6 +22,7 @@ $wants = static fn (string $id): bool => $only === [] || array_filter($only, sta
 
 $probe = p48_pdo();
 echo '== ' . $subject . ' @ ' . p48_engine($probe) . "\n";
+echo 'source: ' . str_replace(dirname(__DIR__, 3) . '/', '', (string) (new ReflectionClass(Maatify\Persistence\Pdo\Ordering\ScopedOrderingManager::class))->getFileName()) . "\n";
 $mariadb = str_contains((string) $probe->query('SELECT VERSION()')->fetchColumn(), 'MariaDB');
 $probe = null;
 
@@ -114,7 +115,7 @@ $cells[] = [
 ];
 
 // ---- savepoint command failures (fault injection through a PDO subclass; the statement is NOT executed) ----
-if ($subject === 'proto' || $subject === 'recipe') {
+if (in_array($subject, ['proto', 'recipe', 'reuse'], true)) {
     $cells[] = ['id' => 'S1-sp-false', 'faulty' => true, 'faults' => [['exec', '/^SAVEPOINT /', 'false']]];
     $cells[] = ['id' => 'S2-sp-throws', 'faulty' => true, 'faults' => [['exec', '/^SAVEPOINT /', 'throw']]];
     $cells[] = [

@@ -7,24 +7,8 @@ Time: 00:41.387, Memory: 18.00 MB
 
 OK (620 tests, 4421 assertions)
 
-## D1 adapter: moveWithinScope() inside an active transaction routed to the prototype (see d1-adapter.diff; src/Study48/SavepointMovePrototype.php added to the scratch copy)
-PHPUnit 11.5.57 by Sebastian Bergmann and contributors.
-
-Runtime:       PHP 8.4.4
-Configuration: phpunit.xml
-
-...............................................................  63 / 620 ( 10%)
-............................................................... 126 / 620 ( 20%)
-............................................................... 189 / 620 ( 30%)
-............................................................... 252 / 620 ( 40%)
-............................................................... 315 / 620 ( 50%)
-............................................................... 378 / 620 ( 60%)
-............................................................... 441 / 620 ( 71%)
-............................................................... 504 / 620 ( 81%)
-............................................................... 567 / 620 ( 91%)
-....F................................................           620 / 620 (100%)
-
-Time: 00:42.410, Memory: 18.00 MB
+## adapter: moveWithinScope() inside an active transaction routed to the prototype (see d1-adapter.diff; src/Study48/SavepointMovePrototype.php added to the scratch copy only) — re-measured with the final prototype for the addendum
+Time: 00:42.930, Memory: 18.00 MB
 
 There was 1 failure:
 
@@ -45,4 +29,4 @@ Failed asserting that two arrays are identical.
 tests/Integration/Pdo/Ordering/ScopedOrderingManagerTransactionTest.php:116
 
 FAILURES!
-Tests: 620, Assertions: 4428, Failures: 1.
+Tests: 620, Assertions: 4430, Failures: 1.

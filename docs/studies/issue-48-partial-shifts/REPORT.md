@@ -1,5 +1,7 @@
 # Issue #48 — partial shifts in `moveWithinScope()` inside a caller-owned transaction: operation-local savepoint study
 
+> **Superseded in part by [Addendum 1](ADDENDUM-1-FINAL-DESIGN.md)** (Lead decision on PR #54): the recommended design is now the fix of the existing `moveWithinScope()` with a lazy savepoint placed after the scope lock, **not** an opt-in method. §8, §11-Q1 and §11-Q2 below are historical; the evidence in §§1–7 and 9 stands. The Addendum also shows that the partial-shift behavior is in the published `v1.4.0`.
+
 **Status:** evidence + one recommended design. **No Runtime, Public API, test, CI, composer or public-doc file is changed.** Owner approval is required before any implementation (§10). Nothing here is released, tagged or merged.
 **Scope guard:** Issue #47 (MariaDB `1020`) and Issue #51 (MariaDB integration-suite gaps) are taken as given and not re-analysed; `1020` appears only as an error class the design must not claim to rescue.
 
@@ -162,7 +164,7 @@ Columns: **A** status quo (documentation only); **B** consumer-side recipe (save
 
 Measurement behind column C: the unmodified base passes 620/620; the same suite with `moveWithinScope()` routed to the prototype whenever a transaction is active ([`results/d1-adapter.diff`](results/d1-adapter.diff)) passes 619/620 and fails only the test above ([`results/phpunit-existing-suite.txt`](results/phpunit-existing-suite.txt)). Column D changes no existing test by construction. `getNextPosition()`, `getNextPositionForUpdate()` and `rowExistsInScope()` are untouched in every column.
 
-## 8. Recommended design (one)
+## 8. Recommended design (one) — SUPERSEDED by Addendum 1 (kept as the first-round recommendation)
 
 **An additive, opt-in method on `ScopedOrderingManager` — working name `moveWithinScopeWithSavepoint()` (the name is an Owner question) — with the same parameters and return type as `moveWithinScope()`, which is left unchanged.**
 

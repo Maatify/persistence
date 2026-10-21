@@ -87,6 +87,27 @@ expect "RECIPE eager savepoint: missing row rolls back to the savepoint" $C "$AL
 expect "RECIPE 1213 not rescuable" $C "$ALL" C10-1213final 'EXC PDO 1213/40001 +\| ownView=ORIGINAL marker=0 txn=LOST'
 expect "RECIPE 1020 not rescuable (MariaDB)" $C "$MARIA" C11-1020lock 'EXC PDO 1020/HY000 +\| ownView=ORIGINAL marker=0 txn=LOST .*Δsp/rt/rel=1/1/0'
 
+
+# ---------- released v1.4.0 (Addendum A1): the same RED, from the published tag's source ----------
+V=matrix-real-v1.4.0.txt
+[[ $(grep -c '^source: .*v140/src/Pdo/Ordering/ScopedOrderingManager.php' $V) -eq 4 ]] && ok "v1.4.0 matrix ran against the v1.4.0 source tree on all four engines" || bad "v1.4.0 source path"
+expect "v1.4.0 RED false after shifts"        $V "$ALL" C04-false "false +\| ownView=$PERM_BAD .*afterCommit=$PERM_BAD"
+expect "v1.4.0 RED 1062 on the target write"  $V "$ALL" C06-1062final "EXC PDO 1062/23000 +\| ownView=$PERM_BAD .*afterCommit=$PERM_BAD"
+expect "v1.4.0 RED 1205 on the target write"  $V "$DEF" C07-1205final "EXC PDO 1205/HY000 +\| ownView=$PERM_BAD .*afterCommit=$PERM_BAD"
+expect "v1.4.0 RED two operations"            $V "$ALL" C13-two-steps "true,EXC PDO 1062/23000 +\| ownView=PARTIAL.*CORRUPT"
+expect "v1.4.0 RED carry on after 1213"       $V "$ALL" C15-after-1213 "EXC PDO 1213/40001,EXC PDO 1062/23000 .*afterCommit=PARTIAL.*CORRUPT"
+expect "v1.4.0 safe: missing row / 1062 in the shift" $V "$ALL" C05-1062shift 'EXC PDO 1062/23000 +\| ownView=ORIGINAL'
+expect "v1.4.0 not rescuable 1213 (same as main)" $V "$ALL" C10-1213final 'EXC PDO 1213/40001 +\| ownView=ORIGINAL marker=0 txn=LOST'
+expect "v1.4.0 MariaDB 1020 (pre-#33 scope lock)" $V "$MARIA" C11-1020lock 'EXC PDO 1020/HY000 +\| ownView=ORIGINAL marker=0 txn=LOST'
+
+# ---------- reuse of the existing savepoint runner for the mutation window (Addendum A3) ----------
+U=matrix-reuse.txt
+expect "REUSE success / 1062 / false are undone like the inline design" $U "$ALL" C04-false 'false +\| ownView=ORIGINAL marker=1 txn=alive'
+expect "REUSE 1062 on the target write undone" $U "$ALL" C06-1062final 'EXC PDO 1062/23000 +\| ownView=ORIGINAL marker=1 txn=alive'
+expect "REUSE GAP 1: false is reported over PARTIAL shifts when the undo fails" $U "$ALL" S5-false+rt-false "false +\| ownView=$PERM_BAD"
+expect "REUSE GAP 2: after a swallowed 1213 the runner opens its own transaction inside a participating call" $U "$ALL" C15-after-1213 'EXC PDO 1213/40001,EXC PDO 1062/23000 .*Δcommit/rollback=0/1'
+expect "INLINE: the same two cells fail closed and never begin a transaction" $G "$ALL" C15-after-1213 'EXC TransactionExecutionException .*Δcommit/rollback=0/0'
+
 # ---------- prototype inside a consumer's savepoint runner ----------
 N=matrix-nested.txt
 expect "NESTED savepoints: 1062 undone, both savepoints cleaned up" $N "$ALL" C06-1062final 'EXC PDO 1062/23000 +\| ownView=ORIGINAL marker=1 txn=alive .*Δsp/rt/rel=2/2/2'
