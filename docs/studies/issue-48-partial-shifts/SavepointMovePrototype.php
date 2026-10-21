@@ -92,9 +92,11 @@ final readonly class SavepointMovePrototype
         $savepoint = self::SAVEPOINT_PREFIX . bin2hex(random_bytes(16));
         $this->executeControlStatement($pdo, 'SAVEPOINT ' . $savepoint);
 
-        // A savepoint issued while the server holds no transaction is silently discarded and the following statements
-        // would autocommit one by one. After a swallowed 1213/1020 the driver can still report the dead transaction;
-        // the successful SAVEPOINT reply refreshes that state. Fail closed before the first mutation.
+        // Best-effort detection only, NOT a proof of transaction identity (F54-01). On the engines measured here
+        // (MySQL 8.0.46/8.4.10, MariaDB 11.8.9) a swallowed 1213/1020 leaves no transaction and the successful
+        // SAVEPOINT reply makes the driver report it; then fail before the first mutation. On MariaDB 11.4.7 the
+        // server opens a NEW implicit transaction, the driver reports "active", and this check cannot tell it from
+        // the caller's original transaction. The rule stays: a caller must not swallow 1213/1020 and continue.
         if (!$pdo->inTransaction()) {
             throw new TransactionExecutionException('The caller-owned transaction is no longer active; the move was not started.');
         }

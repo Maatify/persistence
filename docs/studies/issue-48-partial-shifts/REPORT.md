@@ -2,7 +2,7 @@
 
 > **Superseded in part by [Addendum 1](ADDENDUM-1-FINAL-DESIGN.md)** (Lead decision on PR #54): the recommended design is now the fix of the existing `moveWithinScope()` with a lazy savepoint placed after the scope lock, **not** an opt-in method. §8, §11-Q1 and §11-Q2 below are historical; the evidence in §§1–7 and 9 stands. The Addendum also shows that the partial-shift behavior is in the published `v1.4.0`.
 
-**Status:** evidence + one recommended design. **No Runtime, Public API, test, CI, composer or public-doc file is changed.** Owner approval is required before any implementation (§10). Nothing here is released, tagged or merged.
+**Status:** evidence + one recommended design. **No Runtime, Public API, test, CI, composer or public-doc file is changed.** Owner approval is required before any implementation (Addendum 1 §A5). Nothing here is released, tagged or merged.
 **Scope guard:** Issue #47 (MariaDB `1020`) and Issue #51 (MariaDB integration-suite gaps) are taken as given and not re-analysed; `1020` appears only as an error class the design must not claim to rescue.
 
 ## 1. Exact base, head, tree
@@ -27,7 +27,7 @@ Existing suite, unmodified base, MySQL 8.4.10: `vendor/bin/phpunit` → **OK (62
 
 ## 2. Result in one paragraph
 
-The defect is real, reproducible on the unmodified package, and independent of the engine: when `moveWithinScope()` **participates** in a caller-owned transaction it runs the range shift and the target write as separate statements with no undo of its own, so any failure *between* them (or a `false` returned by the target write) leaves rows shifted — duplicated and missing positions (`1:1 2:3 3:4 4:5 5:5`, 'CORRUPT' in the results) — inside the caller's transaction, and a caller that carries on and commits makes that permanent. An **operation-local savepoint** fixes every case in which the transaction is still alive (`false`, `1062`, `1205` with the default server option, injected control-statement failures) without touching the caller's transaction, the caller's own savepoints, the package-owned path, or any earlier operation of the same transaction. It does **not** and cannot rescue `1213`, MariaDB `1020`, or `1205` under `innodb_rollback_on_timeout=ON`: the server has already ended the transaction, the savepoint is gone with it, and the design simply propagates the original exception. The decisive finding for the contract question: a savepoint **created before the scope lock** (what a consumer gets by wrapping the call in a savepoint runner) makes a failed move *release the scope locks*, because `ROLLBACK TO SAVEPOINT` releases locks taken after the savepoint on every tested engine; a savepoint **created lazily right before the first mutating statement** keeps the v1.4.0 lock behavior. Making the savepoint the default behavior of `moveWithinScope()` changes a documented, tested v1.4.0 behavior (1 of 620 existing tests, measured, §7). The recommended design is therefore an **additive, opt-in method** with the lazy savepoint window (§8).
+The defect is real, reproducible on the unmodified package, and independent of the engine: when `moveWithinScope()` **participates** in a caller-owned transaction it runs the range shift and the target write as separate statements with no undo of its own, so any failure *between* them (or a `false` returned by the target write) leaves rows shifted — duplicated and missing positions (`1:1 2:3 3:4 4:5 5:5`, 'CORRUPT' in the results) — inside the caller's transaction, and a caller that carries on and commits makes that permanent. An **operation-local savepoint** fixes every case in which the transaction is still alive (`false`, `1062`, `1205` with the default server option, injected control-statement failures) without touching the caller's transaction, the caller's own savepoints, the package-owned path, or any earlier operation of the same transaction. It does **not** and cannot rescue `1213`, MariaDB `1020`, or `1205` under `innodb_rollback_on_timeout=ON`: the server has already ended the transaction, the savepoint is gone with it, and the design simply propagates the original exception. The decisive finding for the contract question: a savepoint **created before the scope lock** (what a consumer gets by wrapping the call in a savepoint runner) makes a failed move *release the scope locks*, because `ROLLBACK TO SAVEPOINT` releases locks taken after the savepoint on every tested engine; a savepoint **created lazily right before the first mutating statement** keeps the v1.4.0 lock behavior. Making the savepoint the default behavior of `moveWithinScope()` changes a documented, tested v1.4.0 behavior (1 of 620 existing tests, measured, §7). The first-round recommendation here was an additive opt-in method; the Lead decision on PR #54 replaced it with the fix of the existing `moveWithinScope()` using the same lazy savepoint window, specified in [Addendum 1](ADDENDUM-1-FINAL-DESIGN.md) (the normative design).
 
 ## 3. What was run
 
@@ -93,7 +93,7 @@ Savepoint statement counts are `Δsp/rt/rel` = `SAVEPOINT` / `ROLLBACK TO SAVEPO
 | **C13** | `true`, then original `1062` | 1st move **kept**, only the failing 2nd undone | 2/1/2 |
 | **C14** | original `1062` | ORIGINAL; the caller's own savepoint can still be rolled back to | 1/1/1 |
 | nested (`nested`) | same results | same states | 2/·/2 — both savepoints cleaned up |
-| **C15** carry on after `1213` | `1213`, then `TransactionExecutionException` | ORIGINAL, nothing autocommitted | fails before the first mutation |
+| **C15** carry on after `1213` | `1213`, then `TransactionExecutionException` on MySQL 8.0.46/8.4.10 and MariaDB 11.8.9 | ORIGINAL, nothing autocommitted | best-effort check; **not detected on MariaDB 11.4.7** (Addendum A2 step 3, F54-01) |
 | O1–O3 package-owned | identical to the shipped call | | 0/0/0, owned `COMMIT`/`ROLLBACK` as before |
 
 **Error classes that are not rescued** (the prototype *attempts* `ROLLBACK TO SAVEPOINT`, which fails because the savepoint no longer exists, swallows that, and rethrows the original; no error code is special-cased):
@@ -123,7 +123,7 @@ On MySQL the `1020` cells are controls: the engine performs the current read and
 
 **Locks** ([`results/s5-locks.txt`](results/s5-locks.txt), all four engines): (L1) a row lock taken after `SAVEPOINT` is **released** by `ROLLBACK TO SAVEPOINT`; therefore (L2) after a failed move the scope stays locked for `real` and `proto` (the scope lock precedes the savepoint) but is **free** for `recipe` (savepoint first); (L3) after a successful move the scope is locked for all three. The v1.4.0 lock contract ("held until the owning transaction ends") is preserved only by the lazy window.
 
-All of this is asserted by [`assert-results.sh`](assert-results.sh): **190 checks, 0 failures**, and two negative controls (tampered results) fail as they should.
+All of this is asserted by [`assert-results.sh`](assert-results.sh): the check list and its result are in [`results/assert-output.txt`](results/assert-output.txt), and two negative controls (tampered results) fail as they should.
 
 ## 6. Error taxonomy used by the design
 
@@ -159,12 +159,12 @@ Columns: **A** status quo (documentation only); **B** consumer-side recipe (save
 | Carry-on after a swallowed `1213` | silent autocommit of partial shifts | clean, but by side effect: the runner's `SAVEPOINT` reply refreshes the driver flag and the shipped call then opens its own transaction (C15, all four engines) | fails closed | fails closed | fails closed |
 | Existing tests changed | 0 | 0 | **1** (measured) | 0 | 1+ (signature pin) |
 | Docs that must change | none | add a recipe | Package Reference "Rollback Ownership" + Deadlock/`1020` sections, How-To, README, DocBlock, CHANGELOG, a new ADR | add the method to the same places + ADR | as C |
-| SemVer reading | none | none | behavior change of a documented, tested behavior: Owner decision, not a silent patch | additive MINOR | signature/behavior change |
+| SemVer reading (classification only; no version decision is made here, see Addendum A5) | none | none | behavior change of a documented, tested behavior: Owner decision, not a silent patch | additive MINOR | signature/behavior change |
 | Fixes the reported defect for | nobody | consumers who adopt the recipe | every participating caller | callers who opt in | callers who opt in |
 
 Measurement behind column C: the unmodified base passes 620/620; the same suite with `moveWithinScope()` routed to the prototype whenever a transaction is active ([`results/d1-adapter.diff`](results/d1-adapter.diff)) passes 619/620 and fails only the test above ([`results/phpunit-existing-suite.txt`](results/phpunit-existing-suite.txt)). Column D changes no existing test by construction. `getNextPosition()`, `getNextPositionForUpdate()` and `rowExistsInScope()` are untouched in every column.
 
-## 8. Recommended design (one) — SUPERSEDED by Addendum 1 (kept as the first-round recommendation)
+## 8. First-round recommendation — HISTORICAL, SUPERSEDED by Addendum 1 (do not implement from this section)
 
 **An additive, opt-in method on `ScopedOrderingManager` — working name `moveWithinScopeWithSavepoint()` (the name is an Owner question) — with the same parameters and return type as `moveWithinScope()`, which is left unchanged.**
 
@@ -196,20 +196,13 @@ Why this and not the others:
 * The `FaultyPdo` cells (S1–S7) are **injected** control-statement failures, labeled as such; the corresponding real-server failures (`ROLLBACK TO` after transaction loss) are covered by C07rot/C10/C12.
 * The study scripts are probes: not autoloaded, not analysed or formatted by the repository gates.
 
-## 10. Proposed work after approval (nothing added now)
+## 10. Proposed work after approval — historical, see Addendum 1
 
-1. Implementation of §8 as a private shared body plus the one new public method; `moveWithinScope()` untouched.
-2. PHPUnit integration tests, MySQL 8.4.10, one per RED cell now documented as partial (C04, C06, C07, C13), plus C05, C08, C10, C14, C15 and the package-owned controls; unit tests for S1–S7 with a `PDO` double in the style of `SavepointTransactionPdo`; the public-API regression test extended with the new method; a documentation regression test.
-3. Documentation (Package Reference "Rollback Ownership" and the `1213`/`1020` sections, the How-To, README, DocBlock, CHANGELOG) and an ADR; the "no savepoint-rollback guarantee" sentences keep describing `moveWithinScope()`.
-4. Version as MINOR (additive) only on Owner instruction; no tag or release from this work.
+The first-round list (an opt-in public method, a changed public-API regression test, a MINOR version) is **withdrawn**. The normative implementation, test, documentation and release requirements are [Addendum 1](ADDENDUM-1-FINAL-DESIGN.md) §A2–A7; the release target and version are TBD by the Owner.
 
-## 11. Questions for the Owner
+## 11. Questions for the Owner — historical, see Addendum 1
 
-1. **Q1 — opt-in or default.** Is the recommended opt-in method (D) acceptable, or should the documented participating behavior itself be amended (C, changing 1 pinned test and several documented rows)?
-2. **Q2 — shape and name.** A new method on the `final readonly` `ScopedOrderingManager` (additive), or a new class generation as in ADR 0004? Name?
-3. **Q3 — the dead-transaction guard (§8 step 3).** Keep the fail-closed `TransactionExecutionException` when the driver reports no transaction after `SAVEPOINT`, or leave detection out of scope?
-4. **Q4 — `false` + failed undo.** Confirm that fail-closed (`TransactionExecutionException`, never `false` over partial state) is the intended contract.
-5. **Q5 — evidence breadth.** Is MySQL 8.4.10 (CI) plus these supplementary engines enough, or should `READ COMMITTED`/`SERIALIZABLE` and more MariaDB versions be added before implementation?
+The five first-round questions (opt-in vs default, method shape/name, the guard, `false` + failed undo, evidence breadth) are **superseded**: the Lead decided on the existing-method fix, and the remaining Owner decisions are listed in Addendum 1 §A5 and §A8 (consent to the published failure-path change; release target and version TBD).
 
 ## 12. Reproduce
 

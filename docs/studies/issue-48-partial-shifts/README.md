@@ -12,7 +12,7 @@ Study-only material for [Issue #48](https://github.com/Maatify/persistence/issue
 | `s4_differential.php` | Differential parity of the shipped call and the prototype over seeded random operations |
 | `s5_locks.php` | Lock footprint after `ROLLBACK TO SAVEPOINT`, failed and successful moves |
 | `engines-up.sh`, `run-matrix.sh`, `run-all.sh` | Start the throwaway engines, run one probe over the engine matrix, run everything into `results/` and assert |
-| `assert-results.sh` | 190 independent checks of the captured results: RED where expected (shipped call), GREEN where expected (prototype), not-rescuable classes, locks |
+| `assert-results.sh` | Independent checks of the captured results (list and result: `results/assert-output.txt`): RED where expected (shipped call), GREEN where expected (prototype), not-rescuable classes, locks |
 | [`ADDENDUM-1-FINAL-DESIGN.md`](ADDENDUM-1-FINAL-DESIGN.md) | Final design per the Lead decision: released-`v1.4.0` vs `main` evidence, fix of the existing `moveWithinScope()`, savepoint reuse strategy, updated compatibility matrix, test/doc/release requirements |
 | `results/` | Captured output of the run described in the REPORT, `env.txt` (engines and digests), the existing-suite comparison and `d1-adapter.diff` |
 

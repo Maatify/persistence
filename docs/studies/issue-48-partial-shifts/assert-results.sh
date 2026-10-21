@@ -64,7 +64,7 @@ expect "NOT RESCUABLE 1020 in the mutation window: ROLLBACK TO fails, original 1
 expect "GREEN 1020 scenarios are controls on MySQL (current read, success)" $G "$MYSQL" C12-1020final 'true +\| ownView=MOVED'
 expect "GREEN operation-local: the 1st move is kept, only the failing 2nd is undone" $G "$ALL" C13-two-steps 'true,EXC PDO 1062/23000 +\| ownView=MOVED marker=1 .*Δsp/rt/rel=2/1/2 .*afterCommit=MOVED marker=1'
 expect "GREEN caller's own savepoint stays usable" $G "$ALL" C14-caller-sp 'ownView=ORIGINAL marker=1 .*callerSavepointUsable=yes'
-expect "GREEN carry-on-after-1213: fails closed, nothing autocommitted" $G "$ALL" C15-after-1213 'EXC PDO 1213/40001,EXC TransactionExecutionException .*afterCommit=ORIGINAL marker=0'
+expect "GREEN carry-on-after-1213 on the engines where the SAVEPOINT reply reveals the dead transaction: guard fires, nothing autocommitted" $G "$ALL" C15-after-1213 'EXC PDO 1213/40001,EXC TransactionExecutionException .*afterCommit=ORIGINAL marker=0'
 expect "GREEN SAVEPOINT returns false: TransactionExecutionException, nothing mutated" $G "$ALL" S1-sp-false 'EXC TransactionExecutionException +\| ownView=ORIGINAL marker=1 txn=alive .*Δsp/rt/rel=0/0/0'
 expect "GREEN SAVEPOINT throws: same Throwable object" $G "$ALL" S2-sp-throws 'ownView=ORIGINAL marker=1 .*origIdentity=kept'
 expect "RESIDUAL 1062 + ROLLBACK TO fails: original 1062 wins; partial remains for the caller to roll back" $G "$ALL" S3-1062+rt-false "EXC PDO 1062/23000 +\| ownView=$PERM_BAD .*txn=alive"
@@ -100,13 +100,20 @@ expect "v1.4.0 safe: missing row / 1062 in the shift" $V "$ALL" C05-1062shift 'E
 expect "v1.4.0 not rescuable 1213 (same as main)" $V "$ALL" C10-1213final 'EXC PDO 1213/40001 +\| ownView=ORIGINAL marker=0 txn=LOST'
 expect "v1.4.0 MariaDB 1020 (pre-#33 scope lock)" $V "$MARIA" C11-1020lock 'EXC PDO 1020/HY000 +\| ownView=ORIGINAL marker=0 txn=LOST'
 
+# ---------- F54-01: the dead-transaction guard is engine-dependent (MariaDB 11.4.7 opens a new implicit transaction) ----------
+F=f54-01-mariadb-11.4.7.txt
+fl() { awk -v s="$1" -v c="$2" '/^== /{cur=$2} cur==s && index($0,c)==1{print; exit}' $F; }
+l=$(fl real C15-after-1213); [[ "$l" =~ "EXC PDO 1213/40001,EXC PDO 1062/23000" && "$l" =~ "afterCommit=PARTIAL" && "$l" =~ "marker=0" ]] && ok "F54-01 MariaDB 11.4.7 shipped call: partial shifts committed after a swallowed 1213" || bad "F54-01 real :: $l"
+l=$(fl proto C15-after-1213); [[ "$l" =~ "EXC PDO 1213/40001,EXC PDO 1062/23000" && ! "$l" =~ "TransactionExecutionException" && "$l" =~ "marker=0" ]] && ok "F54-01 MariaDB 11.4.7: the guard does NOT fire (new implicit transaction); the caller's earlier work is still lost" || bad "F54-01 proto :: $l"
+l=$(fl proto C10-1213final); [[ "$l" =~ "EXC PDO 1213/40001" && "$l" =~ "txn=LOST" ]] && ok "F54-01 MariaDB 11.4.7: 1213 not rescuable, original propagates" || bad "F54-01 C10 :: $l"
+
 # ---------- reuse of the existing savepoint runner for the mutation window (Addendum A3) ----------
 U=matrix-reuse.txt
 expect "REUSE success / 1062 / false are undone like the inline design" $U "$ALL" C04-false 'false +\| ownView=ORIGINAL marker=1 txn=alive'
 expect "REUSE 1062 on the target write undone" $U "$ALL" C06-1062final 'EXC PDO 1062/23000 +\| ownView=ORIGINAL marker=1 txn=alive'
 expect "REUSE GAP 1: false is reported over PARTIAL shifts when the undo fails" $U "$ALL" S5-false+rt-false "false +\| ownView=$PERM_BAD"
 expect "REUSE GAP 2: after a swallowed 1213 the runner opens its own transaction inside a participating call" $U "$ALL" C15-after-1213 'EXC PDO 1213/40001,EXC PDO 1062/23000 .*Δcommit/rollback=0/1'
-expect "INLINE: the same two cells fail closed and never begin a transaction" $G "$ALL" C15-after-1213 'EXC TransactionExecutionException .*Δcommit/rollback=0/0'
+expect "INLINE (MySQL 8.0.46/8.4.10, MariaDB 11.8.9): the guard fires and no transaction is begun; not claimed for other engines (F54-01)" $G "$ALL" C15-after-1213 'EXC TransactionExecutionException .*Δcommit/rollback=0/0'
 
 # ---------- prototype inside a consumer's savepoint runner ----------
 N=matrix-nested.txt

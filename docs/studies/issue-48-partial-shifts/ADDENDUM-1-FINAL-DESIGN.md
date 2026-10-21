@@ -2,7 +2,13 @@
 
 **Status:** design addendum to [`REPORT.md`](REPORT.md), written after the Lead re-evaluation on PR #54 ("Lead re-evaluation after checking released v1.4.0 against current main"). It **supersedes REPORT §8 and §11-Q1/Q2** (the opt-in method is no longer the recommendation). **No Runtime, Public API, test, CI, composer or public-doc file is changed.** Runtime implementation is **not authorized**; the published failure-path behavior change below needs the Owner's explicit consent first. This is not a claim that the change is non-breaking (§A5).
 
-All numbers come from `results/` (re-run for this addendum: `assert-results.sh` → 239 checks, 0 failures).
+All numbers come from `results/` (`assert-results.sh`; the check list and its result are in `results/assert-output.txt`).
+
+## Errata after the Fresh Full Re-Review of HEAD `4f06d705` (F54-01 … F54-03)
+
+* **F54-01** — the dead-transaction check is narrowed to best-effort, engine-dependent detection (A2 step 3, A4, A6, A8); a MariaDB 11.4.7 cell was added and measured. It does not claim transaction-identity verification, and callers must not swallow `1213`/`1020`.
+* **F54-02** — REPORT §8/§10/§11 are marked historical and their actionable instructions replaced by a pointer to this addendum; the stale check counts were removed (the count lives only in `results/assert-output.txt`); the PR description was rewritten around this design.
+* **F54-03** — the release target and version are **TBD by the Owner**; no `1.5.0`, no "MINOR regardless" (A5).
 
 ## A1. Released `v1.4.0` vs `main`: the defect is in the published contract
 
@@ -16,7 +22,7 @@ All numbers come from `results/` (re-run for this addendum: `assert-results.sh` 
 | C06 `1062` on the target write | same partial state, committed |
 | C07 `1205` on the target write (default server option) | same |
 | C13 second move fails after a first succeeded | corrupt on top of the first |
-| C15 swallow a `1213`, call again | later statements autocommit; partial committed |
+| C15 swallow a `1213`, call again | later statements autocommit (or run in a new implicit transaction on MariaDB 11.4.7); partial shifts committed |
 | C05 `1062` in the shift, C03 missing row | safe (no shift happened / statement rolled back) |
 | C10 `1213` | whole transaction lost (engine behavior, not rescuable) |
 | C11 MariaDB `1020` (scope lock) | `1020`, transaction lost — `v1.4.0` is affected too (Issue #47) |
@@ -31,7 +37,7 @@ No new public API. Signature, return type, documented return values (`true` / `t
 
 1. Validate, run the **read-only phase exactly as today**: `lockScopeForUpdate()` (scope lock and clamp maximum), `getCurrentOrderForUpdate()`, missing-row `false`, clamp, no-op `true`. None of these is inside a savepoint.
 2. **Savepoint placement: after the scope lock (and the target lookup, clamp and no-op check), immediately before the first mutating statement.** The reason is measured, not stylistic: `ROLLBACK TO SAVEPOINT` releases locks taken after the savepoint (L1, all four engines); a savepoint opened *before* the scope lock would release the scope lock on failure (`recipe`, L2: scope rows free), while this placement keeps it (L2 `proto`: locked), as `v1.4.0`/`main` do.
-3. `SAVEPOINT maatify_persistence_sp_<32 hex>` (the ADR 0003 naming contract). A non-throwing `false` → `TransactionExecutionException` before any mutation; a thrown failure propagates unchanged. If the driver then reports no active transaction (a swallowed `1213`/`1020` left a dead one), throw `TransactionExecutionException` **before mutating** (C15).
+3. `SAVEPOINT maatify_persistence_sp_<32 hex>` (the ADR 0003 naming contract). A non-throwing `false` → `TransactionExecutionException` before any mutation; a thrown failure propagates unchanged. Then a **best-effort dead-transaction check**: if the driver reports no active transaction, throw `TransactionExecutionException` before mutating. **Scope of this check (F54-01):** it detects only the dead-transaction state that the `SAVEPOINT` reply reveals, measured on MySQL 8.0.46, MySQL 8.4.10 and MariaDB 11.8.9 (C15). It is **not** a proof that the transaction is the caller's original one: on MariaDB 11.4.7 a server-aborted transaction is followed by a new implicit transaction, the driver reports it as active, the check does not fire, and the caller's earlier work is already lost (`results/f54-01-mariadb-11.4.7.txt`). The package cannot restore or verify transaction identity (the same limit as ADR 0004). **The rule is unchanged: a caller must never swallow `1213`/`1020`/`1205`+`rollback_on_timeout=ON` and continue in that transaction.** The check is a bounded mitigation, not a promise.
 4. Range shift, then target write. Any `Throwable`: best-effort `ROLLBACK TO` + `RELEASE`, rethrow the **original** unchanged; cleanup failures never replace it.
 5. Target write reports no row (`false`): `ROLLBACK TO` **must** succeed or its `Throwable` propagates (never `false` over partial shifts, S5); best-effort `RELEASE`; return `false`.
 6. Success: `RELEASE`; if it fails, best-effort `ROLLBACK TO` + `RELEASE`, then throw the release failure (ADR 0003).
@@ -87,7 +93,7 @@ Guarding the sharing: the implementation PR leaves `src/Pdo/Transaction/**` unto
 | SQL statement stream, participating path | none extra | none extra | **+2** (`SAVEPOINT`, `RELEASE`) per **mutating** move; **0** for no-op / missing row; on failure +`ROLLBACK TO` |
 | Lock behavior | scope locked until the owner ends | same | **same** (savepoint placed after the lock) |
 | `1213`, MariaDB `1020`, `1205`+`rollback_on_timeout=ON` | original exception, transaction lost | same | same; cleanup attempt fails harmlessly; not rescued, not retried |
-| Swallowed `1213` then call again | silent autocommit of partial shifts | same | fails closed before mutating |
+| Swallowed `1213` then call again | silent partial shifts: autocommitted (MySQL, MariaDB 11.8.9) or committed in a new implicit transaction (MariaDB 11.4.7) | same | **best-effort only:** fails closed before mutating on the measured engines MySQL 8.0.46/8.4.10 and MariaDB 11.8.9; **not detected** on MariaDB 11.4.7 (the failing move is still undone inside the new implicit transaction, but the caller's earlier work is already gone). Never a transaction-identity guarantee |
 | `getNextPosition()`, `getNextPositionForUpdate()`, `rowExistsInScope()` | | | untouched |
 | `PdoTransactionRunner`, `PdoSavepointTransactionRunner`, new runners, `OwnedTransactionExecutor` | | | untouched (no source change) |
 | Pinned test(s) | `testParticipantFailure…` asserts partial state | identical file | that **one** test changes (measured on the final prototype: 619/620 pass, 1 fails, only it) |
@@ -97,14 +103,14 @@ Guarding the sharing: the implementation PR leaves `src/Pdo/Transaction/**` unto
 ## A5. What must be recorded before implementation
 
 * **Contract classification (honest).** This is a **published failure-path behavior change** to a method whose previous behavior was pinned by a published test, although its success path, signature, ownership and savepoint semantics are preserved. It must not be described as a free compatibility fix. AGENTS.md requires the v1.4.0 public contract to be preserved; this change deliberately amends one failure-path state of it and therefore needs the Owner's **explicit written consent** (a decision record on PR #54/Issue #48) before Runtime work starts.
-* **Release.** `CHANGELOG [Unreleased]` already carries `Added` and `Deprecated` entries, so the next release is a MINOR regardless (proposed `1.5.0`); this adds a `Changed` entry that names the behavior change, the removed partial-state outcome, the +2 statements and what is unchanged. No tag or release is created by this work, and none by the implementation PR unless the Owner instructs.
+* **Release.** **Release target and version: TBD by the Owner** (Issue #37 keeps the next version open while other changes are open). The implementation PR records the change in `CHANGELOG.md` under `[Unreleased]` with an entry that names the behavior change, the removed partial-state outcome, the +2 statements and what is unchanged. SemVer classification of a published failure-path behavior change is **evaluated at the release gate**; this study does not pre-decide it and does not treat the change as compatible merely because other `[Unreleased]` entries exist. No tag or release is created by this work or by the implementation PR unless the Owner instructs.
 * **ADR.** A new ADR (next number; ADR 0003's decisions stay in force) recording: the decision, the lazy placement and why (L1/L2), why not an opt-in method, why not wrap the runners (R1 gaps), and the not-rescuable list.
 
 ## A6. Tests the implementation must bring (RED first)
 
 1. **Replace the old-behavior test.** `ScopedOrderingManagerTransactionTest::testParticipantFailureLeavesOuterTransactionActiveWithoutIndependentRollback` (line 100; same at `v1.4.0`) is the test that proves the old behavior. Step 1 of the implementation PR rewrites its expectation to the new contract (rows equal `$before` inside the still-active transaction, the original `45000` exception, outer rollback restores the same) and shows it **failing** on the current code; step 2 implements. The old assertion is kept as history in the ADR and in this study (`results/matrix-real-v1.4.0.txt`).
 2. **Real-MySQL 8.4.10 integration tests**, one per cell: C04 (trigger), C06 (`UNIQUE (updated_at)` configuration), C07 (lock partner + `innodb_lock_wait_timeout`), C13, C14, nested savepoint runner, C10/C15 with the existing `DeadlockPartner` infrastructure, C02/C03 asserting **no** savepoint statement (`Com_savepoint`), and the package-owned controls O1–O3. `1020`, `rollback_on_timeout=ON` and MariaDB cells stay out of CI (MariaDB is not a CI target — Issue #51; the server option needs a second service) and are documented as study evidence.
-3. **Unit tests** (scripted `PDO` double, the `SavepointTransactionPdo` style) for S1–S7 and the dead-transaction guard, and the runner/helper parity test of §A3.
+3. **Unit tests** (scripted `PDO` double, the `SavepointTransactionPdo` style) for S1–S7 and the best-effort dead-transaction check (as a control-flow test with a scripted `inTransaction()`), and the runner/helper parity test of §A3. Any integration test of C15 must be limited to the measured engines (MySQL 8.4.10 in CI) and must not claim coverage of MariaDB 11.4.7 behavior; the 11.4.7 limit is documented, not tested in CI.
 4. **Regression:** the public-API test stays as is; a documentation regression test pins the new wording.
 5. Quality gates as documented in `CONTRIBUTING.md` (PHPStan max, php-cs-fixer, unit/regression/integration twice, residue check, consumer harness) before the implementation PR leaves Draft.
 
@@ -117,7 +123,7 @@ Guarding the sharing: the implementation PR leaves `src/Pdo/Transaction/**` unto
 | `README.md` | 260–270 (including "No savepoint guarantee in the ordering API"), 507–508 | same |
 | `docs/guides/MOVE_WITHIN_SCOPE_HOW_TO_USE.md` | 95–99, 121–135 | the `false`/throw guidance; ownership section |
 | `examples/move-within-scope/01_move_after_older_snapshot.php` | 23–24 | comment on partial work |
-| `CHANGELOG.md` | `[Unreleased]` | `Changed` entry (§A5) |
+| `CHANGELOG.md` | `[Unreleased]` | entry per §A5 (version TBD by the Owner) |
 | `docs/adr/` | new ADR + index | §A5 |
 | `CONTRIBUTING.md` | "Transaction Ownership" bullet | unchanged text stays true; add the savepoint sentence |
 
@@ -126,4 +132,5 @@ Guarding the sharing: the implementation PR leaves `src/Pdo/Transaction/**` unto
 * **Pending:** the Owner's explicit consent to the published failure-path change (§A5); the implementation PR with independently reviewed Runtime, tests and docs.
 * **Residuals kept from the report:** a failed undo after a real failure leaves the partial state and the original exception (S3/S4); non-transactional side effects are not undone; two extra control statements per mutating move (no latency measurement).
 * **Note:** the PHPUnit assertion total varies by a few between runs of the same code (4421 and 4430 observed; loop-based concurrency tests); the test count (620) and the verdict do not.
+* **F54-01 limit:** the dead-transaction check is engine-dependent (§A2 step 3). Tested: fires on MySQL 8.0.46, 8.4.10, MariaDB 11.8.9; does not fire on MariaDB 11.4.7. Other MariaDB versions and proxy layers are unknown.
 * **Untested:** `READ COMMITTED`/`SERIALIZABLE` runs of the matrix, other MariaDB versions, MyISAM/mixed engines, XA, proxy or cluster layers, emulated prepares, PHP versions other than 8.4.4.

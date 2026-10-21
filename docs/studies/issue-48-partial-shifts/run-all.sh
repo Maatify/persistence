@@ -11,6 +11,8 @@ for subject in real recipe proto nested reuse; do
   ./run-matrix.sh matrix.php "$subject" 2>&1 | clean > "results/matrix-$subject.txt"
 done
 PROBE_SRC="$V140_SRC" ./run-matrix.sh matrix.php real 2>&1 | clean > results/matrix-real-v1.4.0.txt
+# F54-01: targeted MariaDB 11.4.7 cells (a server-aborted transaction is followed by a new implicit transaction there)
+{ for subject in real proto; do ENGINES="mariadb-11.4.7=33482" ./run-matrix.sh matrix.php "$subject" C10 C15 2>&1 | clean; done; } > results/f54-01-mariadb-11.4.7.txt
 ./run-matrix.sh s4_differential.php 2>&1 | clean > results/s4-differential.txt
 ./run-matrix.sh s5_locks.php 2>&1 | clean > results/s5-locks.txt
-./assert-results.sh
+./assert-results.sh | tee results/assert-output.txt
