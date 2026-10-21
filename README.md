@@ -82,9 +82,9 @@ its signature are released; the behavior below is on `main` only):
 | Behavior of `moveWithinScope()` | `v1.4.0` | `main` (**Unreleased**) |
 |---|---|---|
 | Stale-snapshot clamp in a caller-owned `REPEATABLE READ` transaction (Issue #33) | Clamps against a separate non-locking maximum | Clamps against the maximum of the rows its locking read returns |
-| Failure in a caller-owned transaction (Issue #55, [ADR 0005](docs/adr/0005-move-within-scope-lazy-operation-savepoint.md)): range shift or target write throws, or the target write changes no row (`false`) | The partial range shifts stay in the caller's transaction and a later `commit()` persists them | Its own shifts are undone with an operation-local savepoint (when the transaction is still alive and the undo succeeds); the original exception is still the one thrown |
-| Exceptions in a caller-owned transaction (Issue #55) | Cannot throw `TransactionExecutionException` | Can also throw `TransactionExecutionException` (a class that exists in `v1.4.0`) from the savepoint control statements |
-| Extra statements in a caller-owned transaction (Issue #55) | None | A mutating move adds `SAVEPOINT` and `RELEASE SAVEPOINT` on the success path; failed paths also run `ROLLBACK TO SAVEPOINT`; a no-op or missing row adds none |
+| Failure in a caller-owned transaction (Issue #55, [ADR 0005](docs/adr/0005-move-within-scope-lazy-operation-savepoint.md)): range shift or target write throws, or the target write changes no row (`false`) | If shifts had already been executed and the caller's transaction survives (not aborted by the server), they stay in it and a later `commit()` persists them. No such partial work exists when the call fails before the first shift | Throwing path: its own shifts are undone with an operation-local savepoint (best effort, when the transaction is still alive) and the original exception is rethrown. `false` path: the undo must succeed, then `false` is returned (no exception); if the undo fails, that failure is thrown instead of `false`. If the undo fails on the throwing path, the shifts stay and the original exception still wins |
+| Exceptions in a caller-owned transaction (Issue #55) | The method itself raised no `TransactionExecutionException` from savepoint control statements (it issued none) | Can throw `TransactionExecutionException` (a class that exists in `v1.4.0`) when its own savepoint control statement fails, the dead-transaction guard fires, or an undo/`RELEASE` fails as described above |
+| Extra statements in a caller-owned transaction (Issue #55) | None | A mutating move that succeeds adds exactly `SAVEPOINT` and `RELEASE SAVEPOINT`. After a failure inside the savepointed window, cleanup runs `ROLLBACK TO SAVEPOINT` and then attempts `RELEASE SAVEPOINT` (not promised when the driver reports no active transaction or a cleanup statement fails). A no-op, a missing row, an invalid argument or a failing `SAVEPOINT` add no `ROLLBACK TO` or `RELEASE` |
 
 The two tables answer different questions. A method listed as *Released* in the
 first table can still behave differently from `main` when it appears in the
@@ -286,11 +286,15 @@ $transactions->run(function () use ($pdo, $ordering, $config): void {
   savepoints are not touched, and the scope lock is kept until you end your
   transaction. You still own the final commit or rollback. On the
   success path a mutating move adds exactly two statements (`SAVEPOINT`,
-  `RELEASE SAVEPOINT`); a failed path also runs `ROLLBACK TO SAVEPOINT` and
-  attempts `RELEASE SAVEPOINT` (and a cleanup statement that fails changes the
-  count); a no-op or a missing row adds none. The call can now also throw
-  `TransactionExecutionException` (a class that exists in `v1.4.0`) when a
-  savepoint control statement fails; the `v1.4.0` method could not. This
+  `RELEASE SAVEPOINT`). Only a failure after the savepoint was established
+  adds cleanup: `ROLLBACK TO SAVEPOINT`, then an attempted `RELEASE SAVEPOINT`
+  (skipped when the driver reports no active transaction, and a failing cleanup
+  statement changes the count); no universal count is promised. A no-op, a
+  missing row, an invalid argument or a failing `SAVEPOINT` add no `ROLLBACK TO`
+  or `RELEASE`. The call can now throw `TransactionExecutionException` (a class
+  that exists in `v1.4.0`) when its own savepoint control statement fails, the
+  guard fires, or an undo or `RELEASE` fails; the `v1.4.0` method issued no such
+  statement. This
   changes the failure-path state that `v1.4.0` left behind. A deadlock (`1213`), MariaDB `1020` and `1205` with
   `innodb_rollback_on_timeout=ON` end the whole transaction on the server, erasing
   your earlier work too, and are not rescued; an exception from this call is not

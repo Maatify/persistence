@@ -151,11 +151,13 @@ whole transaction back (as the `catch` above does) is always safe.
   undo behind `false` fails, that failure is thrown (never `false` over partial
   shifts). The scope lock is kept until you end your transaction. On the
   success path a mutating move adds two statements (`SAVEPOINT`,
-  `RELEASE SAVEPOINT`); a failed path also runs `ROLLBACK TO SAVEPOINT` and
-  attempts `RELEASE SAVEPOINT`; a no-op or a missing row adds none. A failing
-  savepoint control statement can make the call throw
+  `RELEASE SAVEPOINT`). Only a failure after the savepoint was established adds
+  cleanup (`ROLLBACK TO SAVEPOINT`, then an attempted `RELEASE SAVEPOINT`, not
+  promised when the transaction is gone or a cleanup statement fails); a no-op,
+  a missing row, an invalid argument or a failing `SAVEPOINT` add neither. A
+  failing savepoint control statement can make the call throw
   `TransactionExecutionException` (a class that exists in `v1.4.0`; the
-  `v1.4.0` method could not throw it here). Use the same PDO connection for every participant.
+  `v1.4.0` method issued no such statement). Use the same PDO connection for every participant.
 * A deadlock (`1213`) rolls back your **entire** transaction on the server. Do not
   catch it and continue in the same transaction, and do not expect a savepoint to
   cover it; see the

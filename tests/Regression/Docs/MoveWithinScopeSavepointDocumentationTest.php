@@ -104,26 +104,33 @@ final class MoveWithinScopeSavepointDocumentationTest extends TestCase
 
     public function testChangelogRecordsTheBehaviorChangeUnderUnreleased(): void
     {
-        $changelog = $this->read('CHANGELOG.md');
-        $unreleased = substr($changelog, (int) strpos($changelog, '## [Unreleased]'), (int) strpos($changelog, '## [1.4.0]') - (int) strpos($changelog, '## [Unreleased]'));
-        $flat = $this->flatten($unreleased);
+        [$heading, $section] = $this->issue55ChangelogSection();
+        $flat = $this->flatten($section);
 
         self::assertStringContainsString('Issue #55', $flat);
         self::assertStringContainsString('Behavior change on failure paths', $flat);
         self::assertStringContainsString('`SAVEPOINT`, `RELEASE SAVEPOINT`', $flat);
-        self::assertStringContainsString('TBD by the Owner', $flat);
+
+        // Version-transition rule: while the entry is under [Unreleased] it must say the release is the Owner's call;
+        // once release work moves it under a version heading, that heading must be a real `## [x.y.z] - date` one.
+        if ($heading === '[Unreleased]') {
+            self::assertStringContainsString('TBD by the Owner', $flat);
+        } else {
+            self::assertMatchesRegularExpression('/^\[\d+\.\d+\.\d+\] - \d{4}-\d{2}-\d{2}$/', $heading);
+        }
     }
 
     public function testChangelogDoesNotClaimUnchangedExceptionTypesAndNamesTheNewThrowPossibility(): void
     {
-        $flat = $this->flatten($this->unreleasedChangelog());
+        $flat = $this->flatten($this->issue55ChangelogSection()[1]);
 
         self::assertStringNotContainsString('return values, exception types,', $flat);
         self::assertStringContainsString('can now also throw `TransactionExecutionException`', $flat);
         self::assertStringContainsString('an existing public class of `v1.4.0`', $flat);
+        self::assertStringContainsString('a `false` result is still returned as `false` when the undo succeeds', $flat);
     }
 
-    public function testStatementCountIsQualifiedAsTheSuccessPathEverywhere(): void
+    public function testStatementCountClaimsAreLocallyQualifiedAsSuccessPathWithCleanupOnlyAfterTheSavepoint(): void
     {
         foreach (
             [
@@ -135,20 +142,46 @@ final class MoveWithinScopeSavepointDocumentationTest extends TestCase
             ] as $file
         ) {
             $contents = $this->flatten($this->read($file));
+            $claims = preg_match_all(
+                '/adds (?:exactly )?two\b|adds exactly `SAVEPOINT`|plus two extra control statements/',
+                $contents,
+                $matches,
+                PREG_OFFSET_CAPTURE,
+            );
 
-            self::assertStringContainsString('success path', $contents, $file);
-            self::assertStringContainsString('ROLLBACK TO SAVEPOINT', $contents, $file);
+            self::assertGreaterThan(0, $claims, $file . ' no longer states the statement count.');
 
-            foreach (
-                [
-                    'A mutating move adds two statements (`SAVEPOINT`, `RELEASE SAVEPOINT`); a no-op',
-                    'mutating move adds exactly two statements (`SAVEPOINT`, `RELEASE SAVEPOINT`); a no-op',
-                    'a mutating move adds exactly `SAVEPOINT` and `RELEASE SAVEPOINT`. The scope lock',
-                ] as $unqualified
-            ) {
-                self::assertStringNotContainsString($unqualified, $contents, $file);
+            foreach ($matches[0] as [, $offset]) {
+                $window = substr($contents, max(0, $offset - 250), 900);
+
+                self::assertMatchesRegularExpression('/success path|that succeeds/', $window, $file . ': count not tied to the success path.');
+                self::assertMatchesRegularExpression('/savepoint was established|savepointed window/', $window, $file . ': cleanup not tied to a failure after the savepoint.');
+                self::assertMatchesRegularExpression('/ROLLBACK TO/', $window, $file . ': failure-path cleanup statements missing next to the count.');
             }
+
+            self::assertStringNotContainsString('a failed path also runs', $contents, $file);
+            self::assertStringNotContainsString('failed paths also run', $contents, $file);
         }
+    }
+
+    public function testReadmeComparisonSeparatesTheThrowingPathFromTheFalsePath(): void
+    {
+        $readme = $this->flatten($this->read('README.md'));
+
+        self::assertStringContainsString('Throwing path:', $readme);
+        self::assertStringContainsString('`false` path:', $readme);
+        self::assertStringNotContainsString('the original exception is still the one thrown', $readme);
+        self::assertStringNotContainsString('Cannot throw `TransactionExecutionException`', $readme);
+        self::assertStringContainsString('If shifts had already been executed and the caller\'s transaction survives', $readme);
+    }
+
+    public function testReferenceSeparatesUnreleasedApiFromTheUnreleasedDeprecationOfReleasedClasses(): void
+    {
+        $head = $this->flatten((string) substr($this->read('PERSISTENCE_PACKAGE_REFERENCE.md'), 0, 5000));
+
+        self::assertStringContainsString('Unreleased status change of released classes', $head);
+        self::assertStringContainsString('Both classes are in `v1.4.0` and not deprecated there', $head);
+        self::assertStringNotContainsString('`InvalidTransactionConfigurationException`, and the deprecation of', $head);
     }
 
     public function testReadmeAndReferenceListTheCallerOwnedBehaviorChangeAsUnreleased(): void
@@ -163,25 +196,84 @@ final class MoveWithinScopeSavepointDocumentationTest extends TestCase
 
     public function testUnreleasedChangelogSectionsFollowKeepAChangelogOrder(): void
     {
-        $changelog = $this->read('CHANGELOG.md');
-
-        preg_match_all('/^### (\w+)$/m', $this->unreleasedChangelog(), $matches);
         $order = ['Added', 'Changed', 'Deprecated', 'Removed', 'Fixed', 'Security'];
-        $positions = array_map(static fn (string $heading): int => (int) array_search($heading, $order, true), $matches[1]);
+
+        $unreleased = $this->unreleasedChangelog();
+
+        if (trim($unreleased) === '') {
+            self::markTestSkipped('[Unreleased] is empty after a release cut; nothing to order.');
+        }
+
+        preg_match_all('/^### (.+)$/m', $unreleased, $matches);
+        $headings = $matches[1];
+
+        self::assertNotSame([], $headings, '[Unreleased] has content but no Keep a Changelog headings.');
+
+        $positions = [];
+
+        foreach ($headings as $heading) {
+            $position = array_search($heading, $order, true);
+            self::assertIsInt($position, 'Unknown changelog heading in [Unreleased]: ' . $heading);
+            $positions[] = $position;
+        }
+
         $sorted = $positions;
         sort($sorted);
 
-        self::assertNotSame([], $matches[1]);
-        self::assertSame($sorted, $positions, 'Unreleased sections: ' . implode(', ', $matches[1]));
-        self::assertSame(array_unique($matches[1]), $matches[1]);
+        self::assertSame($sorted, $positions, 'Unreleased sections: ' . implode(', ', $headings));
+        self::assertSame(array_unique($headings), $headings);
+    }
+
+    public function testChangelogSectionSlicingStopsAtTheNextVersionHeading(): void
+    {
+        $synthetic = "# Changelog\n\n## [Unreleased]\n\n### Added\n* a\n\n## [9.9.9] - 2099-01-01\n\n### Fixed\n* b\n\n## [1.4.0] - 2026-09-18\n\n### Added\n* c\n";
+        $sections = $this->changelogSections($synthetic);
+
+        self::assertSame(['[Unreleased]', '[9.9.9] - 2099-01-01', '[1.4.0] - 2026-09-18'], array_keys($sections));
+        self::assertStringContainsString('* a', $sections['[Unreleased]']);
+        self::assertStringNotContainsString('* b', $sections['[Unreleased]']);
+        self::assertStringNotContainsString('### Fixed', $sections['[Unreleased]']);
+    }
+
+    /** @return array<string, string> heading (without the leading `## `) => body, in file order */
+    private function changelogSections(string $changelog): array
+    {
+        $parts = preg_split('/^## (\[.+)$/m', $changelog, -1, PREG_SPLIT_DELIM_CAPTURE);
+        self::assertIsArray($parts);
+
+        $sections = [];
+
+        for ($i = 1; $i + 1 < count($parts); $i += 2) {
+            $sections[trim($parts[$i])] = $parts[$i + 1];
+        }
+
+        return $sections;
     }
 
     private function unreleasedChangelog(): string
     {
-        $changelog = $this->read('CHANGELOG.md');
-        $start = (int) strpos($changelog, '## [Unreleased]');
+        $sections = $this->changelogSections($this->read('CHANGELOG.md'));
 
-        return substr($changelog, $start, (int) strpos($changelog, '## [1.4.0]') - $start);
+        self::assertSame('[Unreleased]', array_key_first($sections), '[Unreleased] must stay the first changelog section.');
+
+        return $sections['[Unreleased]'];
+    }
+
+    /** @return array{string, string} heading and body of the one section holding the Issue #55 entry */
+    private function issue55ChangelogSection(): array
+    {
+        $holders = [];
+
+        foreach ($this->changelogSections($this->read('CHANGELOG.md')) as $heading => $body) {
+            if (str_contains($body, 'Behavior change on failure paths (Issue #55')) {
+                $holders[$heading] = $body;
+            }
+        }
+
+        self::assertCount(1, $holders, 'The Issue #55 entry must live in exactly one changelog section.');
+        $heading = (string) array_key_first($holders);
+
+        return [$heading, $holders[$heading]];
     }
 
     private function flatten(string $text): string
