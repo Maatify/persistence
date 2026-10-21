@@ -69,6 +69,47 @@ export PERSISTENCE_TEST_MYSQL_USER="your_test_user"
 export PERSISTENCE_TEST_MYSQL_PASSWORD="your_test_password"
 ```
 
+#### MySQL 8.4 with binary logging enabled
+
+Some integration tests create triggers. MySQL 8.4 enables binary logging by
+default, and while it is enabled an account without the `SUPER` privilege
+cannot create triggers unless `log_bin_trust_function_creators` is `1`. Without
+it, those tests fail with `SQLSTATE[HY000]: General error: 1419 You do not have
+the SUPER privilege and binary logging is enabled` (11 errors on a stock
+`mysql:8.4.10` server).
+
+CI sets the variable on its disposable MySQL service in both integration jobs.
+For a local disposable test server, do the same with an account that is allowed
+to change global variables (for example `root`; the unprivileged test user from
+the environment variables above cannot). With the CI image and credentials:
+
+```bash
+docker run -d --name persistence-test-mysql -p 127.0.0.1:3306:3306 \
+  -e MYSQL_ROOT_PASSWORD=root_ci_password \
+  -e MYSQL_DATABASE=maatify_persistence_test \
+  -e MYSQL_USER=maatify_persistence \
+  -e MYSQL_PASSWORD=persistence_ci_password \
+  mysql:8.4.10
+```
+
+Once the server accepts connections, set the variable and verify it:
+
+```bash
+docker exec -e MYSQL_PWD=root_ci_password persistence-test-mysql \
+  mysql --user=root --batch --skip-column-names \
+  --execute="SET GLOBAL log_bin_trust_function_creators = 1; SELECT @@GLOBAL.log_bin_trust_function_creators;"
+```
+
+The query must print `1`. `SET GLOBAL` is lost when the server restarts, so
+repeat it after a restart, or start the disposable server with
+`--log-bin-trust-function-creators=1` appended to the `docker run` command
+(after the image name) instead. For a server you already run, set the variable
+the same way, or through its provisioning.
+
+This is a setting for the throwaway test server only. It is not a
+recommendation to change global settings, trust function creators or disable
+binary logging on any production or shared server.
+
 Then run:
 
 ```bash
