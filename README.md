@@ -65,20 +65,32 @@ composer require maatify/persistence
 
 ## 🧭 Availability: `v1.4.0` vs Unreleased
 
+**API availability** (does the symbol exist in the tagged release?):
+
 | Capability | Status |
 |---|---|
 | `ScopedOrderingConfig`, `ScopedOrderingManager::getNextPosition()`, `moveWithinScope()`, `rowExistsInScope()` | Released in `v1.4.0` |
 | `PdoTransactionRunner`, `PdoSavepointTransactionRunner`, `TransactionRunnerInterface`, `SavepointTransactionRunnerInterface`, `TransactionExecutionException` | Released in `v1.4.0` |
 | PDO Pagination | Released (since `v1.1.0`) |
 | `ScopedOrderingManager::getNextPositionForUpdate()` | **Unreleased** |
-| `moveWithinScope()` stale-snapshot clamp fix (Issue #33) | **Unreleased** (`v1.4.0` clamps against a separate non-locking maximum) |
 | `PdoDeadlockRetryTransactionRunner`, `PdoDeadlockRetrySavepointTransactionRunner`, `InvalidTransactionConfigurationException` | **Unreleased** |
 | Deprecation of `PdoTransactionRunner` and `PdoSavepointTransactionRunner` | **Unreleased** (not deprecated in `v1.4.0`) |
 
-The first rows list API *availability* in `v1.4.0` only. A method present in
-`v1.4.0` can still behave differently from `main` when a later fix is listed as
-Unreleased (for example `moveWithinScope()`'s clamp), and the guides and examples
-describe `main`.
+**Behavior changes of an API that already exists in `v1.4.0`** (the symbol and
+its signature are released; the behavior below is on `main` only):
+
+| Behavior of `moveWithinScope()` | `v1.4.0` | `main` (**Unreleased**) |
+|---|---|---|
+| Stale-snapshot clamp in a caller-owned `REPEATABLE READ` transaction (Issue #33) | Clamps against a separate non-locking maximum | Clamps against the maximum of the rows its locking read returns |
+| Failure in a caller-owned transaction (Issue #55, [ADR 0005](docs/adr/0005-move-within-scope-lazy-operation-savepoint.md)): range shift or target write throws, or the target write changes no row (`false`) | The partial range shifts stay in the caller's transaction and a later `commit()` persists them | Its own shifts are undone with an operation-local savepoint (when the transaction is still alive and the undo succeeds); the original exception is still the one thrown |
+| Exceptions in a caller-owned transaction (Issue #55) | Cannot throw `TransactionExecutionException` | Can also throw `TransactionExecutionException` (a class that exists in `v1.4.0`) from the savepoint control statements |
+| Extra statements in a caller-owned transaction (Issue #55) | None | A mutating move adds `SAVEPOINT` and `RELEASE SAVEPOINT` on the success path; failed paths also run `ROLLBACK TO SAVEPOINT`; a no-op or missing row adds none |
+
+The two tables answer different questions. A method listed as *Released* in the
+first table can still behave differently from `main` when it appears in the
+second table, and the guides and examples describe `main`. Without an active
+transaction (the package-owned path), `moveWithinScope()` behaves as in `v1.4.0`
+with respect to the Issue #55 change.
 
 One engine caveat applies to the released API too: on MariaDB with
 `innodb_snapshot_isolation=ON`, a caller-owned `moveWithinScope()` in `v1.4.0`
@@ -272,10 +284,14 @@ $transactions->run(function () use ($pdo, $ordering, $config): void {
   unchanged. If that cleanup itself fails, the original exception still wins but
   the partial shifts **stay** and you must roll back. Your earlier work and
   savepoints are not touched, and the scope lock is kept until you end your
-  transaction. You still own the final commit or rollback. A
-  mutating move adds exactly two statements (`SAVEPOINT`, `RELEASE SAVEPOINT`); a
-  no-op or a missing row adds none. This changes the failure-path state that
-  `v1.4.0` left behind. A deadlock (`1213`), MariaDB `1020` and `1205` with
+  transaction. You still own the final commit or rollback. On the
+  success path a mutating move adds exactly two statements (`SAVEPOINT`,
+  `RELEASE SAVEPOINT`); a failed path also runs `ROLLBACK TO SAVEPOINT` and
+  attempts `RELEASE SAVEPOINT` (and a cleanup statement that fails changes the
+  count); a no-op or a missing row adds none. The call can now also throw
+  `TransactionExecutionException` (a class that exists in `v1.4.0`) when a
+  savepoint control statement fails; the `v1.4.0` method could not. This
+  changes the failure-path state that `v1.4.0` left behind. A deadlock (`1213`), MariaDB `1020` and `1205` with
   `innodb_rollback_on_timeout=ON` end the whole transaction on the server, erasing
   your earlier work too, and are not rescued; an exception from this call is not
   proof of a clean, still-live transaction, so never swallow it and continue

@@ -18,6 +18,11 @@ of truth for exact semantics and exceptions.
 > signature and transaction ownership are unchanged. The method itself (without
 > this fix) is part of `v1.4.0`; the runnable example exercises the Unreleased
 > behavior.
+>
+> A second Unreleased behavior change of the same released method (Issue #55)
+> concerns failures inside a caller-owned transaction: `main` undoes the
+> method's own partial shifts, whereas `v1.4.0` leaves them for the caller's
+> `commit()`. See [What it does](#what-it-does).
 
 ## What it does
 
@@ -144,9 +149,13 @@ whole transaction back (as the `catch` above does) is always safe.
   it on success. Cleanup is best effort after an exception: if it fails, the
   original exception still wins and the shifts stay for your rollback. If the
   undo behind `false` fails, that failure is thrown (never `false` over partial
-  shifts). The scope lock is kept until you end your transaction. A mutating
-  move adds two statements (`SAVEPOINT`, `RELEASE SAVEPOINT`); a no-op or a
-  missing row adds none. Use the same PDO connection for every participant.
+  shifts). The scope lock is kept until you end your transaction. On the
+  success path a mutating move adds two statements (`SAVEPOINT`,
+  `RELEASE SAVEPOINT`); a failed path also runs `ROLLBACK TO SAVEPOINT` and
+  attempts `RELEASE SAVEPOINT`; a no-op or a missing row adds none. A failing
+  savepoint control statement can make the call throw
+  `TransactionExecutionException` (a class that exists in `v1.4.0`; the
+  `v1.4.0` method could not throw it here). Use the same PDO connection for every participant.
 * A deadlock (`1213`) rolls back your **entire** transaction on the server. Do not
   catch it and continue in the same transaction, and do not expect a savepoint to
   cover it; see the

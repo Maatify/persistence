@@ -114,6 +114,76 @@ final class MoveWithinScopeSavepointDocumentationTest extends TestCase
         self::assertStringContainsString('TBD by the Owner', $flat);
     }
 
+    public function testChangelogDoesNotClaimUnchangedExceptionTypesAndNamesTheNewThrowPossibility(): void
+    {
+        $flat = $this->flatten($this->unreleasedChangelog());
+
+        self::assertStringNotContainsString('return values, exception types,', $flat);
+        self::assertStringContainsString('can now also throw `TransactionExecutionException`', $flat);
+        self::assertStringContainsString('an existing public class of `v1.4.0`', $flat);
+    }
+
+    public function testStatementCountIsQualifiedAsTheSuccessPathEverywhere(): void
+    {
+        foreach (
+            [
+                'README.md',
+                'PERSISTENCE_PACKAGE_REFERENCE.md',
+                'docs/guides/MOVE_WITHIN_SCOPE_HOW_TO_USE.md',
+                'docs/adr/0005-move-within-scope-lazy-operation-savepoint.md',
+                'CHANGELOG.md',
+            ] as $file
+        ) {
+            $contents = $this->flatten($this->read($file));
+
+            self::assertStringContainsString('success path', $contents, $file);
+            self::assertStringContainsString('ROLLBACK TO SAVEPOINT', $contents, $file);
+
+            foreach (
+                [
+                    'A mutating move adds two statements (`SAVEPOINT`, `RELEASE SAVEPOINT`); a no-op',
+                    'mutating move adds exactly two statements (`SAVEPOINT`, `RELEASE SAVEPOINT`); a no-op',
+                    'a mutating move adds exactly `SAVEPOINT` and `RELEASE SAVEPOINT`. The scope lock',
+                ] as $unqualified
+            ) {
+                self::assertStringNotContainsString($unqualified, $contents, $file);
+            }
+        }
+    }
+
+    public function testReadmeAndReferenceListTheCallerOwnedBehaviorChangeAsUnreleased(): void
+    {
+        foreach (['README.md', 'PERSISTENCE_PACKAGE_REFERENCE.md'] as $file) {
+            $head = $this->flatten((string) substr($this->read($file), 0, 9000));
+
+            self::assertStringContainsString('Issue #55', $head, $file);
+            self::assertStringContainsString('TransactionExecutionException', $head, $file);
+        }
+    }
+
+    public function testUnreleasedChangelogSectionsFollowKeepAChangelogOrder(): void
+    {
+        $changelog = $this->read('CHANGELOG.md');
+
+        preg_match_all('/^### (\w+)$/m', $this->unreleasedChangelog(), $matches);
+        $order = ['Added', 'Changed', 'Deprecated', 'Removed', 'Fixed', 'Security'];
+        $positions = array_map(static fn (string $heading): int => (int) array_search($heading, $order, true), $matches[1]);
+        $sorted = $positions;
+        sort($sorted);
+
+        self::assertNotSame([], $matches[1]);
+        self::assertSame($sorted, $positions, 'Unreleased sections: ' . implode(', ', $matches[1]));
+        self::assertSame(array_unique($matches[1]), $matches[1]);
+    }
+
+    private function unreleasedChangelog(): string
+    {
+        $changelog = $this->read('CHANGELOG.md');
+        $start = (int) strpos($changelog, '## [Unreleased]');
+
+        return substr($changelog, $start, (int) strpos($changelog, '## [1.4.0]') - $start);
+    }
+
     private function flatten(string $text): string
     {
         $flat = preg_replace('/\s*\n(?:\s*(?:>|\*|\/\*\*|\*\/)\s*)?\s*/', ' ', $text);
