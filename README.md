@@ -65,20 +65,32 @@ composer require maatify/persistence
 
 ## 🧭 Availability: `v1.4.0` vs Unreleased
 
+**API availability** (does the symbol exist in the tagged release?):
+
 | Capability | Status |
 |---|---|
 | `ScopedOrderingConfig`, `ScopedOrderingManager::getNextPosition()`, `moveWithinScope()`, `rowExistsInScope()` | Released in `v1.4.0` |
 | `PdoTransactionRunner`, `PdoSavepointTransactionRunner`, `TransactionRunnerInterface`, `SavepointTransactionRunnerInterface`, `TransactionExecutionException` | Released in `v1.4.0` |
 | PDO Pagination | Released (since `v1.1.0`) |
 | `ScopedOrderingManager::getNextPositionForUpdate()` | **Unreleased** |
-| `moveWithinScope()` stale-snapshot clamp fix (Issue #33) | **Unreleased** (`v1.4.0` clamps against a separate non-locking maximum) |
 | `PdoDeadlockRetryTransactionRunner`, `PdoDeadlockRetrySavepointTransactionRunner`, `InvalidTransactionConfigurationException` | **Unreleased** |
 | Deprecation of `PdoTransactionRunner` and `PdoSavepointTransactionRunner` | **Unreleased** (not deprecated in `v1.4.0`) |
 
-The first rows list API *availability* in `v1.4.0` only. A method present in
-`v1.4.0` can still behave differently from `main` when a later fix is listed as
-Unreleased (for example `moveWithinScope()`'s clamp), and the guides and examples
-describe `main`.
+**Behavior changes of an API that already exists in `v1.4.0`** (the symbol and
+its signature are released; the behavior below is on `main` only):
+
+| Behavior of `moveWithinScope()` | `v1.4.0` | `main` (**Unreleased**) |
+|---|---|---|
+| Stale-snapshot clamp in a caller-owned `REPEATABLE READ` transaction (Issue #33) | Clamps against a separate non-locking maximum | Clamps against the maximum of the rows its locking read returns |
+| Failure in a caller-owned transaction (Issue #55, [ADR 0005](docs/adr/0005-move-within-scope-lazy-operation-savepoint.md)): range shift or target write throws, or the target write changes no row (`false`) | If shifts had already been executed and the caller's transaction survives (not aborted by the server), they stay in it and a later `commit()` persists them. No such partial work exists when the call fails before the first shift | Throwing path: its own shifts are undone with an operation-local savepoint (best effort, when the transaction is still alive) and the original exception is rethrown. `false` path: the undo must succeed, then `false` is returned (no exception); if the undo fails, that failure is thrown instead of `false`. If the undo fails on the throwing path, the shifts stay and the original exception still wins |
+| Exceptions in a caller-owned transaction (Issue #55) | The method itself raised no `TransactionExecutionException` from savepoint control statements (it issued none) | Can throw `TransactionExecutionException` (a class that exists in `v1.4.0`) when its own savepoint control statement fails, the dead-transaction guard fires, or an undo/`RELEASE` fails as described above |
+| Extra statements in a caller-owned transaction (Issue #55) | None | A mutating move that succeeds adds exactly `SAVEPOINT` and `RELEASE SAVEPOINT`. After a failure inside the savepointed window, cleanup runs `ROLLBACK TO SAVEPOINT` and then attempts `RELEASE SAVEPOINT` (not promised when the driver reports no active transaction or a cleanup statement fails). A no-op, a missing row, an invalid argument or a failing `SAVEPOINT` add no `ROLLBACK TO` or `RELEASE` |
+
+The two tables answer different questions. A method listed as *Released* in the
+first table can still behave differently from `main` when it appears in the
+second table, and the guides and examples describe `main`. Without an active
+transaction (the package-owned path), `moveWithinScope()` behaves as in `v1.4.0`
+with respect to the Issue #55 change.
 
 One engine caveat applies to the released API too: on MariaDB with
 `innodb_snapshot_isolation=ON`, a caller-owned `moveWithinScope()` in `v1.4.0`
@@ -264,22 +276,32 @@ $transactions->run(function () use ($pdo, $ordering, $config): void {
   already made stay in your transaction** and the caller decides on the rollback.
 * **`moveWithinScope()` undoes its own mutation window (Unreleased, Issue #55,
   ADR 0005).** In a caller-owned transaction it takes an operation-local
-  savepoint after the scope lock, right before the first mutating statement. A
-  failure in the range shift or the target write (or `false` after the shifts)
-  rolls back to that savepoint (best effort), so the shifted rows of an
-  interrupted move no longer remain when the transaction is still alive and the
-  rollback to the savepoint succeeds; the original exception is rethrown
-  unchanged. If that cleanup itself fails, the original exception still wins but
-  the partial shifts **stay** and you must roll back. Your earlier work and
-  savepoints are not touched, and the scope lock is kept until you end your
-  transaction. You still own the final commit or rollback. A
-  mutating move adds exactly two statements (`SAVEPOINT`, `RELEASE SAVEPOINT`); a
-  no-op or a missing row adds none. This changes the failure-path state that
-  `v1.4.0` left behind. A deadlock (`1213`), MariaDB `1020` and `1205` with
-  `innodb_rollback_on_timeout=ON` end the whole transaction on the server, erasing
-  your earlier work too, and are not rescued; an exception from this call is not
-  proof of a clean, still-live transaction, so never swallow it and continue
-  unless you know the state.
+  savepoint after the scope lock, right before the first mutating statement.
+  Two outcomes are distinct. If the range shift or the target write **throws**,
+  it attempts a best-effort `ROLLBACK TO SAVEPOINT` and rethrows the original
+  exception unchanged; when the transaction is still alive and that rollback
+  succeeds, the shifted rows of the interrupted move no longer remain, and if
+  that cleanup itself fails the original exception still wins but the partial
+  shifts **stay** and you must roll back. If the target write **changes no row**
+  (no exception exists), the rollback to the savepoint must succeed and the call
+  returns `false`; if it fails, that failure is thrown instead of `false`, so a
+  `false` never sits over partial shifts. Your earlier work and savepoints are
+  not touched, and the scope lock is kept until you end your transaction. You
+  still own the final commit or rollback. On the success path a mutating move
+  adds exactly two statements (`SAVEPOINT`, `RELEASE SAVEPOINT`). Only a failure
+  after the savepoint was established adds cleanup: `ROLLBACK TO SAVEPOINT`,
+  then an attempted `RELEASE SAVEPOINT` (skipped when the driver reports no
+  active transaction, and a failing cleanup statement changes the count); no
+  universal count is promised. A no-op, a missing row, an invalid argument or a
+  failing `SAVEPOINT` add no `ROLLBACK TO` or `RELEASE`. The call can now throw
+  `TransactionExecutionException` (a class that exists in `v1.4.0`) when its own
+  savepoint control statement fails, the guard fires, or an undo or `RELEASE`
+  fails; the `v1.4.0` method issued no such statement. This changes the
+  failure-path state that `v1.4.0` left behind. A deadlock (`1213`), MariaDB
+  `1020` and `1205` with `innodb_rollback_on_timeout=ON` end the whole
+  transaction on the server, erasing your earlier work too, and are not rescued;
+  an exception from this call is not proof of a clean, still-live transaction,
+  so never swallow it and continue unless you know the state.
 
 `TransactionRunnerInterface` exposes only `run(callable $callback)`, so a
 consumer service can depend on the shared transaction abstraction without
@@ -514,7 +536,7 @@ for that condition.
 * When `updatedAtColumn` is configured, updates that column on the target row in the same SQL statement and transaction as the final order update.
 * Does not globally normalize pre-existing gaps.
 * In a transaction it owns: rolls back and returns `false` if the final target update reports no affected row, and rolls back on any Throwable after starting the transaction, so no partial shift survives.
-* In a caller-owned transaction (Unreleased, Issue #55, ADR 0005): it never commits or fully rolls back. It undoes its own shifts with an operation-local savepoint (taken after the scope lock, before the first mutating statement) when it returns `false` after the shifts or throws, and rethrows the original Throwable; if the undo itself fails, the shifts stay for the caller's rollback and the failure is not reported as `false`. The caller still owns the final commit or rollback, and a server-ended transaction (`1213`, MariaDB `1020`) is not restored.
+* In a caller-owned transaction (Unreleased, Issue #55, ADR 0005): it never commits or fully rolls back. It undoes its own shifts with an operation-local savepoint (taken after the scope lock, before the first mutating statement) when it throws (the original Throwable is rethrown) or returns `false` after the shifts (no exception exists; `false` is returned only if the undo succeeded); if the undo itself fails, the shifts stay for the caller's rollback, the original Throwable still wins on the throwing path, and on the `false` path the undo failure is thrown instead of `false`. The caller still owns the final commit or rollback, and a server-ended transaction (`1213`, MariaDB `1020`) is not restored.
 * Rethrows the original Throwable without arbitrary wrapping.
 
 ### Ordering Guarantees on MariaDB (`innodb_snapshot_isolation`)
