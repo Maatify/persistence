@@ -10,4 +10,7 @@ Engine: MySQL 8.4.10 (`mysql:8.4.10`, `--log-bin-trust-function-creators=1`), PH
 | `green-integration-run1.txt`, `green-integration-run2.txt` | Full integration suite twice: 199 tests, OK. |
 | `green-consumer.txt` | Consumer Verification Harness, two clean runs. |
 
-Unit (379) and regression (85) suites, PHPStan max, php-cs-fixer, `composer validate/audit/check-platform-reqs`, `git diff --check` and the table-residue check are reported in the PR description.
+| `red-scope-lock-eager-savepoint.txt` / `green-scope-lock.txt` | F56-02: the new scope-lock test fails when the savepoint is temporarily moved before the scope lock (eager variant, reverted, not committed) and passes on the committed lazy placement. The caller transaction must have done no earlier write: with a prior write InnoDB keeps the locks even after `ROLLBACK TO`, so only a read-only-so-far caller distinguishes lazy from eager. |
+| `red-lowest-deps-phpstan.txt` / `green-lowest-deps-phpstan.txt` | F56-01: PHPStan under `--prefer-lowest` (PHPStan 2.1.0) reports the counters tuple at line 573 before the fix and no errors after. |
+
+Integration is now 200 tests (two runs OK); regression 86. Unit (379) and regression (86) suites, PHPStan max, php-cs-fixer, `composer validate/audit/check-platform-reqs`, `git diff --check` and the table-residue check are reported in the PR description.

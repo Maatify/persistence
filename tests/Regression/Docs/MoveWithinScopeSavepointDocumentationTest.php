@@ -65,6 +65,19 @@ final class MoveWithinScopeSavepointDocumentationTest extends TestCase
         }
     }
 
+    public function testUserFacingGuidanceDoesNotPromiseCleanUndoForEveryException(): void
+    {
+        foreach (['README.md', 'docs/guides/MOVE_WITHIN_SCOPE_HOW_TO_USE.md'] as $file) {
+            $contents = $this->flatten($this->read($file));
+
+            self::assertStringContainsString('not proof', $contents, $file);
+            self::assertStringContainsString('stay', $contents, $file);
+            self::assertStringNotContainsString('the move has undone its own shifts (Unreleased, Issue #55): your earlier work', $contents, $file);
+        }
+
+        self::assertStringContainsString('is not proof of a clean, still-live transaction', $this->flatten($this->read('CHANGELOG.md')));
+    }
+
     public function testAdrRecordsTheDecisionTheNotRescuableListAndTheGuardLimit(): void
     {
         $adr = $this->flatten($this->read(self::ADR));

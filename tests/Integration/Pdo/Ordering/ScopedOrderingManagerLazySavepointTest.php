@@ -201,6 +201,47 @@ final class ScopedOrderingManagerLazySavepointTest extends TestCase
         self::assertSame(self::INITIAL, $this->orders($this->control, LazySavepointSchema::UNIQUE));
     }
 
+    // ---- the scope lock outlives the failed move and its local rollback (why the savepoint is lazy) ----
+
+    /**
+     * The caller transaction has done no write before the call: only then does InnoDB release the row locks taken after
+     * a savepoint on ROLLBACK TO SAVEPOINT, so this is the case in which an eager savepoint (taken before the scope
+     * lock) would free the scope and a later conflicting writer could slip in. The lazy placement must not.
+     */
+    public function testScopeLockSurvivesFailedMoveAndLocalRollbackUntilTheCallerEndsItsTransaction(): void
+    {
+        $this->pdo->beginTransaction();
+
+        try {
+            $this->move(LazySavepointSchema::UNIQUE, LazySavepointSchema::STAMP_DUP);
+            self::fail('Expected the duplicate-key PDOException.');
+        } catch (PDOException $exception) {
+            self::assertSame(1062, $exception->errorInfo[1] ?? null);
+        }
+
+        // The move was undone locally; the caller's transaction is still open.
+        self::assertSame(self::INITIAL, $this->orders($this->pdo, LazySavepointSchema::UNIQUE));
+        self::assertTrue($this->pdo->inTransaction());
+
+        $other = (new MySqlConnectionFactory())->create();
+        $this->callerConnections[] = $other;
+        $other->exec('SET SESSION innodb_lock_wait_timeout = 1');
+
+        // Every row of the scope is still locked: a savepoint taken before the scope lock would have released it.
+        foreach ([1, 2, 3, 4, 5] as $id) {
+            $this->assertBlockedByScopeLock($other, 'UPDATE `' . LazySavepointSchema::UNIQUE . '` SET `label` = \'other\' WHERE `id` = ' . $id);
+        }
+
+        $this->assertBlockedByScopeLock(
+            $other,
+            'INSERT INTO `' . LazySavepointSchema::UNIQUE . '` (`display_order`, `updated_at`, `label`) VALUES (6, \'2026-03-01 00:00:00\', \'other\')',
+        );
+
+        // Once the caller ends its transaction the scope is free again.
+        $this->pdo->rollBack();
+        self::assertSame(1, $other->exec('UPDATE `' . LazySavepointSchema::UNIQUE . '` SET `label` = \'other\' WHERE `id` = 3'));
+    }
+
     // ---- C13: operation-local, an earlier successful move of the same transaction is kept ----
 
     public function testFailedSecondMoveKeepsTheFirstMoveOfTheSameTransaction(): void
@@ -517,6 +558,16 @@ final class ScopedOrderingManagerLazySavepointTest extends TestCase
         return $faulty;
     }
 
+    private function assertBlockedByScopeLock(PDO $other, string $sql): void
+    {
+        try {
+            $other->exec($sql);
+            self::fail('The scope lock was released too early: ' . $sql);
+        } catch (PDOException $exception) {
+            self::assertSame(1205, $exception->errorInfo[1] ?? null, $exception->getMessage());
+        }
+    }
+
     private function assertCallerTransactionIntact(): void
     {
         self::assertTrue($this->pdo->inTransaction());
@@ -555,22 +606,27 @@ final class ScopedOrderingManagerLazySavepointTest extends TestCase
     /** @return array{commit: int, rollback: int, savepoint: int, release: int, rollback_to: int} */
     private function counters(): array
     {
-        $names = [
-            'commit' => 'Com_commit',
-            'rollback' => 'Com_rollback',
-            'savepoint' => 'Com_savepoint',
-            'release' => 'Com_release_savepoint',
-            'rollback_to' => 'Com_rollback_to_savepoint',
+        return [
+            'commit' => $this->statusCounter('Com_commit'),
+            'rollback' => $this->statusCounter('Com_rollback'),
+            'savepoint' => $this->statusCounter('Com_savepoint'),
+            'release' => $this->statusCounter('Com_release_savepoint'),
+            'rollback_to' => $this->statusCounter('Com_rollback_to_savepoint'),
         ];
-        $counters = [];
+    }
 
-        foreach ($names as $key => $variable) {
-            $statement = $this->pdo->query("SHOW SESSION STATUS LIKE '" . $variable . "'");
-            self::assertInstanceOf(PDOStatement::class, $statement);
-            $counters[$key] = (int) $statement->fetchColumn(1);
+    /** @param non-empty-string $variable */
+    private function statusCounter(string $variable): int
+    {
+        $statement = $this->pdo->query("SHOW SESSION STATUS LIKE '" . $variable . "'");
+        self::assertInstanceOf(PDOStatement::class, $statement);
+        $value = $statement->fetchColumn(1);
+
+        if (!is_numeric($value)) {
+            throw new AssertionFailedError('Unexpected status counter ' . $variable . '.');
         }
 
-        return $counters;
+        return (int) $value;
     }
 
     /**

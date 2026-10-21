@@ -266,14 +266,20 @@ $transactions->run(function () use ($pdo, $ordering, $config): void {
   ADR 0005).** In a caller-owned transaction it takes an operation-local
   savepoint after the scope lock, right before the first mutating statement. A
   failure in the range shift or the target write (or `false` after the shifts)
-  rolls back to that savepoint, so the shifted rows of an interrupted move no
-  longer remain; the original exception is rethrown unchanged, and your earlier
-  work and savepoints are kept. You still own the final commit or rollback. A
+  rolls back to that savepoint (best effort), so the shifted rows of an
+  interrupted move no longer remain when the transaction is still alive and the
+  rollback to the savepoint succeeds; the original exception is rethrown
+  unchanged. If that cleanup itself fails, the original exception still wins but
+  the partial shifts **stay** and you must roll back. Your earlier work and
+  savepoints are not touched, and the scope lock is kept until you end your
+  transaction. You still own the final commit or rollback. A
   mutating move adds exactly two statements (`SAVEPOINT`, `RELEASE SAVEPOINT`); a
   no-op or a missing row adds none. This changes the failure-path state that
   `v1.4.0` left behind. A deadlock (`1213`), MariaDB `1020` and `1205` with
-  `innodb_rollback_on_timeout=ON` end the whole transaction on the server and are
-  not rescued; never swallow them and continue.
+  `innodb_rollback_on_timeout=ON` end the whole transaction on the server, erasing
+  your earlier work too, and are not rescued; an exception from this call is not
+  proof of a clean, still-live transaction, so never swallow it and continue
+  unless you know the state.
 
 `TransactionRunnerInterface` exposes only `run(callable $callback)`, so a
 consumer service can depend on the shared transaction abstraction without

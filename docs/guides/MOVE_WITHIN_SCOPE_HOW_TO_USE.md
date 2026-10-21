@@ -93,7 +93,7 @@ try {
     $moved = $ordering->moveWithinScope($pdo, $config, $playlistId, $itemId, 5);
 
     // false means the row is missing or the final update changed nothing. The
-    // move has already undone its own shifts (operation-local savepoint), but
+    // move has undone its own shifts (operation-local savepoint) or thrown, but
     // the outcome of the rest of your unit of work is still yours: here we
     // treat false as a failure and roll the whole transaction back.
     if ($moved === false) {
@@ -119,10 +119,16 @@ try {
 
 Or call it without a transaction and the manager begins and commits one itself.
 
-If the call throws or returns `false` inside your own transaction, the move has
-undone its own shifts (Unreleased, Issue #55): your earlier work is untouched
-and you decide whether to continue or to roll the whole transaction back (as
-the `catch` above does).
+If the call returns `false` inside your own transaction, or throws a recoverable
+statement-level error (for example `1062`, or `1205` without
+`innodb_rollback_on_timeout=ON`), the move has normally undone its own shifts
+(Unreleased, Issue #55) and your earlier work is untouched. That holds only when
+the transaction is still alive and the rollback to the move's savepoint
+succeeded. A thrown exception is **not proof** of that: if the cleanup failed the
+original exception still wins and the partial shifts stay; after `1213`, MariaDB
+`1020` or an aborting `1205` the server has already erased your whole
+transaction. So do not catch-and-continue unless you know the state; rolling the
+whole transaction back (as the `catch` above does) is always safe.
 
 ## Transaction ownership and lock boundaries
 
@@ -135,8 +141,10 @@ the `catch` above does).
   it takes an operation-local savepoint after the scope lock and before the
   first mutating statement, rolls back to it when the shift or the target write
   throws (the original exception is rethrown) or returns `false`, and releases
-  it on success. If that undo itself fails, the failure is thrown (never
-  `false` over partial shifts) and the shifts stay for your rollback. A mutating
+  it on success. Cleanup is best effort after an exception: if it fails, the
+  original exception still wins and the shifts stay for your rollback. If the
+  undo behind `false` fails, that failure is thrown (never `false` over partial
+  shifts). The scope lock is kept until you end your transaction. A mutating
   move adds two statements (`SAVEPOINT`, `RELEASE SAVEPOINT`); a no-op or a
   missing row adds none. Use the same PDO connection for every participant.
 * A deadlock (`1213`) rolls back your **entire** transaction on the server. Do not

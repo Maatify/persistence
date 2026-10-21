@@ -1,0 +1,14 @@
+F                                                                   1 / 1 (100%)
+
+Time: 00:00.074, Memory: 14.00 MB
+
+There was 1 failure:
+
+1) Maatify\Persistence\Tests\Integration\Pdo\Ordering\ScopedOrderingManagerLazySavepointTest::testScopeLockSurvivesFailedMoveAndLocalRollbackUntilTheCallerEndsItsTransaction
+The scope lock was released too early: UPDATE `maa_persistence_test_lsp_unique` SET `label` = 'other' WHERE `id` = 1
+
+/Users/mohamedabdulalim/MEGA/Libraries/2026/persistence/.claude/worktrees/retry-performance-mac-benchmark-f3a0fb/tests/Integration/Pdo/Ordering/ScopedOrderingManagerLazySavepointTest.php:565
+/Users/mohamedabdulalim/MEGA/Libraries/2026/persistence/.claude/worktrees/retry-performance-mac-benchmark-f3a0fb/tests/Integration/Pdo/Ordering/ScopedOrderingManagerLazySavepointTest.php:232
+
+FAILURES!
+Tests: 1, Assertions: 5, Failures: 1.
