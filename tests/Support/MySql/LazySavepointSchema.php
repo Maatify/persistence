@@ -12,8 +12,10 @@ use PDO;
  *
  * Tables (all InnoDB, utf8mb4, PRIMARY KEY (id), no foreign keys or joins to host tables):
  * - PLAIN:  global (NULL-scope) ordering table. Display order is `display_order`,
- *           mutated by the shift; soft delete is `deleted_at` (NULL = active,
- *           never set by these tests); `updated_at` is the optional target
+ *           mutated by the shift. `deleted_at` is the soft-delete column: the
+ *           tests' ScopedOrderingConfig keeps its default `deleted_at`, so the
+ *           soft-delete filter is active, but no test ever soft-deletes a row
+ *           (every row stays NULL = active); `updated_at` is the optional target
  *           mutation timestamp; `label` is free text. Uniqueness: none besides
  *           the primary key.
  * - UNIQUE: same columns as PLAIN plus UNIQUE KEY `u_updated` (`updated_at`), so

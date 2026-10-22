@@ -12,10 +12,12 @@ use PHPUnit\Framework\TestCase;
 
 /**
  * Reads the schema the lazy-savepoint tests actually run against from
- * information_schema (PACKAGE_BUILDING_STANDARD section 6) and pins the
- * documented index set: the access paths the lock and savepoint scenarios rely
- * on must not change silently. It does not execute any locking scenario; those
- * are proved by ScopedOrderingManagerLazySavepointTest.
+ * information_schema (PACKAGE_BUILDING_STANDARD section 6) and pins the declared
+ * structure: PRIMARY KEY (id), table and column COMMENTs, and the exact set of
+ * secondary index declarations. It guards index declarations only; it does not
+ * freeze optimizer plans or EXPLAIN output and does not execute any locking
+ * scenario. The lock, 1062/1205/1213 and savepoint behaviour is proved by
+ * ScopedOrderingManagerLazySavepointTest.
  */
 final class LazySavepointSchemaComplianceTest extends TestCase
 {
@@ -70,23 +72,19 @@ final class LazySavepointSchemaComplianceTest extends TestCase
         );
         self::assertSame([], $uncommented, $table . ' has columns without a COMMENT');
 
+        $from = ' FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? ORDER BY INDEX_NAME, SEQ_IN_INDEX';
+        $names = $this->column('SELECT INDEX_NAME' . $from, [$table]);
+        $nonUnique = $this->column('SELECT CAST(NON_UNIQUE AS CHAR)' . $from, [$table]);
+        $columns = $this->column('SELECT COLUMN_NAME' . $from, [$table]);
+        self::assertCount(count($names), $nonUnique);
+        self::assertCount(count($names), $columns);
+
         /** @var array<string, array{unique: bool, columns: list<string>}> $indexes */
         $indexes = [];
-        $statement = $this->pdo->prepare(
-            'SELECT INDEX_NAME AS name, NON_UNIQUE AS non_unique, COLUMN_NAME AS column_name FROM information_schema.STATISTICS'
-            . ' WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? ORDER BY INDEX_NAME, SEQ_IN_INDEX',
-        );
-        $statement->execute([$table]);
 
-        while (($row = $statement->fetch(PDO::FETCH_ASSOC)) !== false) {
-            $name = $row['name'] ?? null;
-            $nonUnique = $row['non_unique'] ?? null;
-            $columnName = $row['column_name'] ?? null;
-            self::assertIsString($name);
-            self::assertIsString($columnName);
-            self::assertTrue($nonUnique === 0 || $nonUnique === 1 || $nonUnique === '0' || $nonUnique === '1');
-            $indexes[$name] ??= ['unique' => $nonUnique === 0 || $nonUnique === '0', 'columns' => []];
-            $indexes[$name]['columns'][] = $columnName;
+        foreach ($names as $position => $name) {
+            $indexes[$name] ??= ['unique' => $nonUnique[$position] === '0', 'columns' => []];
+            $indexes[$name]['columns'][] = $columns[$position];
         }
 
         self::assertSame(['unique' => true, 'columns' => ['id']], $indexes['PRIMARY'] ?? null, $table . ' needs PRIMARY KEY (id)');
