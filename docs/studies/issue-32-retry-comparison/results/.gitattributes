@@ -1,5 +1,18 @@
-# Issue #42 evidence directories hold verbatim tool output (top/docker/harness reports, including trailing padding and
-# final blank lines); it is kept byte-for-byte and therefore exempt from whitespace linting. Runs 1-5 are not affected.
+# Verbatim tool output (top/docker/harness reports, run logs and generated analyses, including trailing padding and
+# final blank lines) is kept byte-for-byte, so the exact files below are exempt from the whitespace gate. The Issue #42
+# evidence directories are exempt as a whole. Nothing else under results/ is exempt, so a new file is still linted.
+f41-06-local-gates.txt -whitespace
+run-1-initial/ANALYSIS.md -whitespace
+run-1-initial/run.log -whitespace
+run-2/ANALYSIS.md -whitespace
+run-2/run.log -whitespace
+run-3/ANALYSIS.md -whitespace
+run-3/run.log -whitespace
+run-4-decision-cell/ANALYSIS.md -whitespace
+run-4-decision-cell/LOAD.md -whitespace
+run-4-decision-cell/run.log -whitespace
+run-5-decision-cell/ANALYSIS.md -whitespace
+run-5-decision-cell/run.log -whitespace
 i42-phase-a-independent-mac/** -whitespace
 run-6-i42-decision-a/** -whitespace
 run-7-i42-decision-b/** -whitespace

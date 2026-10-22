@@ -76,14 +76,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          shopt -s globstar nullglob
-          files=(src/**/*.php tests/**/*.php .php-cs-fixer.php)
-          if [[ -d examples ]]; then
-            files+=(examples/**/*.php)
-          fi
-          for file in "${files[@]}"; do
-            php -l "$file"
-          done
+          composer check:syntax
 
       - name: PHPStan
         shell: bash
@@ -101,7 +94,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          git diff --check
+          composer check:whitespace
           git diff --exit-code
 
   unit-regression:
@@ -160,7 +153,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          git diff --check
+          composer check:whitespace
           git diff --exit-code
 
   lowest-dependencies:
@@ -211,17 +204,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          composer validate --strict
-          composer update \
-            --prefer-lowest \
-            --prefer-stable \
-            --no-interaction \
-            --prefer-dist \
-            --no-progress
-          composer check-platform-reqs
-          composer audit \
-            --no-interaction \
-            --abandoned=fail
+          composer check:lowest
 
       - name: Static analysis and code style
         shell: bash
@@ -267,65 +250,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          php <<'PHP'
-          <?php
-          declare(strict_types=1);
-
-          $dsn = getenv('PERSISTENCE_TEST_MYSQL_DSN');
-          $user = getenv('PERSISTENCE_TEST_MYSQL_USER');
-          $password = getenv('PERSISTENCE_TEST_MYSQL_PASSWORD');
-
-          if (!is_string($dsn) || $dsn === '' || !is_string($user) || $user === '' || !is_string($password)) {
-              fwrite(STDERR, "Missing MySQL test environment configuration.\n");
-              exit(1);
-          }
-
-          $pdo = new PDO($dsn, $user, $password, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
-          $schema = (string) $pdo->query('SELECT DATABASE()')->fetchColumn();
-
-          $tables = [
-              'maa_persistence_test_global_ordering',
-              'maa_persistence_test_scoped_ordering',
-              'maa_persistence_test_pagination_items',
-              'maa_persistence_test_transaction_savepoint_items',
-          ];
-          $triggers = [
-              'maa_persistence_test_fail_global_target_update',
-              'maa_persistence_test_fail_scoped_target_update',
-          ];
-
-          $tableStatement = $pdo->prepare(
-              'SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = ? AND TABLE_NAME IN (?, ?, ?, ?) ORDER BY TABLE_NAME'
-          );
-          $tableStatement->execute([$schema, ...$tables]);
-          $remainingTables = $tableStatement->fetchAll(PDO::FETCH_COLUMN);
-
-          $triggerStatement = $pdo->prepare(
-              'SELECT TRIGGER_NAME FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA = ? AND TRIGGER_NAME IN (?, ?) ORDER BY TRIGGER_NAME'
-          );
-          $triggerStatement->execute([$schema, ...$triggers]);
-          $remainingTriggers = $triggerStatement->fetchAll(PDO::FETCH_COLUMN);
-
-          if ($remainingTables !== [] || $remainingTriggers !== []) {
-              fwrite(STDERR, "MySQL residue detected.\n");
-              if ($remainingTables !== []) {
-                  fwrite(STDERR, 'Remaining tables: ' . implode(', ', $remainingTables) . "\n");
-              }
-              if ($remainingTriggers !== []) {
-                  fwrite(STDERR, 'Remaining triggers: ' . implode(', ', $remainingTriggers) . "\n");
-              }
-              exit(1);
-          }
-
-          echo "MySQL residue verification passed: no package test tables or triggers remain.\n";
-          PHP
+          composer check:residue
 
       - name: Repository integrity
         if: ${{ always() && !cancelled() && steps.checkout.outcome == 'success' }}
         shell: bash
         run: |
           set -euo pipefail
-          git diff --check
+          composer check:whitespace
           git diff --exit-code
 
   integration:
@@ -433,65 +365,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          php <<'PHP'
-          <?php
-          declare(strict_types=1);
-
-          $dsn = getenv('PERSISTENCE_TEST_MYSQL_DSN');
-          $user = getenv('PERSISTENCE_TEST_MYSQL_USER');
-          $password = getenv('PERSISTENCE_TEST_MYSQL_PASSWORD');
-
-          if (!is_string($dsn) || $dsn === '' || !is_string($user) || $user === '' || !is_string($password)) {
-              fwrite(STDERR, "Missing MySQL test environment configuration.\n");
-              exit(1);
-          }
-
-          $pdo = new PDO($dsn, $user, $password, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
-          $schema = (string) $pdo->query('SELECT DATABASE()')->fetchColumn();
-
-          $tables = [
-              'maa_persistence_test_global_ordering',
-              'maa_persistence_test_scoped_ordering',
-              'maa_persistence_test_pagination_items',
-              'maa_persistence_test_transaction_savepoint_items',
-          ];
-          $triggers = [
-              'maa_persistence_test_fail_global_target_update',
-              'maa_persistence_test_fail_scoped_target_update',
-          ];
-
-          $tableStatement = $pdo->prepare(
-              'SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = ? AND TABLE_NAME IN (?, ?, ?, ?) ORDER BY TABLE_NAME'
-          );
-          $tableStatement->execute([$schema, ...$tables]);
-          $remainingTables = $tableStatement->fetchAll(PDO::FETCH_COLUMN);
-
-          $triggerStatement = $pdo->prepare(
-              'SELECT TRIGGER_NAME FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA = ? AND TRIGGER_NAME IN (?, ?) ORDER BY TRIGGER_NAME'
-          );
-          $triggerStatement->execute([$schema, ...$triggers]);
-          $remainingTriggers = $triggerStatement->fetchAll(PDO::FETCH_COLUMN);
-
-          if ($remainingTables !== [] || $remainingTriggers !== []) {
-              fwrite(STDERR, "MySQL residue detected.\n");
-              if ($remainingTables !== []) {
-                  fwrite(STDERR, 'Remaining tables: ' . implode(', ', $remainingTables) . "\n");
-              }
-              if ($remainingTriggers !== []) {
-                  fwrite(STDERR, 'Remaining triggers: ' . implode(', ', $remainingTriggers) . "\n");
-              }
-              exit(1);
-          }
-
-          echo "MySQL residue verification passed: no package test tables or triggers remain.\n";
-          PHP
+          composer check:residue
 
       - name: Repository integrity
         if: ${{ always() && !cancelled() && steps.checkout.outcome == 'success' }}
         shell: bash
         run: |
           set -euo pipefail
-          git diff --check
+          composer check:whitespace
           git diff --exit-code
 
   ci-gate:

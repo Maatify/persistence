@@ -718,8 +718,12 @@ composer test:regression
 composer test:integration
 composer test:consumer
 vendor/bin/php-cs-fixer fix --dry-run --diff
-git diff --check
+composer check:syntax
+composer check:whitespace
+composer check:residue
 ```
+
+`composer check:whitespace` verifies the whole committed tree plus local changes (a bare `git diff --check` on a clean checkout compares nothing). `composer check:residue` is a read-only check for leftover package-owned MySQL test objects. `composer check:lowest` runs the lowest-dependencies sequence. The full CI-to-local mapping is in [CONTRIBUTING.md](CONTRIBUTING.md#ci-to-local-gate-mapping).
 
 `composer test:integration`, `composer test:consumer`, and `composer test` require a real MySQL database. SQLite is explicitly **not** an integration substitute. The Consumer Verification Harness creates a separate Composer root, installs this package as a non-symlinked dependency, and performs two clean runs.
 

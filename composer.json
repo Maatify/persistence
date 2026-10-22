@@ -55,6 +55,10 @@
   },
   "scripts": {
     "analyse": "phpstan analyse src tests --level=max",
+    "check:lowest": "bash scripts/resolve-lowest-dependencies.sh",
+    "check:residue": "@php scripts/check-mysql-residue.php",
+    "check:syntax": "bash scripts/check-php-syntax.sh",
+    "check:whitespace": "bash scripts/check-whitespace.sh",
     "format": "php-cs-fixer fix",
     "test": "phpunit",
     "test:unit": "phpunit --testsuite unit",

@@ -1,0 +1,5 @@
+# Verbatim captured tool output, kept byte-for-byte; only these exact files are exempt from the whitespace gate.
+p2-root-cause.txt -whitespace
+phpunit-mdb1011-snapshot-OFF-non47-failures.txt -whitespace
+phpunit-mdb114-snapshot-OFF-non47-failures.txt -whitespace
+phpunit-mdb118-snapshot-OFF-non47-failures.txt -whitespace
