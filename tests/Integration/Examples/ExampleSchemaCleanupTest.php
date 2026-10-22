@@ -14,6 +14,12 @@ use PHPUnit\Framework\TestCase;
  * fails part-way. This forces that failure: the second CREATE TABLE collides
  * with a pre-existing table, and the test proves the first table was dropped,
  * the pre-existing table was not touched, and the original error propagated.
+ *
+ * Schema policy of the colliding table (PACKAGE_BUILDING_STANDARD section 6):
+ * test-only, InnoDB, a single `id` column that is the PRIMARY KEY and the only
+ * access path (it is only ever created and dropped, never queried, so no other
+ * index is needed). No soft delete, no display order, no uniqueness beyond the
+ * primary key, and no FK or join to host tables.
  */
 final class ExampleSchemaCleanupTest extends TestCase
 {
@@ -25,9 +31,14 @@ final class ExampleSchemaCleanupTest extends TestCase
         $items = 'maa_example_items_' . $suffix;
 
         $pdo->exec('DROP TABLE IF EXISTS ' . $items);
-        $pdo->exec('CREATE TABLE ' . $items . ' (id INT NOT NULL PRIMARY KEY) ENGINE=InnoDB');
+        $pdo->exec('CREATE TABLE ' . $items . ' ('
+            . "id INT NOT NULL COMMENT 'Surrogate key of the pre-existing colliding probe table. No FK.',"
+            . ' PRIMARY KEY (id)'
+            . ") ENGINE=InnoDB COMMENT='Test-only table that makes the example second CREATE TABLE collide; must survive the cleanup.'");
 
         try {
+            $this->assertCollisionTableIsDocumented($pdo, $items);
+
             $result = $this->runExampleScript(
                 <<<'PHP'
                 try {
@@ -52,6 +63,29 @@ final class ExampleSchemaCleanupTest extends TestCase
             $pdo->exec('DROP TABLE IF EXISTS ' . $items);
             $pdo->exec('DROP TABLE IF EXISTS ' . $playlists);
         }
+    }
+
+    private function assertCollisionTableIsDocumented(PDO $pdo, string $table): void
+    {
+        $statement = $pdo->prepare(
+            'SELECT TABLE_COMMENT FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?',
+        );
+        $statement->execute([$table]);
+        $tableComment = $statement->fetchColumn();
+        self::assertIsString($tableComment);
+        self::assertNotSame('', trim($tableComment), 'the collision table needs a table COMMENT');
+
+        $statement = $pdo->prepare(
+            "SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND TRIM(COLUMN_COMMENT) = ''",
+        );
+        $statement->execute([$table]);
+        self::assertSame(0, (int) $statement->fetchColumn(), 'every column of the collision table needs a COMMENT');
+
+        $statement = $pdo->prepare(
+            "SELECT GROUP_CONCAT(COLUMN_NAME ORDER BY SEQ_IN_INDEX) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND INDEX_NAME = 'PRIMARY'",
+        );
+        $statement->execute([$table]);
+        self::assertSame('id', $statement->fetchColumn(), 'the collision table needs PRIMARY KEY (id)');
     }
 
     /**

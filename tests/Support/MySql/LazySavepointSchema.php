@@ -7,11 +7,31 @@ namespace Maatify\Persistence\Tests\Support\MySql;
 use PDO;
 
 /**
- * Test-only schema for the moveWithinScope() operation-local savepoint tests:
- * two ordering tables (plain, and with UNIQUE (updated_at) so that the target
- * write can fail with 1062 after the range shift), an audit table that a
- * trigger touches to provoke lock waits and deadlocks, a marker table for
- * the caller's earlier work and a filler table that makes a partner transaction heavy.
+ * Test-only schema for the moveWithinScope() operation-local savepoint tests
+ * (PACKAGE_BUILDING_STANDARD section 6; policies below stand in for an SQL header).
+ *
+ * Tables (all InnoDB, utf8mb4, PRIMARY KEY (id), no foreign keys or joins to host tables):
+ * - PLAIN:  global (NULL-scope) ordering table. Display order is `display_order`,
+ *           mutated by the shift. `deleted_at` is the soft-delete column: the
+ *           tests' ScopedOrderingConfig keeps its default `deleted_at`, so the
+ *           soft-delete filter is active, but no test ever soft-deletes a row
+ *           (every row stays NULL = active); `updated_at` is the optional target
+ *           mutation timestamp; `label` is free text. Uniqueness: none besides
+ *           the primary key.
+ * - UNIQUE: same columns as PLAIN plus UNIQUE KEY `u_updated` (`updated_at`), so
+ *           that the target write can fail with 1062 after the range shift.
+ * - AUDIT:  two counter rows; a trigger on the ordering tables updates row 2 to
+ *           provoke lock waits (1205) and deadlocks (1213).
+ * - MARKER: records the caller's earlier work inside its transaction.
+ * - FILL:   filler rows that make the partner transaction heavy enough to lose
+ *           the deadlock victim choice.
+ *
+ * Indexes are deliberate: there is NO index on `display_order` (nor a scope
+ * column). The scope lock is `SELECT ... ORDER BY display_order, id FOR UPDATE`
+ * and the tests assert that it keeps every row and the insert gap (id 6) locked;
+ * an extra index would change the access path and therefore which records and
+ * gaps are locked, so the table stays PRIMARY KEY plus the documented UNIQUE.
+ * LazySavepointSchemaComplianceTest pins this index set.
  */
 final readonly class LazySavepointSchema
 {
@@ -38,13 +58,13 @@ final readonly class LazySavepointSchema
         foreach ([self::PLAIN => '', self::UNIQUE => ', UNIQUE KEY `u_updated` (`updated_at`)'] as $table => $extra) {
             $this->pdo->exec(
                 'CREATE TABLE `' . $table . '` ('
-                . ' `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,'
-                . ' `display_order` INT NOT NULL,'
-                . ' `deleted_at` DATETIME NULL DEFAULT NULL,'
-                . ' `updated_at` DATETIME NULL DEFAULT NULL,'
-                . ' `label` VARCHAR(191) NOT NULL,'
+                . " `id` INT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'Fixture row identity.',"
+                . " `display_order` INT NOT NULL COMMENT 'Mutable ordering position shifted by moveWithinScope(); deliberately unindexed.',"
+                . " `deleted_at` DATETIME NULL DEFAULT NULL COMMENT 'Optional soft-delete timestamp; NULL means active.',"
+                . " `updated_at` DATETIME NULL DEFAULT NULL COMMENT 'Optional target mutation timestamp; UNIQUE only in the UNIQUE variant.',"
+                . " `label` VARCHAR(191) NOT NULL COMMENT 'Fixture row label.',"
                 . ' PRIMARY KEY (`id`)' . $extra
-                . ') ENGINE=InnoDB DEFAULT CHARSET=utf8mb4'
+                . ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Test-only ordering fixture for the lazy savepoint scenarios.'"
             );
 
             for ($i = 1; $i <= 5; $i++) {
@@ -55,10 +75,22 @@ final readonly class LazySavepointSchema
             }
         }
 
-        $this->pdo->exec('CREATE TABLE `' . self::AUDIT . '` (`id` INT NOT NULL PRIMARY KEY, `n` INT NOT NULL) ENGINE=InnoDB');
+        $this->pdo->exec('CREATE TABLE `' . self::AUDIT . '` ('
+            . " `id` INT NOT NULL COMMENT 'Fixed audit row identity (1 and 2); no auto increment.',"
+            . " `n` INT NOT NULL COMMENT 'Counter touched by the trigger to provoke lock waits and deadlocks.',"
+            . ' PRIMARY KEY (`id`)'
+            . ") ENGINE=InnoDB COMMENT='Test-only lock-contention counter rows.'");
         $this->pdo->exec('INSERT INTO `' . self::AUDIT . '` (`id`, `n`) VALUES (1, 0), (2, 0)');
-        $this->pdo->exec('CREATE TABLE `' . self::MARKER . '` (`id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY, `note` VARCHAR(64) NOT NULL) ENGINE=InnoDB');
-        $this->pdo->exec('CREATE TABLE `' . self::FILL . '` (`id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY, `payload` VARCHAR(32) NOT NULL) ENGINE=InnoDB');
+        $this->pdo->exec('CREATE TABLE `' . self::MARKER . '` ('
+            . " `id` INT NOT NULL AUTO_INCREMENT COMMENT 'Marker row identity.',"
+            . " `note` VARCHAR(64) NOT NULL COMMENT 'Caller earlier-work marker text.',"
+            . ' PRIMARY KEY (`id`)'
+            . ") ENGINE=InnoDB COMMENT='Test-only marker rows proving the caller transaction kept earlier work.'");
+        $this->pdo->exec('CREATE TABLE `' . self::FILL . '` ('
+            . " `id` INT NOT NULL AUTO_INCREMENT COMMENT 'Filler row identity.',"
+            . " `payload` VARCHAR(32) NOT NULL COMMENT 'Filler payload that makes the partner transaction heavy.',"
+            . ' PRIMARY KEY (`id`)'
+            . ") ENGINE=InnoDB COMMENT='Test-only filler rows for the deadlock partner transaction.'");
     }
 
     public function drop(): void
