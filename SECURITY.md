@@ -86,7 +86,8 @@ Every case fails the gate regardless of severity, and regardless of whether the 
 
 Record, for each finding, the package, resolved version, advisory ID, severity, and which of these applies:
 
-* **Runtime** (`require`, currently `ext-pdo` and `maatify/exceptions`, and anything they pull in): installed by every consumer, so it can affect consumers of this package. Treat it as in scope of this document's [Security Scope](#security-scope), prepare a fix with priority, and handle it under the [Disclosure Policy](#disclosure-policy) when it affects a published version.
+* **Runtime** (Composer packages in `require`, currently `maatify/exceptions`, and the packages it pulls in): installed by every consumer, so it can affect consumers of this package. Treat it as in scope of this document's [Security Scope](#security-scope), prepare a fix with priority, and handle it under the [Disclosure Policy](#disclosure-policy) when it affects a published version.
+* **PHP platform requirement** (`ext-pdo`, and `php`): not a Composer-installed package, so `composer audit` does not report advisories against it. It is checked by `composer check-platform-reqs`; its security depends on PHP and host patching by the consuming environment.
 * **Development** (`require-dev`: PHPUnit, PHPStan, PHP-CS-Fixer and their dependencies): not installed for consumers and not shipped in the package, but it runs on contributor machines and in CI with repository access. It still blocks the gate and must be resolved, but it does not by itself imply a vulnerability in a published release.
 * **Both or unclear**: assess it as runtime until the dependency path is shown otherwise (`composer why <package>`, `composer why-not <package> <version>`).
 
@@ -97,15 +98,16 @@ A finding is never described as a false positive without evidence that the advis
 1. Reproduce with the command above and capture `composer audit --format=json --abandoned=fail`, `composer show --tree` for the affected package, and the PHP and Composer versions.
 2. Establish the dependency path and whether the package is runtime or development.
 3. If a patched version exists within the current constraints, update to it (`composer update <package> --with-dependencies`). If it only exists outside the constraints, widen or raise the constraint in a reviewed pull request that states the compatibility impact.
+   * Updating a local `vendor/` does not remove an affected version that the declared constraints still allow. Because `composer.lock` is not tracked and the `Lowest dependencies` job resolves with `--prefer-lowest`, check that every supported resolution (latest and lowest) audits clean. If any of them can select an advisory-affected version, investigate and raise or narrow the relevant allowed lower bound in a separate reviewed dependency change, subject to compatibility review and the owner's governance, then re-run the latest and lowest audits and the tests. Differences between environments are investigated separately (Issue #69), not suppressed.
 4. For a transitive dependency, update the direct parent that requires it; if no parent release allows a safe version, report it to that package's maintainers and handle it as step 5 below. Do not patch files in `vendor/`.
 5. When no safe version is available yet, or an abandoned package has no replacement:
    * The gate stays failing. Do not merge unrelated work over a failing audit, and do not add an ignore, skip, baseline or severity filter to make it pass.
-   * Open or update a tracking issue with the advisory or abandonment evidence, the dependency path, the runtime or development classification, and the upstream status.
+   * Handle it privately first. When the vulnerability details are undisclosed or sensitive, do not open a public issue or pull request for them; use the private channel in [Reporting a Vulnerability](#reporting-a-vulnerability) and record the dependency path, classification and upstream status there. A public tracking issue is acceptable only for already-public advisory or abandonment metadata (advisory ID, package, affected and fixed versions, upstream status), with no exploitable details and no private report content.
    * Evaluate removing or replacing the dependency, or constraining the version range to exclude the affected versions, in a separate reviewed pull request.
    * For a runtime finding that affects a published release, follow the [Disclosure Policy](#disclosure-policy).
 6. Verify the fix by re-running the full audit locally and in CI, including the `Lowest dependencies` job, and by recording the results in the pull request.
 
-This policy defines no exception or waiver mechanism. Any change that relaxes the audit gate requires an explicit, separate change to this policy and to the CI workflow, reviewed and approved by the repository owner; it is not decided inside a remediation pull request.
+This policy defines no exception or waiver mechanism, and none can be granted at repository level while the pinned CI Workflow Standard §9 applies: it forbids ignoring vulnerabilities and abandoned packages and requires the audit to stay fail-closed. No ignore, severity skip, baseline or owner-approved local relaxation is available. A proposal incompatible with the standard would first need its own authoritative standards-governance resolution; only after that could any downstream policy or workflow change be considered.
 
 ## Disclosure Policy
 
