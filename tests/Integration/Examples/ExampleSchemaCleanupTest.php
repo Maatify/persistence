@@ -25,7 +25,10 @@ final class ExampleSchemaCleanupTest extends TestCase
         $items = 'maa_example_items_' . $suffix;
 
         $pdo->exec('DROP TABLE IF EXISTS ' . $items);
-        $pdo->exec('CREATE TABLE ' . $items . ' (id INT NOT NULL PRIMARY KEY) ENGINE=InnoDB');
+        $pdo->exec('CREATE TABLE ' . $items . ' ('
+            . "id INT NOT NULL COMMENT 'Surrogate key of the pre-existing colliding probe table. No FK.',"
+            . ' PRIMARY KEY (id)'
+            . ") ENGINE=InnoDB COMMENT='Test-only table that makes the example second CREATE TABLE collide; must survive the cleanup.'");
 
         try {
             $result = $this->runExampleScript(
