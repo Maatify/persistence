@@ -54,6 +54,59 @@ The following areas are explicitly out of scope for this package's security poli
 * Misuse of the package that contradicts the documented contracts and intended usage.
 * External schema modifications or data corruption not caused by the package itself.
 
+## Dependency Audit Policy
+
+This policy applies [CI Workflow Standard §9](docs/php-engineering-standards/standards/packages/CI_WORKFLOW_STANDARD.md) (Composer Security Audit) to this repository. It covers security advisories, abandoned packages, vulnerable direct dependencies and vulnerable transitive dependencies. The audit gate is fail-closed and this policy does not weaken it.
+
+### Enforcement
+
+The audit runs after dependency resolution, with the same command locally and in CI:
+
+```bash
+composer audit --no-interaction --abandoned=fail
+```
+
+* Locally it is part of the verification sequence in [CONTRIBUTING.md](CONTRIBUTING.md#local-verification).
+* In CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) it runs in the `Quality`, `Unit/Regression` and `Integration` jobs after `composer update` and `composer check-platform-reqs`, and in the `Lowest dependencies` job through `composer check:lowest` (`scripts/resolve-lowest-dependencies.sh`).
+* A non-zero exit fails the job and therefore the `CI Gate`. The audit step is never `continue-on-error`, never followed by a shell fallback, and no `audit` ignore, `ignore-severity` or `--no-audit` option is configured or used.
+* `composer.lock` is not tracked, so the audit covers whatever versions the constraints in `composer.json` resolve to on the day it runs. A green audit is a statement about that resolution and that day's advisory data, not a permanent guarantee.
+
+### Cases covered
+
+| Case | Meaning | Gate result |
+| --- | --- | --- |
+| Security advisory | Composer reports an advisory for a resolved package version. | Fails. |
+| Abandoned package | A resolved package is marked abandoned. `--abandoned=fail` makes this an error. | Fails. |
+| Vulnerable direct dependency | The affected package is named in `require` or `require-dev` of `composer.json`. | Fails. |
+| Vulnerable transitive dependency | The affected package is only pulled in by another package. | Fails. |
+
+Every case fails the gate regardless of severity, and regardless of whether the affected code path is believed to be reachable. Impact assessment (below) decides how urgent and how broad the response is; it never decides that a finding may be ignored.
+
+### Assessing impact: runtime versus development
+
+Record, for each finding, the package, resolved version, advisory ID, severity, and which of these applies:
+
+* **Runtime** (`require`, currently `ext-pdo` and `maatify/exceptions`, and anything they pull in): installed by every consumer, so it can affect consumers of this package. Treat it as in scope of this document's [Security Scope](#security-scope), prepare a fix with priority, and handle it under the [Disclosure Policy](#disclosure-policy) when it affects a published version.
+* **Development** (`require-dev`: PHPUnit, PHPStan, PHP-CS-Fixer and their dependencies): not installed for consumers and not shipped in the package, but it runs on contributor machines and in CI with repository access. It still blocks the gate and must be resolved, but it does not by itself imply a vulnerability in a published release.
+* **Both or unclear**: assess it as runtime until the dependency path is shown otherwise (`composer why <package>`, `composer why-not <package> <version>`).
+
+A finding is never described as a false positive without evidence that the advisory does not apply to the resolved version. Findings that differ between environments are recorded with exact versions (PHP, Composer, package and advisory IDs) and investigated separately; a difference is not, by itself, proof of either an exposure or a false positive.
+
+### Remediation
+
+1. Reproduce with the command above and capture `composer audit --format=json --abandoned=fail`, `composer show --tree` for the affected package, and the PHP and Composer versions.
+2. Establish the dependency path and whether the package is runtime or development.
+3. If a patched version exists within the current constraints, update to it (`composer update <package> --with-dependencies`). If it only exists outside the constraints, widen or raise the constraint in a reviewed pull request that states the compatibility impact.
+4. For a transitive dependency, update the direct parent that requires it; if no parent release allows a safe version, report it to that package's maintainers and handle it as step 5 below. Do not patch files in `vendor/`.
+5. When no safe version is available yet, or an abandoned package has no replacement:
+   * The gate stays failing. Do not merge unrelated work over a failing audit, and do not add an ignore, skip, baseline or severity filter to make it pass.
+   * Open or update a tracking issue with the advisory or abandonment evidence, the dependency path, the runtime or development classification, and the upstream status.
+   * Evaluate removing or replacing the dependency, or constraining the version range to exclude the affected versions, in a separate reviewed pull request.
+   * For a runtime finding that affects a published release, follow the [Disclosure Policy](#disclosure-policy).
+6. Verify the fix by re-running the full audit locally and in CI, including the `Lowest dependencies` job, and by recording the results in the pull request.
+
+This policy defines no exception or waiver mechanism. Any change that relaxes the audit gate requires an explicit, separate change to this policy and to the CI workflow, reviewed and approved by the repository owner; it is not decided inside a remediation pull request.
+
 ## Disclosure Policy
 
 Once a security vulnerability is reported via `support@maatify.dev`, the Maatify team will:

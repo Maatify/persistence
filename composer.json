@@ -1,6 +1,6 @@
 {
   "name": "maatify/persistence",
-  "description": "Standalone, framework-agnostic PDO ordering, transaction, and pagination utilities for Maatify projects.",
+  "description": "Standalone, framework-agnostic PDO ordering, transaction, savepoint, and pagination utilities for PHP/MySQL applications.",
   "keywords": [
     "persistence",
     "pdo",
@@ -9,7 +9,6 @@
     "scoped-ordering",
     "global-ordering",
     "display-order",
-    "sort-order",
     "pagination",
     "pdo-pagination",
     "offset-pagination",
@@ -31,7 +30,8 @@
   ],
   "support": {
     "issues": "https://github.com/Maatify/persistence/issues",
-    "source": "https://github.com/Maatify/persistence"
+    "source": "https://github.com/Maatify/persistence",
+    "security": "https://github.com/Maatify/persistence/security/policy"
   },
   "autoload": {
     "psr-4": {
