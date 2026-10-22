@@ -86,6 +86,16 @@ anything and ignores all other objects. A unit test fails when tests or examples
 use a `maa_` name outside those prefixes. Run it after the integration and
 consumer runs, against the dedicated test database only.
 
+### Dependency audit
+
+Dependency security is governed by the [Dependency Audit Policy](SECURITY.md#dependency-audit-policy) in `SECURITY.md`. The enforcing command is the same locally and in CI, and it is fail-closed:
+
+```bash
+composer audit --no-interaction --abandoned=fail
+```
+
+Run it after dependency resolution (`composer install` or `composer update`). Any advisory or abandoned package, direct or transitive, runtime or development, fails the command and the CI job. Do not add `audit` ignores, `--no-audit`, `continue-on-error` or shell fallbacks, and do not weaken the CI workflow to get past a finding; follow the remediation steps in the policy instead. If your local result differs from CI (for example because of a different PHP or Composer version), record the exact versions and advisory IDs in the pull request rather than treating the difference as a false positive.
+
 ### Integration Testing
 
 Integration tests require a real MySQL database. SQLite is explicitly **not** supported as a substitute for these tests.
