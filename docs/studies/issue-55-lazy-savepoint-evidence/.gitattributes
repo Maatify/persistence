@@ -1,0 +1,3 @@
+# Verbatim captured tool output, kept byte-for-byte; only these exact files are exempt from the whitespace gate.
+green-lowest-deps-phpstan.txt -whitespace
+red-lowest-deps-phpstan.txt -whitespace

@@ -1,0 +1,2 @@
+# Verbatim captured tool output, kept byte-for-byte; only this exact file is exempt from the whitespace gate.
+local-gates.txt -whitespace

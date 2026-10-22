@@ -48,7 +48,9 @@ composer test:regression
 composer test:integration
 composer test:consumer
 vendor/bin/php-cs-fixer fix --dry-run --diff
-git diff --check
+composer check:syntax
+composer check:whitespace
+composer check:residue
 ```
 
 The commands above are the local parity sequence for the CI quality and test
@@ -56,6 +58,33 @@ gates. `composer test:integration` and `composer test:consumer` require the
 real MySQL service configured below. The consumer harness must be run from the
 package root; it creates and removes its own clean consumer root and test
 table twice.
+
+### CI-to-local gate mapping
+
+Every CI gate runs a repository-owned command that you can run locally. The
+workflow only coordinates jobs and services; the verification logic lives in
+`composer.json` scripts and `scripts/`.
+
+| CI job / step | Local invocation | Prerequisites |
+| --- | --- | --- |
+| Workflow lint | `actionlint -color` | actionlint `v1.7.12` installed |
+| Validate and resolve dependencies | `composer validate --strict`, `composer update --no-interaction --prefer-dist --no-progress`, `composer check-platform-reqs`, `composer audit --no-interaction --abandoned=fail` | PHP >= 8.2, Composer |
+| Autoload (quality) | `composer dump-autoload --optimize --strict-psr` | `composer install` |
+| PHP syntax check | `composer check:syntax` | PHP, bash |
+| PHPStan | `composer analyse` (CI: `vendor/bin/phpstan analyse -c phpstan.neon --no-progress`) | `composer install` |
+| Code style | `vendor/bin/php-cs-fixer fix --dry-run --diff` | `composer install` |
+| Repository integrity (whitespace) | `composer check:whitespace`, then `git diff --exit-code` | git; checks the committed tree, staged, unstaged and untracked changes |
+| Unit/Regression | `composer test:unit`, `composer test:regression` | `composer install` |
+| Lowest dependencies | `composer check:lowest`, then the PHPStan and code style commands above, then `composer test:unit`, `composer test:regression`, `composer test:integration` twice | MySQL (below); rewrites `vendor/`, so run `composer update` afterwards |
+| Integration | `composer test:consumer`, then `composer test:integration` twice | MySQL (below) |
+| Verify MySQL residue | `composer check:residue` | MySQL environment variables below; read-only |
+
+The residue check reports every table, view, trigger, routine and event in the
+test database whose name starts with a package-owned prefix listed in
+`scripts/mysql-package-objects.php` (the single source of truth); it never drops
+anything and ignores all other objects. A unit test fails when tests or examples
+use a `maa_` name outside those prefixes. Run it after the integration and
+consumer runs, against the dedicated test database only.
 
 ### Integration Testing
 
