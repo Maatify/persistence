@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Maatify\Persistence\Tests\Support\MySql;
 
+use Closure;
 use PHPUnit\Framework\AssertionFailedError;
 
 /**
@@ -13,9 +14,14 @@ use PHPUnit\Framework\AssertionFailedError;
  * PHP's stream_set_timeout() is not honoured by a blocking fgets() on a
  * proc_open() pipe, so a stuck child used to hang the whole run. Reads here
  * wait on stream_select() against a monotonic deadline and fail with
- * diagnostics instead. stop() never waits on a child that ignores or cannot
- * handle SIGTERM (for example a stopped one): it escalates to SIGKILL, reaps the
- * child and closes every pipe. Requires POSIX pipes (Linux, macOS).
+ * diagnostics instead. stop() is bounded: it never waits on a child that
+ * ignores or cannot handle SIGTERM (for example a stopped one), it escalates to
+ * SIGKILL, and it only reaps with proc_close() a child it has seen exit. If the
+ * child is still running after SIGKILL and the grace period, stop() closes the
+ * pipes, does NOT call proc_close() (which would block without bound) and
+ * throws; the child is then leaked (the resource is kept, so a later stop()
+ * can retry) and PHP may wait for it when the process shuts down. Requires POSIX
+ * pipes and a `kill` binary (Linux, macOS).
  */
 final class PartnerProcess
 {
@@ -39,8 +45,12 @@ final class PartnerProcess
 
     private string $buffer = '';
 
-    private function __construct(private readonly int $pid)
+    /** @var Closure(resource, int): bool */
+    private Closure $signaler;
+
+    private function __construct(private readonly int $pid, ?Closure $signaler)
     {
+        $this->signaler = $signaler ?? self::sendSignal(...);
     }
 
     /** The deadlock partner script with the contended row ids 1 and 2. */
@@ -49,8 +59,12 @@ final class PartnerProcess
         return self::start([PHP_BINARY, __DIR__ . '/DeadlockPartner.php', '1', '2']);
     }
 
-    /** @param non-empty-list<string> $command */
-    public static function start(array $command): self
+    /**
+     * @param non-empty-list<string>                    $command
+     * @param (Closure(resource, int): bool)|null       $signaler test seam replacing the signal delivery (proc_terminate with a
+     *                                                            `kill` fallback), to exercise failed termination
+     */
+    public static function start(array $command, ?Closure $signaler = null): self
     {
         $pipes = [];
         $process = proc_open(
@@ -66,22 +80,18 @@ final class PartnerProcess
         $stderr = $openedPipes[2] ?? null;
 
         if (!is_resource($process) || !is_resource($stdin) || !is_resource($stdout) || !is_resource($stderr)) {
-            foreach ([$stdin, $stdout, $stderr] as $pipe) {
-                if (is_resource($pipe)) {
-                    fclose($pipe);
-                }
-            }
-
-            if (is_resource($process)) {
-                proc_terminate($process, self::SIGKILL);
-                proc_close($process);
-            }
+            $partial = new self(is_resource($process) ? proc_get_status($process)['pid'] : 0, $signaler);
+            $partial->process = is_resource($process) ? $process : null;
+            $partial->stdin = is_resource($stdin) ? $stdin : null;
+            $partial->stdout = is_resource($stdout) ? $stdout : null;
+            $partial->stderr = is_resource($stderr) ? $stderr : null;
+            $partial->stop();
 
             throw new AssertionFailedError('Unable to start the test partner process.');
         }
 
         $status = proc_get_status($process);
-        $partner = new self($status['pid']);
+        $partner = new self($status['pid'], $signaler);
         $partner->process = $process;
         $partner->stdin = $stdin;
         $partner->stdout = $stdout;
@@ -177,15 +187,45 @@ final class PartnerProcess
         }
     }
 
+    /**
+     * Startup barrier for a child that stops itself (SIGSTOP) before it can write
+     * anything: returns once the kernel reports it stopped, within the deadline.
+     * Must be called before any other status query, since the stop event is
+     * reported to the first proc_get_status() that observes it.
+     */
+    public function awaitStopped(float $timeoutSeconds): void
+    {
+        $deadline = hrtime(true) + (int) ($timeoutSeconds * 1_000_000_000);
+
+        while (is_resource($this->process)) {
+            $status = proc_get_status($this->process);
+
+            if ($status['stopped']) {
+                return;
+            }
+
+            if (!$status['running'] || hrtime(true) >= $deadline) {
+                break;
+            }
+
+            usleep(self::REAP_POLL_MICROSECONDS);
+        }
+
+        throw new AssertionFailedError(sprintf('Test partner pid %d did not stop within %.1f s; %s', $this->pid, $timeoutSeconds, $this->diagnostics()));
+    }
+
     public function isRunning(): bool
     {
         return is_resource($this->process) && proc_get_status($this->process)['running'];
     }
 
     /**
-     * Idempotent and bounded: closes stdin (the child ends on EOF), asks the
-     * child to terminate, escalates to SIGKILL after a short grace period,
-     * reaps it and closes all pipes.
+     * Closes stdin (the child ends on EOF), asks the child to terminate, escalates
+     * to SIGKILL after a short grace period, reaps it and closes all pipes.
+     * Idempotent. Total wait is bounded by two grace periods.
+     *
+     * @throws AssertionFailedError when the child is still running after SIGKILL and the grace period;
+     *                              the pipes are closed, proc_close() is not called and the child is leaked
      */
     public function stop(): void
     {
@@ -194,14 +234,24 @@ final class PartnerProcess
         }
 
         $this->stdin = null;
+        $failure = null;
 
-        if (is_resource($this->process)) {
-            if (!$this->waitForExit(0.0)) {
-                proc_terminate($this->process, self::SIGTERM);
+        if (is_resource($this->process) && !$this->waitForExit(0.0)) {
+            $termSent = $this->signal(self::SIGTERM);
+
+            if (!$this->waitForExit(self::TERMINATE_GRACE_SECONDS)) {
+                $killSent = $this->signal(self::SIGKILL);
 
                 if (!$this->waitForExit(self::TERMINATE_GRACE_SECONDS)) {
-                    proc_terminate($this->process, self::SIGKILL);
-                    $this->waitForExit(self::TERMINATE_GRACE_SECONDS);
+                    $failure = sprintf(
+                        'Test partner pid %d is still running %.1f s after SIGKILL (SIGTERM delivery %s, SIGKILL delivery %s); '
+                        . 'proc_close() is not called because it would block, so the child is leaked and must be killed manually; %s',
+                        $this->pid,
+                        self::TERMINATE_GRACE_SECONDS,
+                        $termSent ? 'ok' : 'failed',
+                        $killSent ? 'ok' : 'failed',
+                        $this->diagnostics(),
+                    );
                 }
             }
         }
@@ -215,6 +265,10 @@ final class PartnerProcess
         $this->stdout = null;
         $this->stderr = null;
 
+        if ($failure !== null) {
+            throw new AssertionFailedError($failure);
+        }
+
         if (is_resource($this->process)) {
             proc_close($this->process);
         }
@@ -222,6 +276,29 @@ final class PartnerProcess
         $this->process = null;
     }
 
+    private function signal(int $signal): bool
+    {
+        return is_resource($this->process) && ($this->signaler)($this->process, $signal);
+    }
+
+    /** @param resource $process */
+    private static function sendSignal($process, int $signal): bool
+    {
+        if (proc_terminate($process, $signal)) {
+            return true;
+        }
+
+        $pipes = [];
+        $kill = proc_open(
+            ['kill', '-' . $signal, (string) proc_get_status($process)['pid']],
+            [1 => ['file', '/dev/null', 'w'], 2 => ['file', '/dev/null', 'w']],
+            $pipes,
+        );
+
+        return is_resource($kill) && proc_close($kill) === 0;
+    }
+
+    /** @phpstan-impure */
     private function waitForExit(float $seconds): bool
     {
         $deadline = hrtime(true) + (int) ($seconds * 1_000_000_000);

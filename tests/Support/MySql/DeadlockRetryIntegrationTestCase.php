@@ -251,11 +251,21 @@ abstract class DeadlockRetryIntegrationTestCase extends TestCase
 
     private function stopPartners(): void
     {
+        $failure = null;
+
         foreach ($this->partners as $partner) {
-            $partner->stop();
+            try {
+                $partner->stop();
+            } catch (AssertionFailedError $error) {
+                $failure ??= $error;
+            }
         }
 
         $this->partners = [];
+
+        if ($failure !== null) {
+            throw $failure;
+        }
     }
 
     private static function rollBackOpenTransaction(PDO $pdo): void

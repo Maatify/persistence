@@ -10,12 +10,15 @@ use PHPUnit\Framework\AssertionFailedError;
 
 /**
  * Harness reliability (Issue #68): the deadlock partner's bounded read and
- * shutdown, exercised with a real partner process that is frozen with SIGSTOP
- * before it can report readiness. A hung partner must fail fast with
- * diagnostics, and must never leave a child process or open pipe behind.
+ * shutdown. The negative controls start the real partner script behind a shell
+ * that stops itself (SIGSTOP) before exec'ing it, so the partner provably cannot
+ * write READY before the freeze, whatever the scheduling. A hung partner must
+ * fail fast with diagnostics and must never leave a child process or pipe behind.
  */
 final class PartnerProcessIntegrationTest extends DeadlockRetryIntegrationTestCase
 {
+    private const STARTUP_BARRIER_SECONDS = 10.0;
+
     protected function setUp(): void
     {
         if (PHP_OS_FAMILY === 'Windows') {
@@ -27,16 +30,15 @@ final class PartnerProcessIntegrationTest extends DeadlockRetryIntegrationTestCa
 
     public function testReadFromAFrozenPartnerFailsWithinTheDeadlineAndStopReapsTheChild(): void
     {
-        $partner = PartnerProcess::deadlockPartner();
+        $partner = self::startPartnerFrozenBeforeExec();
         $stopStartedAt = 0;
 
         try {
-            self::signal($partner, 'STOP');
             $startedAt = hrtime(true);
 
             try {
                 $partner->readLine(1.0);
-                self::fail('A frozen partner cannot report readiness.');
+                self::fail('A partner frozen before exec cannot report readiness.');
             } catch (AssertionFailedError $failure) {
                 $elapsed = (hrtime(true) - $startedAt) / 1_000_000_000;
                 self::assertStringContainsString('produced no complete output line within 1.0 s', $failure->getMessage());
@@ -57,6 +59,35 @@ final class PartnerProcessIntegrationTest extends DeadlockRetryIntegrationTestCa
         $partner->stop();
     }
 
+    public function testStopFailsClosedWithoutAnUnboundedWaitWhenTheChildCannotBeTerminated(): void
+    {
+        $gate = new \ArrayObject(['deliver' => false]);
+        $partner = self::startPartnerFrozenBeforeExec(
+            static fn ($process, int $signal): bool => $gate['deliver'] === true && proc_terminate($process, $signal),
+        );
+
+        try {
+            $startedAt = hrtime(true);
+
+            try {
+                $partner->stop();
+                self::fail('stop() must not report success for a child it could not terminate.');
+            } catch (AssertionFailedError $failure) {
+                self::assertStringContainsString('still running', $failure->getMessage());
+                self::assertStringContainsString('SIGTERM delivery failed, SIGKILL delivery failed', $failure->getMessage());
+                self::assertStringContainsString('proc_close() is not called', $failure->getMessage());
+            }
+
+            self::assertLessThan(10.0, (hrtime(true) - $startedAt) / 1_000_000_000, 'The failed termination must be bounded.');
+            self::assertTrue(self::processExists($partner->pid()), 'The child is leaked by design, not reaped.');
+        } finally {
+            $gate['deliver'] = true;
+            $partner->stop();
+        }
+
+        self::assertFalse(self::processExists($partner->pid()), 'A later stop() terminates and reaps the child.');
+    }
+
     public function testNormalPartnerReportsReadyAndIsStoppedCleanly(): void
     {
         $partner = PartnerProcess::deadlockPartner();
@@ -70,12 +101,30 @@ final class PartnerProcessIntegrationTest extends DeadlockRetryIntegrationTestCa
         self::assertFalse(self::processExists($partner->pid()));
     }
 
-    private static function signal(PartnerProcess $partner, string $signal): void
+    /**
+     * The real partner script behind `sh -c 'kill -STOP $$; exec ...'`: the shell
+     * stops itself before exec'ing PHP, so nothing can be written until a SIGCONT
+     * that never comes. The startup barrier waits for the kernel to report it
+     * stopped; there is no sleep and no dependence on scheduling speed.
+     *
+     * @param (\Closure(resource, int): bool)|null $signaler
+     */
+    private static function startPartnerFrozenBeforeExec(?\Closure $signaler = null): PartnerProcess
     {
-        $pipes = [];
-        $process = proc_open(['kill', '-' . $signal, (string) $partner->pid()], [], $pipes);
-        self::assertIsResource($process, 'Unable to run kill.');
-        self::assertSame(0, proc_close($process), 'kill -' . $signal . ' failed.');
+        $partner = PartnerProcess::start(
+            ['sh', '-c', 'kill -STOP $$; exec "$0" "$@"', PHP_BINARY, __DIR__ . '/../../Support/MySql/DeadlockPartner.php', '1', '2'],
+            $signaler,
+        );
+
+        try {
+            $partner->awaitStopped(self::STARTUP_BARRIER_SECONDS);
+        } catch (AssertionFailedError $failure) {
+            $partner->stop();
+
+            throw $failure;
+        }
+
+        return $partner;
     }
 
     private static function processExists(int $pid): bool
