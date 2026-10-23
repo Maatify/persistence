@@ -45,6 +45,9 @@ final class PartnerProcess
 
     private string $buffer = '';
 
+    /** Latched the first time any status query observed the child stopped (the event is reported only once). */
+    private bool $stopObserved = false;
+
     /** @var Closure(resource, int): bool */
     private Closure $signaler;
 
@@ -92,6 +95,7 @@ final class PartnerProcess
 
         $status = proc_get_status($process);
         $partner = new self($status['pid'], $signaler);
+        $partner->stopObserved = $status['stopped'];
         $partner->process = $process;
         $partner->stdin = $stdin;
         $partner->stdout = $stdout;
@@ -189,18 +193,21 @@ final class PartnerProcess
 
     /**
      * Startup barrier for a child that stops itself (SIGSTOP) before it can write
-     * anything: returns once the kernel reports it stopped, within the deadline.
-     * Must be called before any other status query, since the stop event is
-     * reported to the first proc_get_status() that observes it.
+     * anything: returns once the kernel has reported it stopped, within the
+     * deadline. The kernel reports a stop only to the first status query that
+     * sees it, so every query here goes through status(), which latches the
+     * event, including the one start() makes to read the pid: a stop that
+     * happened before start() returned is accepted, not lost. The latch records
+     * that the child stopped at some point; it is not cleared by SIGCONT.
      */
     public function awaitStopped(float $timeoutSeconds): void
     {
         $deadline = hrtime(true) + (int) ($timeoutSeconds * 1_000_000_000);
 
         while (is_resource($this->process)) {
-            $status = proc_get_status($this->process);
+            $status = $this->status();
 
-            if ($status['stopped']) {
+            if ($this->stopObserved) {
                 return;
             }
 
@@ -216,7 +223,7 @@ final class PartnerProcess
 
     public function isRunning(): bool
     {
-        return is_resource($this->process) && proc_get_status($this->process)['running'];
+        return is_resource($this->process) && $this->status()['running'];
     }
 
     /**
@@ -298,12 +305,25 @@ final class PartnerProcess
         return is_resource($kill) && proc_close($kill) === 0;
     }
 
+    /**
+     * proc_get_status() of the open process, latching a reported stop.
+     *
+     * @return array{pid: int, running: bool, stopped: bool}
+     */
+    private function status(): array
+    {
+        $status = proc_get_status($this->process ?? throw new AssertionFailedError('The test partner process is closed.'));
+        $this->stopObserved = $this->stopObserved || $status['stopped'];
+
+        return ['pid' => $status['pid'], 'running' => $status['running'], 'stopped' => $status['stopped']];
+    }
+
     /** @phpstan-impure */
     private function waitForExit(float $seconds): bool
     {
         $deadline = hrtime(true) + (int) ($seconds * 1_000_000_000);
 
-        while (is_resource($this->process) && proc_get_status($this->process)['running']) {
+        while (is_resource($this->process) && $this->status()['running']) {
             if (hrtime(true) >= $deadline) {
                 return false;
             }

@@ -88,6 +88,42 @@ final class PartnerProcessIntegrationTest extends DeadlockRetryIntegrationTestCa
         self::assertFalse(self::processExists($partner->pid()), 'A later stop() terminates and reaps the child.');
     }
 
+    public function testStartupBarrierAcceptsAStopThatHappensAfterStartReturned(): void
+    {
+        $partner = PartnerProcess::start(['sh', '-c', 'read go; kill -STOP $$; exec sleep 60']);
+
+        try {
+            // The child cannot stop before this line is written, i.e. strictly after start() returned.
+            $partner->writeLine('go');
+            $partner->awaitStopped(self::STARTUP_BARRIER_SECONDS);
+            self::assertTrue($partner->isRunning(), 'A stopped child is still alive.');
+        } finally {
+            $partner->stop();
+        }
+
+        self::assertFalse(self::processExists($partner->pid()));
+    }
+
+    public function testStartupBarrierFailsWithinItsDeadlineForAChildThatNeverStops(): void
+    {
+        $partner = PartnerProcess::start(['sh', '-c', 'exec sleep 60']);
+        $startedAt = hrtime(true);
+
+        try {
+            try {
+                $partner->awaitStopped(0.5);
+                self::fail('A running child must not satisfy the stop barrier.');
+            } catch (AssertionFailedError $failure) {
+                self::assertStringContainsString('did not stop within 0.5 s', $failure->getMessage());
+                self::assertLessThan(5.0, (hrtime(true) - $startedAt) / 1_000_000_000);
+            }
+        } finally {
+            $partner->stop();
+        }
+
+        self::assertFalse(self::processExists($partner->pid()));
+    }
+
     public function testNormalPartnerReportsReadyAndIsStoppedCleanly(): void
     {
         $partner = PartnerProcess::deadlockPartner();
