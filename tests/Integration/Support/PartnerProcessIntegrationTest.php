@@ -59,6 +59,29 @@ final class PartnerProcessIntegrationTest extends DeadlockRetryIntegrationTestCa
         $partner->stop();
     }
 
+    /** The #76 consumer: the LazySavepoint deadlock partner script, frozen before it can print READY. */
+    public function testFrozenLazySavepointPartnerFailsWithinTheDeadlineAndIsReaped(): void
+    {
+        $partner = self::startPartnerFrozenBeforeExec(null, 'LazySavepointDeadlockPartner.php');
+
+        try {
+            $startedAt = hrtime(true);
+
+            try {
+                $partner->readLine(1.0);
+                self::fail('A partner frozen before exec cannot report readiness.');
+            } catch (AssertionFailedError $failure) {
+                $elapsed = (hrtime(true) - $startedAt) / 1_000_000_000;
+                self::assertStringContainsString('produced no complete output line within 1.0 s', $failure->getMessage());
+                self::assertLessThan(5.0, $elapsed, 'The deadline must bound the wait.');
+            }
+        } finally {
+            $partner->stop();
+        }
+
+        self::assertFalse(self::processExists($partner->pid()), 'The frozen child must be killed and reaped.');
+    }
+
     public function testStopFailsClosedWithoutAnUnboundedWaitWhenTheChildCannotBeTerminated(): void
     {
         $gate = new \ArrayObject(['deliver' => false]);
@@ -145,10 +168,10 @@ final class PartnerProcessIntegrationTest extends DeadlockRetryIntegrationTestCa
      *
      * @param (\Closure(resource, int): bool)|null $signaler
      */
-    private static function startPartnerFrozenBeforeExec(?\Closure $signaler = null): PartnerProcess
+    private static function startPartnerFrozenBeforeExec(?\Closure $signaler = null, string $script = 'DeadlockPartner.php'): PartnerProcess
     {
         $partner = PartnerProcess::start(
-            ['sh', '-c', 'kill -STOP $$; exec "$0" "$@"', PHP_BINARY, __DIR__ . '/../../Support/MySql/DeadlockPartner.php', '1', '2'],
+            ['sh', '-c', 'kill -STOP $$; exec "$0" "$@"', PHP_BINARY, __DIR__ . '/../../Support/MySql/' . $script, '1', '2'],
             $signaler,
         );
 

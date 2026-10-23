@@ -11,6 +11,7 @@ use Maatify\Persistence\Pdo\Transaction\PdoSavepointTransactionRunner;
 use Maatify\Persistence\Tests\Support\MySql\FaultInjectingPdo;
 use Maatify\Persistence\Tests\Support\MySql\LazySavepointSchema;
 use Maatify\Persistence\Tests\Support\MySql\MySqlConnectionFactory;
+use Maatify\Persistence\Tests\Support\MySql\PartnerProcess;
 use PDO;
 use PDOException;
 use PDOStatement;
@@ -37,7 +38,9 @@ final class ScopedOrderingManagerLazySavepointTest extends TestCase
     private LazySavepointSchema $schema;
     private ScopedOrderingManager $manager;
 
-    /** @var list<array{resource, array<int, resource>}> */
+    private const PARTNER_READ_TIMEOUT_SECONDS = 30.0;
+
+    /** @var list<PartnerProcess> */
     private array $partners = [];
 
     /** @var list<PDO> */
@@ -53,33 +56,44 @@ final class ScopedOrderingManagerLazySavepointTest extends TestCase
         $this->manager = new ScopedOrderingManager();
     }
 
+    /**
+     * Every owned resource is released even when an earlier step fails: a partner that cannot be stopped must not skip
+     * the rollbacks or the schema drop. The first failure is rethrown after all cleanup was attempted.
+     */
     protected function tearDown(): void
     {
-        foreach ($this->partners as [$process, $pipes]) {
-            foreach ($pipes as $pipe) {
-                if (is_resource($pipe)) {
-                    fclose($pipe);
-                }
-            }
+        $failure = null;
 
-            proc_terminate($process);
-            proc_close($process);
+        foreach ($this->partners as $partner) {
+            try {
+                $partner->stop();
+            } catch (Throwable $stopFailure) {
+                $failure ??= $stopFailure;
+            }
         }
 
         $this->partners = [];
 
         foreach ([$this->pdo, ...$this->callerConnections] as $connection) {
-            if ($connection->inTransaction()) {
-                try {
+            try {
+                if ($connection->inTransaction()) {
                     $connection->rollBack();
-                } catch (Throwable) {
                 }
+            } catch (Throwable) {
             }
         }
 
         $this->callerConnections = [];
 
-        $this->schema->drop();
+        try {
+            $this->schema->drop();
+        } catch (Throwable $dropFailure) {
+            $failure ??= $dropFailure;
+        }
+
+        if ($failure !== null) {
+            throw $failure;
+        }
     }
 
     // ---- C04: `false` after the shifts ----
@@ -655,52 +669,22 @@ final class ScopedOrderingManagerLazySavepointTest extends TestCase
     {
         $this->pdo->exec('UPDATE `' . LazySavepointSchema::AUDIT . '` SET `n` = `n` + 1 WHERE `id` = 1');
 
-        $pipes = [];
-        $process = proc_open(
-            [PHP_BINARY, dirname(__DIR__, 3) . '/Support/MySql/LazySavepointDeadlockPartner.php'],
-            [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
-            $pipes,
-        );
-
-        /** @var array<int, resource> $opened */
-        $opened = $pipes;
-
-        if (!is_resource($process) || !isset($opened[0], $opened[1], $opened[2])) {
-            throw new AssertionFailedError('Unable to start the deadlock partner process.');
-        }
-
-        $this->partners[] = [$process, $opened];
-        $ready = $this->readPartnerLine($opened);
+        $partner = PartnerProcess::start([PHP_BINARY, dirname(__DIR__, 3) . '/Support/MySql/LazySavepointDeadlockPartner.php']);
+        $this->partners[] = $partner;
+        $ready = $partner->readLine(self::PARTNER_READ_TIMEOUT_SECONDS);
         self::assertStringStartsWith('READY ', $ready);
 
-        fwrite($opened[0], "go\n");
-        fflush($opened[0]);
+        $partner->writeLine('go');
         $this->awaitBlockedPartner(substr($ready, strlen('READY ')));
     }
 
     /** @return list<string> */
     private function partnerReports(): array
     {
-        $reports = [];
-
-        foreach ($this->partners as [, $pipes]) {
-            $reports[] = $this->readPartnerLine($pipes);
-        }
-
-        return $reports;
-    }
-
-    /** @param array<int, resource> $pipes */
-    private function readPartnerLine(array $pipes): string
-    {
-        stream_set_timeout($pipes[1], 30);
-        $line = fgets($pipes[1]);
-
-        if ($line === false) {
-            throw new AssertionFailedError('Deadlock partner produced no output; stderr: ' . stream_get_contents($pipes[2]));
-        }
-
-        return trim($line);
+        return array_map(
+            static fn (PartnerProcess $partner): string => $partner->readLine(self::PARTNER_READ_TIMEOUT_SECONDS),
+            $this->partners,
+        );
     }
 
     private function awaitBlockedPartner(string $connectionId): void
