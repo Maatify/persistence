@@ -57,18 +57,19 @@ final class ScopedOrderingManagerLazySavepointTest extends TestCase
     }
 
     /**
-     * Every owned resource is released even when an earlier step fails: a partner that cannot be stopped must not skip
-     * the rollbacks or the schema drop. The first failure is rethrown after all cleanup was attempted.
+     * Every cleanup step is attempted even when an earlier one fails (a partner that cannot be stopped must not skip the
+     * rollbacks or the schema drop); a child that survives SIGKILL still cannot be guaranteed released. All failures are
+     * kept in order: a single one is rethrown as is, several are reported together with the first as the primary.
      */
     protected function tearDown(): void
     {
-        $failure = null;
+        $failures = [];
 
         foreach ($this->partners as $partner) {
             try {
                 $partner->stop();
-            } catch (Throwable $stopFailure) {
-                $failure ??= $stopFailure;
+            } catch (Throwable $failure) {
+                $failures[] = $failure;
             }
         }
 
@@ -76,10 +77,11 @@ final class ScopedOrderingManagerLazySavepointTest extends TestCase
 
         foreach ([$this->pdo, ...$this->callerConnections] as $connection) {
             try {
-                if ($connection->inTransaction()) {
-                    $connection->rollBack();
+                if ($connection->inTransaction() && !$connection->rollBack()) {
+                    throw new RuntimeException('Test cleanup rollBack() returned false.');
                 }
-            } catch (Throwable) {
+            } catch (Throwable $failure) {
+                $failures[] = $failure;
             }
         }
 
@@ -87,12 +89,25 @@ final class ScopedOrderingManagerLazySavepointTest extends TestCase
 
         try {
             $this->schema->drop();
-        } catch (Throwable $dropFailure) {
-            $failure ??= $dropFailure;
+        } catch (Throwable $failure) {
+            $failures[] = $failure;
         }
 
-        if ($failure !== null) {
-            throw $failure;
+        if (count($failures) === 1) {
+            throw $failures[0];
+        }
+
+        if ($failures !== []) {
+            throw new RuntimeException(
+                sprintf(
+                    'Test cleanup failed: %s (%d additional failure(s): %s)',
+                    $failures[0]->getMessage(),
+                    count($failures) - 1,
+                    implode(' | ', array_map(static fn (Throwable $failure): string => $failure->getMessage(), array_slice($failures, 1))),
+                ),
+                0,
+                $failures[0],
+            );
         }
     }
 
@@ -529,7 +544,97 @@ final class ScopedOrderingManagerLazySavepointTest extends TestCase
         $faulty->rollBack();
     }
 
+    // ---- tearDown() fail-closed cleanup (#76 / F77-01) ----
+
+    public function testTearDownSurfacesARollbackFailureAndStillCleansTheRest(): void
+    {
+        $this->beginCallerTransaction();
+        $doomed = $this->killedCallerConnection();
+
+        $failure = null;
+
+        try {
+            $this->tearDown();
+        } catch (Throwable $thrown) {
+            $failure = $thrown;
+        }
+
+        self::assertInstanceOf(PDOException::class, $failure, 'A failed rollback must not be reported as a clean teardown.');
+
+        self::assertTrue($doomed->inTransaction(), 'The doomed connection really failed to roll back.');
+        self::assertFalse($this->pdo->inTransaction(), 'The remaining connections were still rolled back.');
+        self::assertSame(0, $this->schemaTableCount(), 'The schema drop was still attempted.');
+    }
+
+    public function testTearDownKeepsAFailedPartnerStopPrimaryAndStillCleansTheDatabase(): void
+    {
+        $gate = new \ArrayObject(['deliver' => false]);
+        $partner = PartnerProcess::start(
+            ['sh', '-c', 'kill -STOP $$; exec sleep 60'],
+            static fn ($process, int $signal): bool => $gate['deliver'] === true && proc_terminate($process, $signal),
+        );
+        $this->partners[] = $partner;
+
+        try {
+            $partner->awaitStopped(10.0);
+            $this->beginCallerTransaction();
+            $this->killedCallerConnection();
+
+            $failure = null;
+
+            try {
+                $this->tearDown();
+            } catch (Throwable $thrown) {
+                $failure = $thrown;
+            }
+
+            self::assertNotNull($failure, 'A failed partner stop must not be reported as a clean teardown.');
+            self::assertStringStartsWith('Test cleanup failed: Test partner pid ' . $partner->pid() . ' is still running', $failure->getMessage());
+            self::assertStringContainsString('additional failure(s)', $failure->getMessage());
+            self::assertInstanceOf(AssertionFailedError::class, $failure->getPrevious());
+
+            self::assertFalse($this->pdo->inTransaction(), 'Rollbacks were still attempted after the failed stop.');
+            self::assertSame(0, $this->schemaTableCount(), 'The schema drop was still attempted after the failed stop.');
+        } finally {
+            $gate['deliver'] = true;
+            $partner->stop();
+        }
+    }
+
     // ---- helpers ----
+
+    /** A caller connection in an open transaction whose server session is gone: rollBack() fails for real. */
+    private function killedCallerConnection(): PDO
+    {
+        $doomed = (new MySqlConnectionFactory())->create();
+        $this->callerConnections[] = $doomed;
+        $doomed->beginTransaction();
+        $id = $doomed->query('SELECT CONNECTION_ID()');
+        self::assertInstanceOf(PDOStatement::class, $id);
+        $connectionId = (int) $id->fetchColumn();
+        $this->control->exec('KILL ' . $connectionId);
+        $deadline = microtime(true) + 5;
+
+        while (microtime(true) < $deadline) {
+            $alive = $this->control->query('SELECT COUNT(*) FROM information_schema.processlist WHERE id = ' . $connectionId);
+            if ($alive !== false && (int) $alive->fetchColumn() === 0) {
+                break;
+            }
+            usleep(50_000);
+        }
+
+        return $doomed;
+    }
+
+    private function schemaTableCount(): int
+    {
+        $statement = $this->control->query(
+            "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name LIKE 'maa\\_persistence\\_test\\_lsp\\_%'",
+        );
+        self::assertInstanceOf(PDOStatement::class, $statement);
+
+        return (int) $statement->fetchColumn();
+    }
 
     /** @param non-empty-string $table */
     private function config(string $table): ScopedOrderingConfig
