@@ -22,12 +22,13 @@ abstract class DeadlockRetryIntegrationTestCase extends TestCase
 {
     protected const DEADLOCK_DRIVER_CODE = 1213;
     protected const DEADLOCK_SQLSTATE = '40001';
+    protected const PARTNER_READ_TIMEOUT_SECONDS = 30.0;
 
     protected static PDO $pdo;
     protected static PDO $controlPdo;
     protected static DeadlockRetrySchemaManager $schemaManager;
 
-    /** @var list<array{resource, array<int, resource>}> */
+    /** @var list<PartnerProcess> */
     private array $partners = [];
 
     /** @var list<string> */
@@ -85,15 +86,14 @@ abstract class DeadlockRetryIntegrationTestCase extends TestCase
     protected function provokeDeadlockAsVictim(?PDO $victim = null): PDOException
     {
         $victim ??= self::$pdo;
-        [$process, $pipes] = $this->startPartner();
-        $this->partners[] = [$process, $pipes];
+        $partner = PartnerProcess::deadlockPartner();
+        $this->partners[] = $partner;
 
-        $ready = $this->readPartnerLine($pipes);
+        $ready = $partner->readLine(self::PARTNER_READ_TIMEOUT_SECONDS);
         self::assertStringStartsWith('READY ', $ready);
 
         $this->lockRow($victim, 1);
-        fwrite($pipes[0], "go\n");
-        fflush($pipes[0]);
+        $partner->writeLine('go');
         $this->awaitBlockedLockingRead(substr($ready, strlen('READY ')));
 
         try {
@@ -184,8 +184,8 @@ abstract class DeadlockRetryIntegrationTestCase extends TestCase
      */
     protected function partnerReports(): array
     {
-        foreach ($this->partners as [, $pipes]) {
-            $this->partnerReports[] = $this->readPartnerLine($pipes);
+        foreach ($this->partners as $partner) {
+            $this->partnerReports[] = $partner->readLine(self::PARTNER_READ_TIMEOUT_SECONDS);
         }
 
         $this->stopPartners();
@@ -210,42 +210,6 @@ abstract class DeadlockRetryIntegrationTestCase extends TestCase
         self::assertInstanceOf(PDOStatement::class, $statement);
         $statement->execute(['id' => $id]);
         $statement->fetchAll();
-    }
-
-    /** @return array{resource, array<int, resource>} */
-    private function startPartner(): array
-    {
-        $pipes = [];
-        $process = proc_open(
-            [PHP_BINARY, __DIR__ . '/DeadlockPartner.php', '1', '2'],
-            [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
-            $pipes,
-        );
-
-        /** @var array<int, resource> $openedPipes */
-        $openedPipes = $pipes;
-        $stdin = $openedPipes[0] ?? null;
-        $stdout = $openedPipes[1] ?? null;
-        $stderr = $openedPipes[2] ?? null;
-
-        if (!is_resource($process) || !is_resource($stdin) || !is_resource($stdout) || !is_resource($stderr)) {
-            throw new AssertionFailedError('Unable to start the deadlock partner process.');
-        }
-
-        return [$process, [0 => $stdin, 1 => $stdout, 2 => $stderr]];
-    }
-
-    /** @param array<int, resource> $pipes */
-    private function readPartnerLine(array $pipes): string
-    {
-        stream_set_timeout($pipes[1], 30);
-        $line = fgets($pipes[1]);
-
-        if ($line === false) {
-            throw new AssertionFailedError('Deadlock partner produced no output; stderr: ' . stream_get_contents($pipes[2]));
-        }
-
-        return trim($line);
     }
 
     /**
@@ -287,15 +251,8 @@ abstract class DeadlockRetryIntegrationTestCase extends TestCase
 
     private function stopPartners(): void
     {
-        foreach ($this->partners as [$process, $pipes]) {
-            foreach ($pipes as $pipe) {
-                if (is_resource($pipe)) {
-                    fclose($pipe);
-                }
-            }
-
-            proc_terminate($process);
-            proc_close($process);
+        foreach ($this->partners as $partner) {
+            $partner->stop();
         }
 
         $this->partners = [];

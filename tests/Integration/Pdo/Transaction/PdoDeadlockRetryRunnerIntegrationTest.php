@@ -112,17 +112,24 @@ final class PdoDeadlockRetryRunnerIntegrationTest extends DeadlockRetryIntegrati
     {
         /** @var list<PDOException> $raised */
         $raised = [];
+        $attempts = 0;
 
         $thrown = $this->runCatching(
             $runnerFactory($this->pdo()),
-            function () use (&$raised): never {
+            function () use (&$raised, &$attempts): never {
+                $attempts++;
                 $this->insert('attempt-' . (count($raised) + 1));
 
                 throw $raised[] = $this->provokeDeadlockAsVictim();
             },
         );
 
-        self::assertCount(4, $raised, 'Initial attempt plus three retries.');
+        self::assertCount(4, $raised, sprintf(
+            'Initial attempt plus three retries. Callback attempts: %d; real deadlocks provoked: %d; runner threw %s',
+            $attempts,
+            count($raised),
+            self::describeThrowable($thrown),
+        ));
         $finalDeadlock = array_pop($raised);
         self::assertNotNull($finalDeadlock);
         self::assertSame($finalDeadlock, $thrown);
@@ -258,6 +265,21 @@ final class PdoDeadlockRetryRunnerIntegrationTest extends DeadlockRetryIntegrati
         self::assertFalse($this->pdo()->inTransaction());
         self::assertSame(['outer-2', 'inner-2'], $this->committedPayloads());
         self::assertSame(['ACQUIRED'], $this->partnerReports());
+    }
+
+    private static function describeThrowable(Throwable $throwable): string
+    {
+        $errorInfo = $throwable instanceof PDOException ? $throwable->errorInfo : null;
+        $sqlState = is_array($errorInfo) && is_scalar($errorInfo[0] ?? null) ? (string) $errorInfo[0] : 'n/a';
+        $driverCode = is_array($errorInfo) && is_scalar($errorInfo[1] ?? null) ? (string) $errorInfo[1] : 'n/a';
+
+        return sprintf(
+            '%s (SQLSTATE %s, driver code %s): %s',
+            $throwable::class,
+            $sqlState,
+            $driverCode,
+            $throwable->getMessage(),
+        );
     }
 
     /** @param callable(): mixed $callback */
