@@ -11,6 +11,7 @@ use Maatify\Persistence\Pdo\Transaction\PdoSavepointTransactionRunner;
 use Maatify\Persistence\Tests\Support\MySql\FaultInjectingPdo;
 use Maatify\Persistence\Tests\Support\MySql\LazySavepointSchema;
 use Maatify\Persistence\Tests\Support\MySql\MySqlConnectionFactory;
+use Maatify\Persistence\Tests\Support\MySql\PartnerProcess;
 use PDO;
 use PDOException;
 use PDOStatement;
@@ -37,7 +38,9 @@ final class ScopedOrderingManagerLazySavepointTest extends TestCase
     private LazySavepointSchema $schema;
     private ScopedOrderingManager $manager;
 
-    /** @var list<array{resource, array<int, resource>}> */
+    private const PARTNER_READ_TIMEOUT_SECONDS = 30.0;
+
+    /** @var list<PartnerProcess> */
     private array $partners = [];
 
     /** @var list<PDO> */
@@ -53,33 +56,59 @@ final class ScopedOrderingManagerLazySavepointTest extends TestCase
         $this->manager = new ScopedOrderingManager();
     }
 
+    /**
+     * Every cleanup step is attempted even when an earlier one fails (a partner that cannot be stopped must not skip the
+     * rollbacks or the schema drop); a child that survives SIGKILL still cannot be guaranteed released. All failures are
+     * kept in order: a single one is rethrown as is, several are reported together with the first as the primary.
+     */
     protected function tearDown(): void
     {
-        foreach ($this->partners as [$process, $pipes]) {
-            foreach ($pipes as $pipe) {
-                if (is_resource($pipe)) {
-                    fclose($pipe);
-                }
-            }
+        $failures = [];
 
-            proc_terminate($process);
-            proc_close($process);
+        foreach ($this->partners as $partner) {
+            try {
+                $partner->stop();
+            } catch (Throwable $failure) {
+                $failures[] = $failure;
+            }
         }
 
         $this->partners = [];
 
         foreach ([$this->pdo, ...$this->callerConnections] as $connection) {
-            if ($connection->inTransaction()) {
-                try {
-                    $connection->rollBack();
-                } catch (Throwable) {
+            try {
+                if ($connection->inTransaction() && !$connection->rollBack()) {
+                    throw new RuntimeException('Test cleanup rollBack() returned false.');
                 }
+            } catch (Throwable $failure) {
+                $failures[] = $failure;
             }
         }
 
         $this->callerConnections = [];
 
-        $this->schema->drop();
+        try {
+            $this->schema->drop();
+        } catch (Throwable $failure) {
+            $failures[] = $failure;
+        }
+
+        if (count($failures) === 1) {
+            throw $failures[0];
+        }
+
+        if ($failures !== []) {
+            throw new RuntimeException(
+                sprintf(
+                    'Test cleanup failed: %s (%d additional failure(s): %s)',
+                    $failures[0]->getMessage(),
+                    count($failures) - 1,
+                    implode(' | ', array_map(static fn (Throwable $failure): string => $failure->getMessage(), array_slice($failures, 1))),
+                ),
+                0,
+                $failures[0],
+            );
+        }
     }
 
     // ---- C04: `false` after the shifts ----
@@ -515,7 +544,97 @@ final class ScopedOrderingManagerLazySavepointTest extends TestCase
         $faulty->rollBack();
     }
 
+    // ---- tearDown() fail-closed cleanup (#76 / F77-01) ----
+
+    public function testTearDownSurfacesARollbackFailureAndStillCleansTheRest(): void
+    {
+        $this->beginCallerTransaction();
+        $doomed = $this->killedCallerConnection();
+
+        $failure = null;
+
+        try {
+            $this->tearDown();
+        } catch (Throwable $thrown) {
+            $failure = $thrown;
+        }
+
+        self::assertInstanceOf(PDOException::class, $failure, 'A failed rollback must not be reported as a clean teardown.');
+
+        self::assertTrue($doomed->inTransaction(), 'The doomed connection really failed to roll back.');
+        self::assertFalse($this->pdo->inTransaction(), 'The remaining connections were still rolled back.');
+        self::assertSame(0, $this->schemaTableCount(), 'The schema drop was still attempted.');
+    }
+
+    public function testTearDownKeepsAFailedPartnerStopPrimaryAndStillCleansTheDatabase(): void
+    {
+        $gate = new \ArrayObject(['deliver' => false]);
+        $partner = PartnerProcess::start(
+            ['sh', '-c', 'kill -STOP $$; exec sleep 60'],
+            static fn ($process, int $signal): bool => $gate['deliver'] === true && proc_terminate($process, $signal),
+        );
+        $this->partners[] = $partner;
+
+        try {
+            $partner->awaitStopped(10.0);
+            $this->beginCallerTransaction();
+            $this->killedCallerConnection();
+
+            $failure = null;
+
+            try {
+                $this->tearDown();
+            } catch (Throwable $thrown) {
+                $failure = $thrown;
+            }
+
+            self::assertNotNull($failure, 'A failed partner stop must not be reported as a clean teardown.');
+            self::assertStringStartsWith('Test cleanup failed: Test partner pid ' . $partner->pid() . ' is still running', $failure->getMessage());
+            self::assertStringContainsString('additional failure(s)', $failure->getMessage());
+            self::assertInstanceOf(AssertionFailedError::class, $failure->getPrevious());
+
+            self::assertFalse($this->pdo->inTransaction(), 'Rollbacks were still attempted after the failed stop.');
+            self::assertSame(0, $this->schemaTableCount(), 'The schema drop was still attempted after the failed stop.');
+        } finally {
+            $gate['deliver'] = true;
+            $partner->stop();
+        }
+    }
+
     // ---- helpers ----
+
+    /** A caller connection in an open transaction whose server session is gone: rollBack() fails for real. */
+    private function killedCallerConnection(): PDO
+    {
+        $doomed = (new MySqlConnectionFactory())->create();
+        $this->callerConnections[] = $doomed;
+        $doomed->beginTransaction();
+        $id = $doomed->query('SELECT CONNECTION_ID()');
+        self::assertInstanceOf(PDOStatement::class, $id);
+        $connectionId = (int) $id->fetchColumn();
+        $this->control->exec('KILL ' . $connectionId);
+        $deadline = microtime(true) + 5;
+
+        while (microtime(true) < $deadline) {
+            $alive = $this->control->query('SELECT COUNT(*) FROM information_schema.processlist WHERE id = ' . $connectionId);
+            if ($alive !== false && (int) $alive->fetchColumn() === 0) {
+                break;
+            }
+            usleep(50_000);
+        }
+
+        return $doomed;
+    }
+
+    private function schemaTableCount(): int
+    {
+        $statement = $this->control->query(
+            "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name LIKE 'maa\\_persistence\\_test\\_lsp\\_%'",
+        );
+        self::assertInstanceOf(PDOStatement::class, $statement);
+
+        return (int) $statement->fetchColumn();
+    }
 
     /** @param non-empty-string $table */
     private function config(string $table): ScopedOrderingConfig
@@ -655,52 +774,22 @@ final class ScopedOrderingManagerLazySavepointTest extends TestCase
     {
         $this->pdo->exec('UPDATE `' . LazySavepointSchema::AUDIT . '` SET `n` = `n` + 1 WHERE `id` = 1');
 
-        $pipes = [];
-        $process = proc_open(
-            [PHP_BINARY, dirname(__DIR__, 3) . '/Support/MySql/LazySavepointDeadlockPartner.php'],
-            [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
-            $pipes,
-        );
-
-        /** @var array<int, resource> $opened */
-        $opened = $pipes;
-
-        if (!is_resource($process) || !isset($opened[0], $opened[1], $opened[2])) {
-            throw new AssertionFailedError('Unable to start the deadlock partner process.');
-        }
-
-        $this->partners[] = [$process, $opened];
-        $ready = $this->readPartnerLine($opened);
+        $partner = PartnerProcess::start([PHP_BINARY, dirname(__DIR__, 3) . '/Support/MySql/LazySavepointDeadlockPartner.php']);
+        $this->partners[] = $partner;
+        $ready = $partner->readLine(self::PARTNER_READ_TIMEOUT_SECONDS);
         self::assertStringStartsWith('READY ', $ready);
 
-        fwrite($opened[0], "go\n");
-        fflush($opened[0]);
+        $partner->writeLine('go');
         $this->awaitBlockedPartner(substr($ready, strlen('READY ')));
     }
 
     /** @return list<string> */
     private function partnerReports(): array
     {
-        $reports = [];
-
-        foreach ($this->partners as [, $pipes]) {
-            $reports[] = $this->readPartnerLine($pipes);
-        }
-
-        return $reports;
-    }
-
-    /** @param array<int, resource> $pipes */
-    private function readPartnerLine(array $pipes): string
-    {
-        stream_set_timeout($pipes[1], 30);
-        $line = fgets($pipes[1]);
-
-        if ($line === false) {
-            throw new AssertionFailedError('Deadlock partner produced no output; stderr: ' . stream_get_contents($pipes[2]));
-        }
-
-        return trim($line);
+        return array_map(
+            static fn (PartnerProcess $partner): string => $partner->readLine(self::PARTNER_READ_TIMEOUT_SECONDS),
+            $this->partners,
+        );
     }
 
     private function awaitBlockedPartner(string $connectionId): void
